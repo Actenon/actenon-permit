@@ -17,7 +17,6 @@ import os
 import sys
 import tempfile
 import warnings
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 warnings.filterwarnings("ignore", message=".*LOCAL HMAC SIGNER.*")
@@ -32,16 +31,19 @@ if _ROOT not in sys.path:
 from actenon.core.errors import ProofVerificationError  # noqa: E402
 
 from actenon_permit import (  # noqa: E402
+    PDP,
     AutoApproveGate,
     Broker,
     Gateway,
     Ledger,
-    PDP,
     SQLiteStore,
     ToolRegistry,
 )
 from actenon_permit._mock_providers import mock_stripe_refund  # noqa: E402
-from actenon_permit.ed25519_signer import generate_ed25519_keypair, save_ed25519_keypair  # noqa: E402
+from actenon_permit.ed25519_signer import (  # noqa: E402
+    generate_ed25519_keypair,
+    save_ed25519_keypair,
+)
 from actenon_permit.kernel_bridge import mint_pccb_for_action, verify_pccb_at_edge  # noqa: E402
 from actenon_permit.model import Action, GrantStatus  # noqa: E402
 from actenon_permit.policy import compile_policy  # noqa: E402
@@ -208,10 +210,11 @@ def demo_2_mcp_action_binding() -> bool:
     store.put_grant(grant)
     from actenon_permit.token import grant_to_token
     token = grant_to_token(grant)
-    _print("MCP AUTH", f"connection established, grant token presented (who-may-connect)")
+    _print("MCP AUTH", "connection established, grant token presented (who-may-connect)")
 
     # 2a. tools/list — the MCP client discovers available tools
     import io
+
     from actenon_permit.gateway import mcp_serve
 
     infile = io.StringIO(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n")
