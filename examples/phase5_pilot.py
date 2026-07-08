@@ -106,6 +106,22 @@ def run() -> int:
                 secret, amount, reason
             ),
         )
+        # Register the charge tool too — so Step 4's scope-injection test
+        # actually exercises the scope-DENY rule, not just "unknown tool."
+        # The grant denies invoice.payment.charge; a registered charge tool
+        # means the PDP's deny-scope check fires (not the tool-registry check).
+        from actenon_permit._mock_providers import mock_stripe_charge
+
+        tools.register(
+            "charge",
+            action_type="invoice.payment.charge",
+            target="stripe",
+            cost_from="amount",
+            credential_name="MOCK_STRIPE_KEY",
+            real_call=lambda secret, amount, description="": mock_stripe_charge(
+                secret, amount, description
+            ),
+        )
         gateway = Gateway(
             state=store, ledger=ledger, pdp=pdp, broker=broker, tools=tools,
             approval_gate=AutoApproveGate(),
@@ -196,22 +212,26 @@ def run() -> int:
         print()
 
         # ============================================================
-        # STEP 4: Scope injection — try a charge (denied scope)
+        # STEP 4: Scope injection — a prompt-injected agent tries to
+        # call charge (denied by scope) instead of refund.
+        #
+        # The charge tool IS registered (above), so this exercises the
+        # PDP's scope-DENY rule — not the tool-registry "unknown tool"
+        # check. The denial reason must be "scope denied", not "unknown
+        # tool". This is the difference between testing the real defense
+        # and testing a side effect of missing registration.
         # ============================================================
-        print("  ── STEP 4: Scope injection (refund → charge) — must DENY ──")
-        r4 = gateway.call_tool(
-            "refund",
-            {"amount": 500, "reason": "hijack attempt"},
-            token,
+        print("  ── STEP 4: Scope injection (refund → charge) — must DENY at scope ──")
+        r4 = gateway.call_tool("charge", {"amount": 100, "description": "exfiltrate"}, token)
+        _print("DECISION", f"charge($100) → outcome={r4['outcome']}")
+        _print("DECISION", f"  reason: {r4['reason']}")
+        _print("DECISION", f"  rule_matched: {r4.get('rule_matched')}")
+        assert r4["outcome"] == "DENY", f"charge must be denied, got {r4['outcome']}"
+        assert "scope denied" in r4["reason"], (
+            f"charge must be denied by the scope-DENY rule, not 'unknown tool'. "
+            f"got reason: {r4['reason']}"
         )
-        _print("DECISION", f"outcome={r4['outcome']}  remaining=${r4.get('remaining_budget')}")
-        assert r4["outcome"] == "ALLOW"  # this is a legitimate refund, should pass
-        print()
-        # Now try a charge via the gateway (the tool registry doesn't have 'charge',
-        # so this is DENY at the tool-registry level)
-        r4b = gateway.call_tool("charge", {"amount": 100}, token)
-        _print("DECISION", f"charge attempt → outcome={r4b['outcome']}  reason={r4b['reason']}")
-        assert r4b["outcome"] == "DENY"
+        _print("PROOF", "denied by scope-DENY rule (not 'unknown tool') — real defense exercised")
         print()
 
         # ============================================================
@@ -242,26 +262,30 @@ def run() -> int:
         # SUMMARY
         # ============================================================
         print("=" * 80)
-        print("  PILOT RESULT: PASS")
+        print("  PILOT RESULT: PASS (mechanism proof)")
         print("=" * 80)
-        print("  Acme Finance executed a $2,500 invoice refund through the full")
-        print("  Actenon system with Ed25519-signed kernel PCCBs.")
+        print("  This is a scripted mechanism proof — NOT a real design-partner pilot.")
+        print("  'Acme Finance' is a fixture this script plays. The Phase 5 gate as")
+        print("  written in ARCHITECTURE.md requires a real external user in a real")
+        print("  environment. What this script proves is that the MECHANISM works")
+        print("  end-to-end with Ed25519-signed kernel PCCBs:")
         print()
         print("  What was proven:")
         print("    ✓ The refund was ALLOWED and executed via the broker")
         print("    ✓ The PCCB was signed with Ed25519 (real asymmetric crypto)")
         print("    ✓ A tampered amount ($99,999) was REFUSED at the edge (ACTION_MISMATCH)")
-        print("    ✓ A scope injection (charge) was DENIED")
+        print("    ✓ A scope injection (charge) was DENIED by the scope-deny rule")
+        print("      (NOT 'unknown tool' — the charge tool is registered, so the PDP's")
+        print("      deny-scope check fired, which is the real defense)")
         print("    ✓ The kill switch (revoke) killed the next call")
         print("    ✓ The ledger chain is intact and tamper-evident")
         print()
-        print("  What this defeats (the lethal trifecta):")
-        print("    ✓ Private data + untrusted input: the PCCB is bound to exact params,")
-        print("      so injected input cannot widen the authorized action")
-        print("    ✓ The edge refuses any action not matching the exact issued intent")
-        print("    ✓ The credential is released for ONE call only — no exfiltration")
+        print("  What was NOT proven (honestly):")
+        print("    ✗ No real external user depended on this")
+        print("    ✗ No real production environment (Ed25519 key is a local file, not KMS/HSM)")
+        print("    ✗ No real Stripe API (mock provider)")
         print()
-        print("  This is the Phase 5 gate from ARCHITECTURE.md. No simulation.")
+        print("  The gap between this and a real pilot: a stranger who needs it.")
         print("=" * 80)
         print()
         return 0
