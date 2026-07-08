@@ -324,6 +324,13 @@ class SQLiteStore(StateStore):
         reserved_amount: float,
     ) -> float:
         """Commit actual cost and release the over-reservation."""
+        # SECURITY: reject negative actual costs — a negative actual_cost would
+        # inflate the budget via the reconciliation step (release = reserved -
+        # actual = 20 - (-10) = 30, adding 30 to remaining). Found by
+        # adversarial testing (round 2, test_negative_actual_cost_rejected).
+        if actual_cost < 0:
+            actual_cost = 0.0
+
         now_iso = datetime.now(UTC).isoformat()
         with self._lock:
             cur = self._conn.cursor()
@@ -338,7 +345,9 @@ class SQLiteStore(StateStore):
                 grant = Grant.model_validate_json(body)
 
                 # Release the difference back.
-                release_amount = max(0.0, reserved_amount - actual_cost)
+                # Clamp release to [0, reserved] so a weird actual_cost
+                # can't inflate budget or release more than was reserved.
+                release_amount = max(0.0, min(reserved_amount, reserved_amount - actual_cost))
                 new_remaining = remaining + release_amount
 
                 cur.execute(
