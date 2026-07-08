@@ -7,7 +7,7 @@ on:
     branches: [main, master]
 
 jobs:
-  test:
+  test-python:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -33,5 +33,41 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
-      - name: Run demo (smoke test)
+      - name: Run v0 demo (smoke test)
         run: uv run permit demo --auto-approve
+
+      - name: Run v1 gateway demo (smoke test)
+        run: uv run permit demo --mode gateway --auto-approve
+
+  test-ts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (for spawning the python gateway in TS tests)
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Python package (so TS tests can spawn the gateway)
+        run: uv sync --extra dev
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.x
+
+      - name: Install TS SDK deps
+        working-directory: ts-sdk
+        run: bun install
+
+      - name: TypeScript typecheck
+        working-directory: ts-sdk
+        run: bun run typecheck
+
+      - name: TS SDK tests
+        working-directory: ts-sdk
+        run: bun test

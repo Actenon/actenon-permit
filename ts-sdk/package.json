@@ -1,0 +1,36 @@
+{
+  "name": "@actenon/permit-sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for Actenon-Permit — an open-source authority broker for AI agents.",
+  "type": "module",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "security",
+    "authorization",
+    "pdp",
+    "pep",
+    "capabilities",
+    "policy",
+    "actenon"
+  ],
+  "license": "Apache-2.0",
+  "author": "Actenon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Actenon/actenon-permit",
+    "directory": "ts-sdk"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.0",
+    "typescript": "^5.5.0"
+  }
+}

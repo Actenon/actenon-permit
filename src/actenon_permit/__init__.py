@@ -5,11 +5,14 @@ Public API:
     from actenon_permit import PDP, Broker, SQLiteStore, Ledger
     from actenon_permit import guard, wrap, GuardRegistry
     from actenon_permit import compile_policy, load_policy
+    # v1:
+    from actenon_permit import Gateway, ToolRegistry, grant_to_token, token_to_grant
+    from actenon_permit import remote_guard, RemoteGuardRegistry
 """
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 from .broker import Broker, CredentialMissing
 from .enforce import (
@@ -19,6 +22,7 @@ from .enforce import (
     guard,
     wrap,
 )
+from .gateway import Gateway, ToolRegistry, ToolSpec, mcp_serve, mount_proxy
 from .ledger import Ledger
 from .model import (
     Action,
@@ -35,8 +39,16 @@ from .model import (
     verify_signature,
 )
 from .pdp import PDP, LeashApprovalRequired, LeashDenied
+from .pep_client import (
+    RemoteGuardDenied,
+    RemoteGuardError,
+    RemoteGuardRegistry,
+    remote_guard,
+    remote_wrap,
+)
 from .policy import PolicyError, compile_policy, load_policy
 from .state import SQLiteStore, StateError, StateStore, get_default_store
+from .token import TokenError, grant_to_token, token_to_grant
 
 __all__ = [
     "__version__",
@@ -67,7 +79,7 @@ __all__ = [
     # broker
     "Broker",
     "CredentialMissing",
-    # enforce
+    # enforce (v0 in-process PEP)
     "guard",
     "wrap",
     "GuardRegistry",
@@ -77,4 +89,20 @@ __all__ = [
     "compile_policy",
     "load_policy",
     "PolicyError",
+    # v1: token wire format
+    "grant_to_token",
+    "token_to_grant",
+    "TokenError",
+    # v1: out-of-process gateway
+    "Gateway",
+    "ToolRegistry",
+    "ToolSpec",
+    "mount_proxy",
+    "mcp_serve",
+    # v1: remote PEP client
+    "remote_guard",
+    "remote_wrap",
+    "RemoteGuardRegistry",
+    "RemoteGuardError",
+    "RemoteGuardDenied",
 ]

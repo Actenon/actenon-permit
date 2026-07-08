@@ -117,6 +117,24 @@ class IssueRequest(BaseModel):
     policy: dict[str, Any]
 
 
+class AttenuateRequest(BaseModel):
+    """Request body for POST /grants/{id}/attenuate.
+
+    All fields optional; absent fields inherit from the parent. Any field
+    present must be equal-or-weaker than the parent (enforced by
+    ``Grant.attenuate()``).
+    """
+
+    agent_id: str | None = None
+    expires_at: str | None = None
+    scopes_allow: list[str] | None = None
+    scopes_deny: list[str] | None = None
+    budget_limit: float | None = None
+    rate_max: int | None = None
+    rate_per_seconds: int | None = None
+    extra_approval_rules: list[str] | None = None
+
+
 class RevokeResponse(BaseModel):
     grant_id: str
     status: str
@@ -138,8 +156,14 @@ def create_app(
     ledger: Ledger | None = None,
     pdp: PDP | None = None,
     approval_store: ApprovalStore | None = None,
+    gateway: Any = None,
 ) -> FastAPI:
-    """Build the FastAPI app. Defaults to a fresh SQLiteStore + Ledger."""
+    """Build the FastAPI app. Defaults to a fresh SQLiteStore + Ledger.
+
+    If ``gateway`` is provided, the v1 HTTP proxy endpoints (``/proxy/*``)
+    are mounted on the same app so a single ``permit serve`` can host both
+    the control plane and the gateway.
+    """
     state = state or SQLiteStore()
     ledger = ledger or Ledger(state)
     pdp = pdp or PDP(state, ledger)
@@ -194,6 +218,74 @@ def create_app(
                 approvals.resolve(p["action_id"], "denied")
         return RevokeResponse(grant_id=grant_id, status="revoked")
 
+    @app.post("/grants/{grant_id}/attenuate", response_model=dict)
+    def attenuate_grant(grant_id: str, req: AttenuateRequest) -> dict[str, Any]:
+        """Derive a strictly-weaker sub-grant from an existing grant.
+
+        This is the v1 wire endpoint for UCAN-style multi-agent delegation.
+        The parent grant MUST be active. The child grant is freshly signed
+        and stored, then returned. The parent is unaffected.
+        """
+        from datetime import datetime
+
+        parent = state.get_grant(grant_id)
+        if parent is None:
+            raise HTTPException(status_code=404, detail="parent grant not found")
+        if parent.status != GrantStatus.ACTIVE:
+            raise HTTPException(
+                status_code=409,
+                detail=f"parent grant status is {parent.status.value}, must be active",
+            )
+
+        kwargs: dict[str, Any] = {}
+        if req.agent_id is not None:
+            kwargs["agent_id"] = req.agent_id
+        if req.expires_at is not None:
+            try:
+                kwargs["expires_at"] = datetime.fromisoformat(req.expires_at)
+                if kwargs["expires_at"].tzinfo is None:
+                    kwargs["expires_at"] = kwargs["expires_at"].replace(tzinfo=UTC)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"invalid expires_at: {e}") from e
+        if req.scopes_allow is not None:
+            kwargs["scopes_allow"] = req.scopes_allow
+        if req.scopes_deny is not None:
+            kwargs["scopes_deny"] = req.scopes_deny
+        if req.budget_limit is not None:
+            kwargs["budget_limit"] = req.budget_limit
+        if req.rate_max is not None:
+            kwargs["rate_max"] = req.rate_max
+        if req.rate_per_seconds is not None:
+            kwargs["rate_per_seconds"] = req.rate_per_seconds
+        if req.extra_approval_rules is not None:
+            kwargs["extra_approval_rules"] = req.extra_approval_rules
+
+        try:
+            child = parent.attenuate(**kwargs)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"attenuation rejected: {e}") from e
+
+        state.put_grant(child)
+        return json.loads(child.model_dump_json())
+
+    @app.post("/grants/{grant_id}/token", response_model=dict)
+    def grant_to_token_endpoint(grant_id: str) -> dict[str, str]:
+        """Mint a bearer token for an existing grant.
+
+        The token is signed with the local signing key and can be presented
+        to the v1 gateway as the ``X-Actenon-Grant`` header.
+        """
+        from .token import grant_to_token
+
+        g = state.get_grant(grant_id)
+        if g is None:
+            raise HTTPException(status_code=404, detail="grant not found")
+        if not g.signature:
+            g.sign()
+            state.put_grant(g)
+        token = grant_to_token(g)
+        return {"grant_id": grant_id, "token": token}
+
     # ------------------------------------------------------------------
     # Approvals
     # ------------------------------------------------------------------
@@ -244,5 +336,13 @@ def create_app(
     @app.get("/ledger/verify", response_model=dict)
     def verify_ledger() -> dict[str, bool]:
         return {"ok": ledger.verify()}
+
+    # ------------------------------------------------------------------
+    # v1: out-of-process gateway proxy (mounted only if a Gateway is provided)
+    # ------------------------------------------------------------------
+    if gateway is not None:
+        from .gateway import mount_proxy
+
+        mount_proxy(app, gateway)
 
     return app

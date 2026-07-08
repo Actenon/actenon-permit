@@ -42,5 +42,10 @@ ENV/
 htmlcov/
 .ruff_cache/
 
+# TS SDK
+ts-sdk/node_modules/
+ts-sdk/dist/
+ts-sdk/.bun/
+
 # OS
 Thumbs.db

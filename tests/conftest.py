@@ -7,6 +7,12 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _ensure_mock_stripe_key(monkeypatch):
+    """Every test gets the mock secret in env. NEVER a real key."""
+    monkeypatch.setenv("MOCK_STRIPE_KEY", "sk_mock_123")
+
+
 @pytest.fixture
 def tmp_db(monkeypatch, tmp_path) -> Path:
     """Point ACTENON_DB_PATH at a fresh file in a tmp dir for each test."""
