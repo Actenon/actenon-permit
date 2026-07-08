@@ -81,17 +81,31 @@ class Broker:
         # NEVER passed anywhere except to real_call.
         result = real_call(secret)
 
-        actual_cost = self._extract_cost(result, action)
+        actual_cost = extract_cost(result, action)
         self.pdp.commit(grant, action, actual_cost)
         return result, actual_cost
 
-    @staticmethod
-    def _extract_cost(result: Any, action: Action) -> float:
-        if isinstance(result, (int, float)):
-            return float(result)
-        if isinstance(result, dict):
-            for k in ("amount", "cost", "actual_cost", "charged"):
-                if k in result and isinstance(result[k], (int, float)):
-                    return float(result[k])
-        # Fall back to the reservation. The broker does NOT inflate cost.
-        return float(action.est_cost or 0.0)
+
+def extract_cost(result: Any, action: Action) -> float:
+    """Extract the actual cost of a completed call from its result.
+
+    Public helper (was ``Broker._extract_cost``). Used by both the broker
+    and the gateway's no-credential path. The lookup order is:
+
+    1. ``result`` is a number → use it.
+    2. ``result`` is a dict with one of ``amount`` / ``cost`` /
+       ``actual_cost`` / ``charged`` → use that.
+    3. Fall back to ``action.est_cost`` (the reservation). The broker does
+       NOT inflate cost.
+
+    This is deliberately permissive: real provider SDKs return a variety of
+    shapes, and we'd rather fall back to the reservation than crash.
+    """
+    if isinstance(result, (int, float)):
+        return float(result)
+    if isinstance(result, dict):
+        for k in ("amount", "cost", "actual_cost", "charged"):
+            if k in result and isinstance(result[k], (int, float)):
+                return float(result[k])
+    # Fall back to the reservation. The broker does NOT inflate cost.
+    return float(action.est_cost or 0.0)

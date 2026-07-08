@@ -202,7 +202,7 @@ def test_http_proxy_allow(tmp_db, monkeypatch):
     store.put_grant(grant)
     token = grant_to_token(grant)
 
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw)
+    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
     client = TestClient(app)
 
     resp = client.post(
@@ -226,7 +226,7 @@ def test_http_proxy_deny_403(tmp_db, monkeypatch):
     store.put_grant(grant)
     token = grant_to_token(grant)
 
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw)
+    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
     client = TestClient(app)
 
     # charge -> DENY (scope)
@@ -247,7 +247,7 @@ def test_http_proxy_missing_grant_header(tmp_db, monkeypatch):
     pdp = PDP(store, ledger)
     gw = _make_gateway(store, ledger, pdp)
 
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw)
+    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
     client = TestClient(app)
 
     resp = client.post("/proxy/refund", json={"amount": 20})
@@ -261,7 +261,7 @@ def test_http_proxy_list_tools(tmp_db, monkeypatch):
     pdp = PDP(store, ledger)
     gw = _make_gateway(store, ledger, pdp)
 
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw)
+    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
     client = TestClient(app)
 
     resp = client.get("/proxy/tools")

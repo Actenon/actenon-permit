@@ -68,10 +68,15 @@ def token_to_grant(token: str, *, verify: bool = True) -> Grant:
         body = base64.urlsafe_b64decode(encoded + pad)
     except Exception as e:
         raise TokenError(f"invalid base64 payload: {e}") from e
+    # body is bytes; json.loads accepts bytes but raises UnicodeDecodeError
+    # (a ValueError subclass, NOT JSONDecodeError) if the bytes aren't valid
+    # UTF-8. Catch both so malformed tokens don't crash the gateway.
     try:
         payload: dict[str, Any] = json.loads(body)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
         raise TokenError(f"invalid JSON payload: {e}") from e
+    if not isinstance(payload, dict):
+        raise TokenError("invalid grant payload: not a JSON object")
     try:
         grant = Grant.model_validate(payload)
     except Exception as e:

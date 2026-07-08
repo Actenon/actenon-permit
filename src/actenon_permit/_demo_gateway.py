@@ -18,36 +18,14 @@ Architecture:
 from __future__ import annotations
 
 import os
-import socket
 import sys
-import threading
-import time
 from typing import Any
 
 # Ensure the mock secret is set for the broker to resolve. NEVER a real key.
 os.environ.setdefault("MOCK_STRIPE_KEY", "sk_mock_123")
 
 
-def _pick_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def _wait_for_server(url: str, timeout: float = 15.0) -> None:
-    import urllib.request
-
-    deadline = time.time() + timeout
-    last_err: Exception | None = None
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(f"{url}/health", timeout=0.5) as resp:
-                if resp.status == 200:
-                    return
-        except Exception as e:  # noqa: BLE001
-            last_err = e
-            time.sleep(0.1)
-    raise RuntimeError(f"server at {url} did not become ready: {last_err}")
+from actenon_permit._net import start_uvicorn_in_thread, wait_for_server  # noqa: E402
 
 
 def _print_step(n: int, label: str, outcome: str, reason: str, extra: str = "") -> None:
@@ -157,19 +135,17 @@ def run_gateway_demo(*, auto_approve: bool = False) -> list[dict[str, Any]]:
     print(f"  grant token:  {token[:48]}... (signed, bearer)")
     print()
 
-    # --- Start the HTTP server in a background thread ---
-    port = _pick_port()
-    base_url = f"http://127.0.0.1:{port}"
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gateway)
-
-    import uvicorn
-
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
-    server = uvicorn.Server(config)
-    server_thread = threading.Thread(target=server.run, daemon=True)
-    server_thread.start()
+    # --- Start the HTTP server in a background thread on an OS-assigned port ---
+    # wire_gateway_approvals=False because the demo uses AutoApproveGate — we
+    # don't want create_app to replace it with a BlockingApprovalGate that
+    # would hang waiting for a human.
+    app = create_app(
+        state=store, ledger=ledger, pdp=pdp, gateway=gateway,
+        wire_gateway_approvals=False,
+    )
+    server, server_thread, base_url = start_uvicorn_in_thread(app, port=0)
     try:
-        _wait_for_server(base_url)
+        wait_for_server(base_url)
         print(f"  gateway listening at {base_url} (out-of-process PEP)")
         print(f"  agent process will call: POST {base_url}/proxy/<tool> with X-Actenon-Grant header")
         print()

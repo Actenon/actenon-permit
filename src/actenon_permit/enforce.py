@@ -31,7 +31,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-from .broker import Broker, CredentialMissing
+from .broker import Broker, CredentialMissing, extract_cost
 from .model import Action, Decision, DecisionOutcome, Grant
 from .pdp import PDP, LeashDenied
 from .state import StateStore
@@ -242,7 +242,7 @@ def guard(
             if credential_name is None:
                 # No secret needed — just call the fn directly.
                 result = fn(*args, **kwargs)
-                actual_cost = Broker._extract_cost(result, action)  # noqa: SLF001
+                actual_cost = extract_cost(result, action)
                 registry.pdp.commit(grant, action, actual_cost)
                 return result
 

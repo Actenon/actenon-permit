@@ -45,7 +45,7 @@ def _make_app_and_store(tmp_db, monkeypatch):
         state=store, ledger=ledger, pdp=pdp, broker=broker, tools=tools,
         approval_gate=AutoApproveGate(),
     )
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw)
+    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
     return app, store, gw
 
 

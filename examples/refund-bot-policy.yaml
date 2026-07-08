@@ -1,0 +1,14 @@
+# Actenon-Permit demo policy for the refund-bot agent.
+# Used by examples/agents/runner.py. Issue with:
+#   permit issue examples/refund-bot-policy.yaml --quiet
+# Then mint a token:
+#   permit mint-token <grant_id>
+
+agent: refund-bot
+ttl: 1h
+budget: { currency: USD, limit: 50 }
+scopes:
+  allow: [ payment.refund, email.send ]
+  deny:  [ payment.charge, shell.* ]
+rate: { max: 20, per: 1m }
+approval: { require_human: [ email.send ] }

@@ -210,13 +210,61 @@ def ledger(
 
 
 @app.command()
-def watch() -> None:
-    """Live TUI for pending approvals. Press a/d to approve/deny, q to quit."""
-    # Import here so the demo path doesn't depend on control.py being importable.
-    from .control import ApprovalStore
+def watch(
+    url: str = typer.Option(
+        "http://127.0.0.1:7780",
+        "--url",
+        help="Control plane URL to poll for pending approvals.",
+    ),
+    once: bool = typer.Option(
+        False,
+        "--once",
+        help="Print pending approvals once and exit (non-interactive, for scripts/CI).",
+    ),
+) -> None:
+    """Live TUI for pending approvals. Polls the control plane's /approvals
+    endpoint. Press a=approve, d=deny on the most recent pending request,
+    q=quit.
 
-    approvals = ApprovalStore()
+    This command talks to a running `permit serve` (or `permit serve
+    --with-gateway`) instance over HTTP. It does NOT hold any in-memory
+    state — every action is a real API call to the control plane.
+    """
+    import json as _json
+    import urllib.error
+    import urllib.request
 
+    def _get(path: str):
+        req = urllib.request.Request(f"{url}{path}", method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return _json.loads(resp.read().decode("utf-8"))
+        except urllib.error.URLError as e:
+            typer.echo(f"cannot reach control plane at {url}: {e}", err=True)
+            raise typer.Exit(code=1) from e
+
+    def _post(path: str):
+        req = urllib.request.Request(f"{url}{path}", method="POST", data=b"")
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return resp.status == 200
+        except urllib.error.HTTPError:
+            return False
+
+    # Non-interactive mode: print and exit.
+    if once:
+        pending = _get("/approvals")
+        if not pending:
+            typer.echo("(no pending approvals)")
+            return
+        for p in pending:
+            typer.echo(
+                f"{p['action_id']}  grant={p['grant_id']}  "
+                f"type={p['action_type']}  reason={p['reason']}"
+            )
+        return
+
+    # Interactive mode — needs a TTY.
     try:
         import termios
         import tty
@@ -224,23 +272,52 @@ def watch() -> None:
         old_settings = termios.tcgetattr(sys.stdin)
         tty.setcbreak(sys.stdin.fileno())
     except (ImportError, AttributeError):
-        # Not a TTY (e.g. CI). Fall back to polling prints.
-        old_settings = None
+        typer.echo(
+            "watch: no TTY available. Use `permit watch --once` to print pending "
+            "approvals non-interactively, or approve directly via the API:\n"
+            "  curl -X POST http://127.0.0.1:7780/approvals/<action_id>/approve",
+            err=True,
+        )
+        raise typer.Exit(code=1) from None
+
+    typer.echo(f"Actenon-Permit watch — polling {url}/approvals every 0.5s")
+    typer.echo("press a=approve, d=deny on the most recent pending, q=quit")
+    typer.echo()
+    last_seen: set[str] = set()
+    current: dict[str, Any] | None = None
     try:
-        typer.echo("Actenon-Permit watch — press a=approve, d=deny, q=quit")
-        typer.echo("(when no terminal is attached, this just polls and prints)")
-        last_seen: set[str] = set()
         while True:
-            pending = approvals.list_pending()
-            new = [p for p in pending if p["action_id"] not in last_seen]
-            for p in new:
-                last_seen.add(p["action_id"])
-                typer.echo(
-                    f"\n[pending] {p['action_id']}  agent-grant={p['grant_id']}  "
-                    f"type={p['action_type']}  reason={p['reason']}"
-                )
-                typer.echo("  press a=approve, d=deny")
-            time.sleep(0.2)
+            try:
+                pending = _get("/approvals")
+            except typer.Exit:
+                raise
+            except Exception:
+                pending = []
+            # Print newly-seen pending requests.
+            for p in pending:
+                if p["action_id"] not in last_seen:
+                    last_seen.add(p["action_id"])
+                    current = p
+                    typer.echo(
+                        f"\n[pending] {p['action_id']}  grant={p['grant_id']}  "
+                        f"type={p['action_type']}  reason={p['reason']}"
+                    )
+                    typer.echo("  press a=approve, d=deny")
+            # Non-blocking read of one char if available.
+            ch = sys.stdin.read(1)
+            if ch == "q":
+                typer.echo("\nbye.")
+                break
+            if ch in ("a", "d") and current is not None:
+                action_id = current["action_id"]
+                if ch == "a":
+                    ok = _post(f"/approvals/{action_id}/approve")
+                    typer.echo(f"\n  approved {action_id}: {'ok' if ok else 'FAILED'}")
+                else:
+                    ok = _post(f"/approvals/{action_id}/deny")
+                    typer.echo(f"\n  denied {action_id}: {'ok' if ok else 'FAILED'}")
+                current = None
+            time.sleep(0.5)
     except KeyboardInterrupt:
         typer.echo("\nbye.")
     finally:
@@ -348,6 +425,7 @@ def attenuate(
 @app.command()
 def mint_token(
     grant_id: str = typer.Argument(..., help="Grant id to mint a bearer token for."),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the token (no warnings)."),
 ) -> None:
     """Mint a v1 bearer token for a grant. The token is presented to the
     gateway as the X-Actenon-Grant header."""

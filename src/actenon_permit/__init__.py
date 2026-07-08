@@ -14,7 +14,7 @@ from __future__ import annotations
 
 __version__ = "1.0.0"
 
-from .broker import Broker, CredentialMissing
+from .broker import Broker, CredentialMissing, extract_cost
 from .enforce import (
     AutoApproveGate,
     BlockingApprovalGate,
@@ -79,6 +79,7 @@ __all__ = [
     # broker
     "Broker",
     "CredentialMissing",
+    "extract_cost",
     # enforce (v0 in-process PEP)
     "guard",
     "wrap",

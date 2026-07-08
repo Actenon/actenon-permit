@@ -1,16 +1,12 @@
 """End-to-end tests for the v1 remote PEP client.
 
 The agent-side code (``RemoteGuardRegistry`` + ``remote_guard``) talks to a
-real HTTP gateway server (started in a background thread on a random port).
-These tests prove the agent never imports the mock providers — it only makes
-HTTP calls.
+real HTTP gateway server (started in a background thread on an OS-assigned
+port via ``start_uvicorn_in_thread``). These tests prove the agent never
+imports the mock providers — it only makes HTTP calls.
 """
 
 from __future__ import annotations
-
-import socket
-import threading
-import time
 
 import pytest
 
@@ -24,31 +20,12 @@ from actenon_permit import (
     ToolRegistry,
 )
 from actenon_permit._mock_providers import mock_send_email, mock_stripe_charge, mock_stripe_refund
+from actenon_permit._net import start_uvicorn_in_thread, wait_for_server
 from actenon_permit.control import create_app
 from actenon_permit.model import GrantStatus
 from actenon_permit.pep_client import RemoteGuardDenied, RemoteGuardRegistry, remote_guard
 from actenon_permit.policy import compile_policy
 from actenon_permit.token import grant_to_token
-
-
-def _pick_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def _wait_for_server(url: str, timeout: float = 10.0) -> None:
-    import urllib.request
-
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(f"{url}/health", timeout=0.5) as resp:
-                if resp.status == 200:
-                    return
-        except Exception:
-            time.sleep(0.05)
-    raise RuntimeError(f"server at {url} did not become ready")
 
 
 @pytest.fixture
@@ -88,18 +65,11 @@ def gateway_server(tmp_db, monkeypatch):
         state=store, ledger=ledger, pdp=pdp, broker=broker, tools=tools,
         approval_gate=AutoApproveGate(),
     )
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw)
+    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
 
-    import uvicorn
-
-    port = _pick_port()
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
-    server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    url = f"http://127.0.0.1:{port}"
+    server, thread, url = start_uvicorn_in_thread(app, port=0)
     try:
-        _wait_for_server(url)
+        wait_for_server(url)
         # Yield the store + url so tests can issue grants and tokens.
         yield {"url": url, "store": store, "gateway": gw}
     finally:

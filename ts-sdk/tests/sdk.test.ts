@@ -64,7 +64,7 @@ tools.register("send_email", action_type="email.send", target="smtp",
                credential_name="MOCK_STRIPE_KEY",
                real_call=lambda secret, to, subject, body="": mock_send_email(secret, to, subject, body))
 gw = Gateway(state=state, ledger=ledger, pdp=pdp, broker=broker, tools=tools, approval_gate=AutoApproveGate())
-app = create_app(state=state, ledger=ledger, pdp=pdp, gateway=gw)
+app = create_app(state=state, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
 uvicorn.run(app, host="127.0.0.1", port=7781, log_level="warning")
 `,
     ],

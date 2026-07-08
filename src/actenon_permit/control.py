@@ -157,17 +157,34 @@ def create_app(
     pdp: PDP | None = None,
     approval_store: ApprovalStore | None = None,
     gateway: Any = None,
+    wire_gateway_approvals: bool = True,
 ) -> FastAPI:
     """Build the FastAPI app. Defaults to a fresh SQLiteStore + Ledger.
 
     If ``gateway`` is provided, the v1 HTTP proxy endpoints (``/proxy/*``)
     are mounted on the same app so a single ``permit serve`` can host both
     the control plane and the gateway.
+
+    If ``wire_gateway_approvals`` is True (default) and a ``gateway`` is
+    provided, the gateway's ``approval_gate`` is REPLACED with a
+    ``BlockingApprovalGate`` backed by this app's ``ApprovalStore``. This
+    means REQUIRE_APPROVAL decisions made inside the gateway will create
+    pending-approval entries visible at ``/approvals`` and resolvable via
+    ``/approvals/{id}/approve`` and ``/approvals/{id}/deny`` — so
+    ``permit watch`` can approve them. Pass ``wire_gateway_approvals=False``
+    to keep the gateway's existing gate (e.g. AutoApproveGate for tests).
     """
     state = state or SQLiteStore()
     ledger = ledger or Ledger(state)
     pdp = pdp or PDP(state, ledger)
     approvals = approval_store or ApprovalStore()
+
+    # Wire the gateway's approval gate to this app's ApprovalStore so that
+    # REQUIRE_APPROVAL flows through /approvals and is visible to `permit watch`.
+    if gateway is not None and wire_gateway_approvals:
+        from .enforce import BlockingApprovalGate
+
+        gateway.approval_gate = BlockingApprovalGate(approvals)
 
     app = FastAPI(title="Actenon-Permit Control Plane", version="0.1.0")
     app.state.state = state

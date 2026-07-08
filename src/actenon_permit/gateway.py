@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from .broker import Broker, CredentialMissing
+from .broker import Broker, CredentialMissing, extract_cost
 from .enforce import ApprovalGate, AutoApproveGate
 from .ledger import Ledger
 from .model import Action, Decision, DecisionOutcome, Grant, GrantStatus
@@ -272,7 +272,7 @@ class Gateway:
         try:
             if spec.credential_name is None:
                 result = spec.real_call(**arguments)
-                actual_cost = Broker._extract_cost(result, action)  # noqa: SLF001
+                actual_cost = extract_cost(result, action)
                 self.pdp.commit(grant, action, actual_cost)
             else:
                 result, actual_cost = self.broker.execute(
