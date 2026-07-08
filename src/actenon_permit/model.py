@@ -15,6 +15,7 @@ import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
@@ -26,6 +27,40 @@ from pydantic import BaseModel, Field, field_validator
 _DEV_KEY: str | None = None
 _WARNED_ABOUT_DEV_KEY = False
 _SUPPRESS_DEV_KEY_WARNING = False
+
+
+def _default_key_file_path() -> Path:
+    """The default location for a persisted dev signing key.
+
+    ``~/.actenon-permit/signing-key`` — user-level, persists across projects
+    and process restarts. Created by ``permit init-key``.
+    """
+    return Path.home() / ".actenon-permit" / "signing-key"
+
+
+def _load_persisted_key() -> str | None:
+    """Load a persisted dev key from disk, if one exists.
+
+    Checks (in order):
+      1. ``ACTENON_SIGNING_KEY_FILE`` env var — explicit path override
+      2. ``~/.actenon-permit/signing-key`` — default location from ``permit init-key``
+
+    Returns the key as a hex string, or None if no file exists.
+    """
+    env_path = os.environ.get("ACTENON_SIGNING_KEY_FILE", "").strip()
+    candidates = [env_path, str(_default_key_file_path())] if env_path else [str(_default_key_file_path())]
+    for p in candidates:
+        if not p:
+            continue
+        try:
+            path = Path(p)
+            if path.is_file():
+                key = path.read_text(encoding="utf-8").strip()
+                if key:
+                    return key
+        except OSError:
+            continue
+    return None
 
 
 def suppress_dev_key_warning(suppress: bool = True) -> None:
@@ -42,23 +77,34 @@ def suppress_dev_key_warning(suppress: bool = True) -> None:
 def _get_signing_key() -> bytes:
     """Return the HMAC signing key.
 
-    Reads ``ACTENON_SIGNING_KEY`` from the environment. If unset, generates a
-    random dev key for the lifetime of the process and warns once. The dev
-    key is useful for local demos but means grants do not survive a restart.
+    Resolution order:
+      1. ``ACTENON_SIGNING_KEY`` env var (production)
+      2. ``ACTENON_SIGNING_KEY_FILE`` env var → read key from that file
+      3. ``~/.actenon-permit/signing-key`` (created by ``permit init-key``)
+      4. Ephemeral in-memory dev key + warning (the demo default)
+
+    The ephemeral key (step 4) is regenerated on every process start, so
+    grants minted in one process won't validate in another. Run
+    ``permit init-key`` to persist a stable dev key and avoid this.
     """
     global _DEV_KEY, _WARNED_ABOUT_DEV_KEY
     env_val = os.environ.get("ACTENON_SIGNING_KEY", "").strip()
     if env_val:
         return env_val.encode("utf-8")
+    persisted = _load_persisted_key()
+    if persisted:
+        return persisted.encode("utf-8")
     if _DEV_KEY is None:
         _DEV_KEY = secrets.token_hex(32)
     if not _WARNED_ABOUT_DEV_KEY and not _SUPPRESS_DEV_KEY_WARNING:
         import sys
 
         print(
-            "[actenon-permit] WARNING: ACTENON_SIGNING_KEY is not set. "
-            "Using a generated dev key — grants will not validate after "
-            "this process exits. Set ACTENON_SIGNING_KEY in production.",
+            "[actenon-permit] WARNING: ACTENON_SIGNING_KEY is not set and no "
+            "persisted key was found. Using an EPHEMERAL dev key — grants "
+            "will NOT validate after this process exits. "
+            "Run `permit init-key` to persist a stable local key, or set "
+            "ACTENON_SIGNING_KEY in production.",
             file=sys.stderr,
         )
         _WARNED_ABOUT_DEV_KEY = True

@@ -10,7 +10,7 @@ as the underlying function — the agent calls it normally, and the PEP:
        honoured even if the agent has a stale grant object).
     3. Calls ``PDP.decide()``.
     4. On ALLOW: invokes the underlying fn via the broker, reconciles cost.
-    5. On DENY: raises ``LeashDenied`` — the agent sees only the reason.
+    5. On DENY: raises ``PermitDenied`` — the agent sees only the reason.
     6. On REQUIRE_APPROVAL: blocks until the control plane returns
        approve/deny/timeout, then re-runs from step 2.
 
@@ -33,7 +33,7 @@ from typing import Any, Protocol
 
 from .broker import Broker, CredentialMissing, extract_cost
 from .model import Action, Decision, DecisionOutcome, Grant
-from .pdp import PDP, LeashDenied
+from .pdp import PDP, PermitDenied
 from .state import StateStore
 
 # ---------------------------------------------------------------------------
@@ -217,11 +217,11 @@ def guard(
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             grant_id = registry.grant_id
             if not grant_id:
-                raise LeashDenied("no grant is bound to this registry")
+                raise PermitDenied("no grant is bound to this registry")
 
             grant = registry.state.get_grant(grant_id)
             if grant is None:
-                raise LeashDenied(f"grant {grant_id} not found in state store")
+                raise PermitDenied(f"grant {grant_id} not found in state store")
 
             # Bind args to the underlying signature so we can extract cost
             # by name and build a clean params dict for the Action.
@@ -231,7 +231,7 @@ def guard(
                 bound_args = dict(bound.arguments)
             except TypeError:
                 # Args don't bind to the signature — fail closed.
-                raise LeashDenied("tool arguments do not match its signature") from None
+                raise PermitDenied("tool arguments do not match its signature") from None
 
             # The first param of the wrapped fn is the secret; do NOT put it
             # in the Action params (the agent never sees it, and it must not
@@ -254,12 +254,12 @@ def guard(
             decision = registry.pdp.decide(grant, action, ctx={})
 
             if decision.outcome == DecisionOutcome.DENY:
-                raise LeashDenied(decision.reason, decision.rule_matched)
+                raise PermitDenied(decision.reason, decision.rule_matched)
 
             if decision.outcome == DecisionOutcome.REQUIRE_APPROVAL:
                 approved = registry.gate.request(grant, action, decision)
                 if not approved:
-                    raise LeashDenied("approval denied or timed out", decision.rule_matched)
+                    raise PermitDenied("approval denied or timed out", decision.rule_matched)
                 # Re-run decision after approval — state and clock have moved.
                 # Pass approved_action_id so the PDP skips the approval-rule
                 # step on this re-run (otherwise it would loop forever).
@@ -268,7 +268,7 @@ def guard(
                     grant, action, ctx={"approved_action_id": action.action_id}
                 )
                 if decision.outcome != DecisionOutcome.ALLOW:
-                    raise LeashDenied(decision.reason, decision.rule_matched)
+                    raise PermitDenied(decision.reason, decision.rule_matched)
 
             # ALLOW — invoke the real call via the broker.
             if credential_name is None:
@@ -287,7 +287,7 @@ def guard(
                 if action.est_cost:
                     with contextlib.suppress(Exception):
                         registry.state.release(grant.id, action.action_id, action.est_cost)
-                raise LeashDenied(f"credential missing: {e}") from e
+                raise PermitDenied(f"credential missing: {e}") from e
 
             return result
 

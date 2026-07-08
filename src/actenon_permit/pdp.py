@@ -47,7 +47,7 @@ from .state import StateStore
 _THRESHOLD_RE = re.compile(r"^(?P<type>[^\s>]+)\s*>\s*(?P<amount>[0-9.]+)\s*$")
 
 
-class LeashDenied(Exception):
+class PermitDenied(Exception):
     """Raised by the PEP when a guarded action is denied."""
 
     def __init__(self, reason: str, rule_matched: str | None = None):
@@ -56,13 +56,21 @@ class LeashDenied(Exception):
         self.rule_matched = rule_matched
 
 
-class LeashApprovalRequired(Exception):
+class PermitApprovalRequired(Exception):
     """Raised by the PEP when a guarded action requires human approval."""
 
     def __init__(self, reason: str, rule_matched: str | None = None):
         super().__init__(reason)
         self.reason = reason
         self.rule_matched = rule_matched
+
+
+# Backward-compat aliases for the pre-rename names. The product was originally
+# called "Leash" internally; it's now "Permit". These aliases keep old code
+# working but the canonical names are PermitDenied / PermitApprovalRequired.
+# TODO: remove these aliases in v2.0.
+LeashDenied = PermitDenied
+LeashApprovalRequired = PermitApprovalRequired
 
 
 def _scope_matches(patterns: list[str], action_type: str) -> str | None:

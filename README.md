@@ -4,8 +4,9 @@
 uv run permit demo
 ```
 
-(Or: `python -m actenon_permit.cli demo`. Both work from a fresh clone with no
-API keys, no network, and no real money.)
+> Requires [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`).
+> No uv? `pip install -e '.[dev]' && permit demo`, or `python -m actenon_permit.cli demo`.
+> No API keys, no network, no real money — works from a fresh clone.
 
 ## Why
 
@@ -117,18 +118,28 @@ def refund(amount, reason=""): ...   # no `secret` param — gateway holds it
 ### v1 CLI
 
 ```bash
+# ONE-TIME: persist a stable dev signing key so grants validate across
+# process restarts (essential for multi-terminal workflows).
+permit init-key
+
 # Start the control plane + gateway on one port
 permit serve --with-gateway --port 7780
+
+# In another terminal: issue a grant + mint a token
+permit issue examples/refund-bot-policy.yaml --quiet
+permit mint-token <grant_id> --quiet
 
 # Or run just the MCP stdio server (for Claude Desktop / Cursor)
 permit mcp-serve
 
-# Mint a bearer token for an existing grant
-permit mint-token <grant_id>
-
 # Derive a weaker sub-grant (UCAN-style multi-agent delegation)
 permit attenuate <grant_id> --budget-limit 10 --scopes-allow payment.refund
 ```
+
+> Without `permit init-key`, each `permit` invocation generates an ephemeral
+> key, so a token minted by `permit mint-token` in one process won't validate
+> in `permit serve` in another. `permit init-key` writes a stable key to
+> `~/.actenon-permit/signing-key` (mode 0600) — run it once and forget.
 
 ### TS SDK (`ts-sdk/`)
 

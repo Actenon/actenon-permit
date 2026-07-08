@@ -1,6 +1,7 @@
 """Actenon-Permit CLI.
 
 Commands:
+    permit init-key                     generate and persist a stable dev signing key
     permit issue <policy.yaml>          compile a policy file to a signed grant
     permit revoke <agent_id>            kill switch — revoke all grants for an agent
     permit watch                        live TUI: pending approvals, a/d to approve/deny
@@ -140,6 +141,67 @@ def _build_demo_gateway():
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
+
+
+@app.command(name="init-key")
+def init_key(
+    path: Path | None = typer.Option(
+        None,
+        "--path",
+        "-p",
+        help="Where to write the key. Default: ~/.actenon-permit/signing-key",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite an existing key file. DANGEROUS — invalidates all existing tokens.",
+    ),
+) -> None:
+    """Generate and persist a stable dev signing key.
+
+    By default, writes a 32-byte random hex key to
+    ``~/.actenon-permit/signing-key`` (mode 0600). Once written, every
+    ``permit`` command in any process will use this key, so grants minted
+    by ``permit issue`` / ``permit mint-token`` will validate in
+    ``permit serve`` even across restarts.
+
+    Without this, Actenon-Permit generates an EPHEMERAL key per process,
+    which means tokens minted in one ``permit`` invocation won't validate
+    in the next. The demo works because it's all one process, but any
+    multi-process workflow (issue in one terminal, serve in another) needs
+    a stable key.
+
+    The key file is read by ``_get_signing_key()`` AFTER the
+    ``ACTENON_SIGNING_KEY`` env var, so env vars still win in production.
+    """
+    import os
+    import secrets
+
+    from .model import _default_key_file_path
+
+    target = path or _default_key_file_path()
+    if target.exists() and not force:
+        typer.echo(
+            f"ERROR: {target} already exists. "
+            f"Use --force to overwrite (this will invalidate all existing tokens).",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    key = secrets.token_hex(32)
+    # Write with mode 0600 — the key is the root of trust for all grants.
+    fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, key.encode("utf-8"))
+    finally:
+        os.close(fd)
+    # Ensure the mode is correct even if the file already existed.
+    os.chmod(target, 0o600)
+
+    typer.echo(f"wrote stable dev signing key to {target} (mode 0600)")
+    typer.echo("  grants minted with this key will validate across process restarts.")
+    typer.echo("  to use a different key in production, set ACTENON_SIGNING_KEY instead.")
 
 
 @app.command()

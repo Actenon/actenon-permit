@@ -39,7 +39,7 @@ from .model import (
     sign,
     verify_signature,
 )
-from .pdp import PDP, LeashApprovalRequired, LeashDenied
+from .pdp import PDP, PermitApprovalRequired, PermitDenied
 from .pep_client import (
     RemoteGuardDenied,
     RemoteGuardError,
@@ -50,6 +50,13 @@ from .pep_client import (
 from .policy import PolicyError, compile_policy, load_policy
 from .state import SQLiteStore, StateError, StateStore, get_default_store
 from .token import TokenError, grant_to_token, token_to_grant
+
+# Backward-compat aliases for the pre-rename names. The product was originally
+# called "Leash" internally; it's now "Permit". These aliases keep old code
+# working but the canonical names are PermitDenied / PermitApprovalRequired.
+# TODO: remove these aliases in v2.0.
+LeashDenied = PermitDenied
+LeashApprovalRequired = PermitApprovalRequired
 
 __all__ = [
     "__version__",
@@ -75,6 +82,9 @@ __all__ = [
     "Ledger",
     # pdp
     "PDP",
+    "PermitDenied",
+    "PermitApprovalRequired",
+    # backward-compat aliases (pre-rename; remove in v2.0)
     "LeashDenied",
     "LeashApprovalRequired",
     # broker
