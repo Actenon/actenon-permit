@@ -35,7 +35,6 @@ from actenon.models.contracts import (
 )
 from actenon.models.runtime import DynamicContextInput, PolicyDecision, RuleEvaluation
 from actenon.proof.service import PCCBMinter, PCCBVerifier, build_action_hash_input
-from actenon.proof.signers.local import build_local_proof_signer
 
 from .model import Action, Decision, DecisionOutcome, Grant
 
@@ -194,16 +193,15 @@ def mint_pccb_for_action(
     kernel_decision = _permit_decision_to_kernel_decision(decision)
     context = _build_context(grant, action, audience_id=audience_id)
 
-    # Resolve the signing key. In dev this is permit's ACTENON_SIGNING_KEY;
-    # in production the integrator supplies a kernel asymmetric signer.
-    import os
+    # Resolve the signer. Phase 4: prefer Ed25519 (asymmetric) over HMAC.
+    # The resolve_signer() function checks, in order:
+    #   1. Ed25519 key file (ACTENON_ED25519_KEY_FILE or ~/.actenon-permit/ed25519-key.json)
+    #   2. HMAC secret (ACTENON_SIGNING_KEY or the signing_secret param)
+    # This is the production hardening: real Ed25519 signatures when a keypair
+    # is available, HMAC fallback for dev/demo.
+    from .ed25519_signer import resolve_signer
 
-    secret = signing_secret
-    if secret is None:
-        env_key = os.environ.get("ACTENON_SIGNING_KEY", "").strip()
-        if env_key:
-            secret = env_key
-    signer = build_local_proof_signer(secret=secret) if secret is not None else build_local_proof_signer()
+    signer = resolve_signer(hmac_secret=signing_secret)
 
     minter = PCCBMinter(
         signer=signer,
@@ -232,14 +230,10 @@ def verify_pccb_at_edge(
     rather than aspirational: the edge refuses to release the credential
     until the kernel has verified the proof is bound to the EXACT action.
     """
-    import os
+    # Resolve the signer for verification — same resolution as minting.
+    from .ed25519_signer import resolve_signer
 
-    secret = signing_secret
-    if secret is None:
-        env_key = os.environ.get("ACTENON_SIGNING_KEY", "").strip()
-        if env_key:
-            secret = env_key
-    signer = build_local_proof_signer(secret=secret) if secret is not None else build_local_proof_signer()
+    signer = resolve_signer(hmac_secret=signing_secret)
     verifier = PCCBVerifier(signer=signer)
     context = _build_context(grant, action, audience_id=audience_id)
 

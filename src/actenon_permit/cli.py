@@ -204,6 +204,60 @@ def init_key(
     typer.echo("  to use a different key in production, set ACTENON_SIGNING_KEY instead.")
 
 
+@app.command(name="init-keys")
+def init_keys(
+    path: Path | None = typer.Option(
+        None,
+        "--path",
+        "-p",
+        help="Where to write the keypair. Default: ~/.actenon-permit/ed25519-key.json",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite an existing keypair. DANGEROUS — invalidates all existing PCCBs.",
+    ),
+) -> None:
+    """Generate and persist an Ed25519 keypair for production-grade PCCB signing.
+
+    Phase 4 production hardening: Ed25519 is the real asymmetric signature
+    algorithm. Unlike the HMAC dev key, the private key never leaves the
+    keypair file, and verification can be done with only the public key.
+
+    Once written, every PCCB minted by permit (and every PCCB verified at
+    the gateway) uses this Ed25519 keypair automatically. The kernel's
+    production guardrail allows ``pilot_local_eddsa`` in production only
+    with ``ACTENON_ALLOW_PILOT_LOCAL_EDDSA_IN_PRODUCTION=1`` — for a real
+    production deploy, wire a KMS/HSM backend via the kernel's
+    ``external_managed`` adapter instead.
+
+    The keypair file is mode 0600. Protect it — it's the root of trust.
+    """
+    from .ed25519_signer import generate_ed25519_keypair, save_ed25519_keypair
+    from .model import _default_key_file_path as _default_hmac_key_path  # noqa: F401 — for context
+
+    target = path or (Path.home() / ".actenon-permit" / "ed25519-key.json")
+    if target.exists() and not force:
+        typer.echo(
+            f"ERROR: {target} already exists. "
+            f"Use --force to overwrite (this will invalidate all existing PCCBs).",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    keypair = generate_ed25519_keypair()
+    save_ed25519_keypair(keypair, target)
+
+    typer.echo(f"wrote Ed25519 keypair to {target} (mode 0600)")
+    typer.echo(f"  key_id: {keypair.key_id}")
+    typer.echo("  algorithm: EdDSA (Ed25519)")
+    typer.echo(f"  public key (JWK x): {keypair.public_key_jwk['x'][:32]}...")
+    typer.echo("")
+    typer.echo("  PCCBs will now be signed with Ed25519 instead of dev-HMAC.")
+    typer.echo("  To use a different key file: set ACTENON_ED25519_KEY_FILE=/path/to/key.json")
+    typer.echo("  For real production: wire a KMS/HSM backend via the kernel's external_managed adapter.")
+
+
 @app.command()
 def issue(
     policy: Path = typer.Argument(..., help="Path to a YAML policy file."),
