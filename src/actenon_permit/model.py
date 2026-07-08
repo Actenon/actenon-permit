@@ -307,12 +307,19 @@ class Action(BaseModel):
 
 
 class Decision(BaseModel):
-    """The outcome of running an Action through the PDP."""
+    """The outcome of running an Action through the PDP.
+
+    ``failure_code`` is the structured, stable enum imported from the kernel
+    (actenon.outcomes.FailureCode). It is set at the SAME branch where
+    ``reason`` is set — never reconstructed or parsed from ``reason``.
+    The ledger records it as a first-class field (not derived from prose).
+    """
 
     outcome: DecisionOutcome
     reason: str
     rule_matched: str | None = None
     state_delta: dict[str, Any] = Field(default_factory=dict)
+    failure_code: str | None = None  # FailureCode enum value, imported from kernel
 
 
 # ---------------------------------------------------------------------------

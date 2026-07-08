@@ -39,6 +39,8 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
+from actenon.outcomes import FailureCode
+
 from .ledger import Ledger
 from .model import Action, Decision, DecisionOutcome, Grant, GrantStatus
 from .state import StateStore
@@ -111,6 +113,22 @@ def _approval_rule_matches(rule: str, action: Action) -> bool:
     return action.type == rule
 
 
+def _build_authority_boundary(grant: Grant, action: Action) -> dict[str, Any]:
+    """Build the authority_boundary for the ledger entry."""
+    return {
+        "authorized_action_hash": None,  # null if no PCCB; set by gateway path
+        "attempted_action_hash": None,  # can be computed by kernel bridge
+        "envelope": {
+            "scopes_allow": list(grant.scopes.allow),
+            "scopes_deny": list(grant.scopes.deny),
+            "budget_remaining_at_decision": grant.budget.remaining,
+            "expires_at": grant.expires_at.isoformat(),
+            "rate_max": grant.rate.max,
+            "rate_per_seconds": grant.rate.per_seconds,
+        },
+    }
+
+
 class PDP:
     """Policy Decision Point. Stateless except for the state-store and ledger
     references it consults for rate/budget counting and audit logging.
@@ -144,12 +162,15 @@ class PDP:
                     reason=f"engine error, failing closed: {type(e).__name__}: {e}",
                     rule_matched=None,
                     state_delta={},
+                    failure_code=FailureCode.ENGINE_ERROR,
+                    authority_boundary=_build_authority_boundary(grant, action),
                 )
             return Decision(
                 outcome=DecisionOutcome.DENY,
                 reason=f"engine error, failing closed: {type(e).__name__}: {e}",
                 rule_matched=None,
                 state_delta={},
+                failure_code=FailureCode.ENGINE_ERROR,
             )
 
     # ------------------------------------------------------------------
@@ -159,44 +180,15 @@ class PDP:
     def _decide_inner(self, grant: Grant, action: Action, ctx: dict[str, Any]) -> Decision:
         # 1. status check
         if grant.status != GrantStatus.ACTIVE:
-            return Decision(
+            d = Decision(
                 outcome=DecisionOutcome.DENY,
                 reason=f"grant status is {grant.status.value}",
                 rule_matched="status",
-            )
-
-        # 2. expiry check — if expired, transition the grant
-        now = datetime.now(UTC)
-        if now > grant.expires_at:
-            with contextlib.suppress(Exception):
-                self.state.set_status(grant.id, GrantStatus.EXPIRED)
-            self.ledger.append(
-                action_id=action.action_id,
-                grant_id=grant.id,
-                ts=action.ts,
-                action_type=action.type,
-                target=action.target,
-                params=action.params,
-                est_cost=action.est_cost,
-                outcome=DecisionOutcome.DENY.value,
-                reason="expired",
-                rule_matched="expiry",
-                state_delta={"status": "expired"},
-            )
-            return Decision(
-                outcome=DecisionOutcome.DENY,
-                reason="expired",
-                rule_matched="expiry",
-                state_delta={"status": "expired"},
-            )
-
-        # 3. deny scopes
-        matched_deny = _scope_matches(grant.scopes.deny, action.type)
-        if matched_deny is not None:
-            d = Decision(
-                outcome=DecisionOutcome.DENY,
-                reason=f"scope denied: {matched_deny}",
-                rule_matched=f"deny:{matched_deny}",
+                failure_code=(
+                    FailureCode.REVOKED
+                    if grant.status == GrantStatus.REVOKED
+                    else FailureCode.NOT_ACTIVE
+                ),
             )
             self.ledger.append(
                 action_id=action.action_id,
@@ -210,6 +202,63 @@ class PDP:
                 reason=d.reason,
                 rule_matched=d.rule_matched,
                 state_delta={},
+                failure_code=d.failure_code,
+                authority_boundary=_build_authority_boundary(grant, action),
+            )
+            return d
+
+        # 2. expiry check — if expired, transition the grant
+        now = datetime.now(UTC)
+        if now > grant.expires_at:
+            with contextlib.suppress(Exception):
+                self.state.set_status(grant.id, GrantStatus.EXPIRED)
+            d = Decision(
+                outcome=DecisionOutcome.DENY,
+                reason="expired",
+                rule_matched="expiry",
+                state_delta={"status": "expired"},
+                failure_code=FailureCode.EXPIRED,
+            )
+            self.ledger.append(
+                action_id=action.action_id,
+                grant_id=grant.id,
+                ts=action.ts,
+                action_type=action.type,
+                target=action.target,
+                params=action.params,
+                est_cost=action.est_cost,
+                outcome=d.outcome.value,
+                reason=d.reason,
+                rule_matched=d.rule_matched,
+                state_delta=d.state_delta,
+                failure_code=d.failure_code,
+                authority_boundary=_build_authority_boundary(grant, action),
+            )
+            return d
+
+        # 3. deny scopes
+        matched_deny = _scope_matches(grant.scopes.deny, action.type)
+        if matched_deny is not None:
+            d = Decision(
+                outcome=DecisionOutcome.DENY,
+                reason=f"scope denied: {matched_deny}",
+                rule_matched=f"deny:{matched_deny}",
+                failure_code=FailureCode.SCOPE_DENIED,
+            )
+            self.ledger.append(
+                action_id=action.action_id,
+                grant_id=grant.id,
+                ts=action.ts,
+                action_type=action.type,
+                target=action.target,
+                params=action.params,
+                est_cost=action.est_cost,
+                outcome=d.outcome.value,
+                reason=d.reason,
+                rule_matched=d.rule_matched,
+                state_delta={},
+                failure_code=d.failure_code,
+                authority_boundary=_build_authority_boundary(grant, action),
             )
             return d
 
@@ -221,6 +270,7 @@ class PDP:
                     outcome=DecisionOutcome.DENY,
                     reason="out of scope",
                     rule_matched="allow:default-deny",
+                    failure_code=FailureCode.OUT_OF_SCOPE,
                 )
                 self.ledger.append(
                     action_id=action.action_id,
@@ -234,6 +284,8 @@ class PDP:
                     reason=d.reason,
                     rule_matched=d.rule_matched,
                     state_delta={},
+                    failure_code=d.failure_code,
+                    authority_boundary=_build_authority_boundary(grant, action),
                 )
                 return d
 
@@ -248,6 +300,7 @@ class PDP:
                     outcome=DecisionOutcome.DENY,
                     reason="rate limit",
                     rule_matched=f"rate:{grant.rate.max}/{grant.rate.per_seconds}s",
+                    failure_code=FailureCode.RATE_LIMITED,
                 )
                 self.ledger.append(
                     action_id=action.action_id,
@@ -261,6 +314,8 @@ class PDP:
                     reason=d.reason,
                     rule_matched=d.rule_matched,
                     state_delta={},
+                    failure_code=d.failure_code,
+                    authority_boundary=_build_authority_boundary(grant, action),
                 )
                 return d
 
@@ -276,11 +331,21 @@ class PDP:
             rate_per_seconds=grant.rate.per_seconds,
         )
         if not ok:
+            # Map the reserve_reason onto a structured FailureCode so callers
+            # and the ledger get a stable taxonomy, not free-text prose.
+            r = (reserve_reason or "").lower()
+            if "rate limit" in r:
+                fc = FailureCode.RATE_LIMITED
+            elif "budget" in r or "exceed" in r:
+                fc = FailureCode.BUDGET_EXCEEDED
+            else:
+                fc = FailureCode.ENGINE_ERROR
             d = Decision(
                 outcome=DecisionOutcome.DENY,
                 reason=reserve_reason,
                 rule_matched="reserve",
                 state_delta=snapshot,
+                failure_code=fc,
             )
             self.ledger.append(
                 action_id=action.action_id,
@@ -294,6 +359,8 @@ class PDP:
                 reason=d.reason,
                 rule_matched=d.rule_matched,
                 state_delta=snapshot,
+                failure_code=d.failure_code,
+                authority_boundary=_build_authority_boundary(grant, action),
             )
             return d
 
@@ -323,6 +390,7 @@ class PDP:
                         reason=f"approval required: {rule}",
                         rule_matched=f"approval:{rule}",
                         state_delta={"released": est_cost},
+                        failure_code=FailureCode.APPROVAL_REQUIRED,
                     )
                     self.ledger.append(
                         action_id=action.action_id,
@@ -336,6 +404,8 @@ class PDP:
                         reason=d.reason,
                         rule_matched=d.rule_matched,
                         state_delta=d.state_delta,
+                        failure_code=d.failure_code,
+                        authority_boundary=_build_authority_boundary(grant, action),
                     )
                     return d
 
@@ -345,6 +415,7 @@ class PDP:
             reason="allowed",
             rule_matched=None,
             state_delta=snapshot,
+            failure_code=FailureCode.ALLOWED,
         )
         self.ledger.append(
             action_id=action.action_id,
@@ -358,6 +429,8 @@ class PDP:
             reason=d.reason,
             rule_matched=d.rule_matched,
             state_delta=snapshot,
+            failure_code=d.failure_code,
+            authority_boundary=_build_authority_boundary(grant, action),
         )
         return d
 
@@ -418,6 +491,7 @@ class PDP:
                     reason="PCCB emission failed — failing closed",
                     rule_matched="kernel_bridge:emission_failed",
                     state_delta=decision.state_delta,
+                    failure_code=FailureCode.ENGINE_ERROR,
                 ),
                 None,
                 None,

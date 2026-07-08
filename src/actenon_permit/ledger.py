@@ -104,6 +104,13 @@ class Ledger:
                 """
             )
 
+            # Migration: add v2 columns if they don't exist
+            columns = {row[1] for row in cur.execute("PRAGMA table_info(ledger)").fetchall()}
+            if "failure_code" not in columns:
+                cur.execute("ALTER TABLE ledger ADD COLUMN failure_code TEXT")
+            if "authority_boundary" not in columns:
+                cur.execute("ALTER TABLE ledger ADD COLUMN authority_boundary TEXT")
+
     # ------------------------------------------------------------------
     # Append
     # ------------------------------------------------------------------
@@ -122,6 +129,8 @@ class Ledger:
         reason: str,
         rule_matched: str | None,
         state_delta: dict[str, Any],
+        failure_code: str | None = None,
+        authority_boundary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Append a single entry. Computes and stores the hash. Returns the entry."""
         ts_str = ts.astimezone(UTC).isoformat() if isinstance(ts, datetime) else ts
@@ -135,6 +144,7 @@ class Ledger:
                 prev_hash = row[0] if row else GENESIS_PREV_HASH
 
                 entry_body: dict[str, Any] = {
+                    "entry_format": "v2",
                     "action_id": action_id,
                     "grant_id": grant_id,
                     "ts": ts_str,
@@ -146,6 +156,8 @@ class Ledger:
                     "reason": reason,
                     "rule_matched": rule_matched,
                     "state_delta": state_delta,
+                    "failure_code": failure_code,
+                    "authority_boundary": authority_boundary,
                     "prev_hash": prev_hash,
                 }
                 h = _hash_entry(prev_hash, entry_body)
@@ -155,8 +167,8 @@ class Ledger:
                     INSERT INTO ledger (
                         action_id, grant_id, ts, action_type, target, params,
                         est_cost, outcome, reason, rule_matched, state_delta,
-                        prev_hash, hash
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        failure_code, authority_boundary, prev_hash, hash
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         action_id,
@@ -170,6 +182,10 @@ class Ledger:
                         reason,
                         rule_matched,
                         json.dumps(state_delta, sort_keys=True, default=str),
+                        failure_code,
+                        json.dumps(authority_boundary, sort_keys=True, default=str)
+                        if authority_boundary is not None
+                        else None,
                         prev_hash,
                         h,
                     ),
@@ -193,14 +209,16 @@ class Ledger:
             if grant_id:
                 cur.execute(
                     "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
-                    "est_cost, outcome, reason, rule_matched, state_delta, prev_hash, hash "
+                    "est_cost, outcome, reason, rule_matched, state_delta, "
+                    "failure_code, authority_boundary, prev_hash, hash "
                     "FROM ledger WHERE grant_id = ? ORDER BY seq ASC LIMIT ?",
                     (grant_id, limit),
                 )
             else:
                 cur.execute(
                     "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
-                    "est_cost, outcome, reason, rule_matched, state_delta, prev_hash, hash "
+                    "est_cost, outcome, reason, rule_matched, state_delta, "
+                    "failure_code, authority_boundary, prev_hash, hash "
                     "FROM ledger ORDER BY seq ASC LIMIT ?",
                     (limit,),
                 )
@@ -222,8 +240,10 @@ class Ledger:
                     "reason": r[9],
                     "rule_matched": r[10],
                     "state_delta": json.loads(r[11]) if r[11] else {},
-                    "prev_hash": r[12],
-                    "hash": r[13],
+                    "failure_code": r[12],
+                    "authority_boundary": json.loads(r[13]) if r[13] else None,
+                    "prev_hash": r[14],
+                    "hash": r[15],
                 }
             )
         return entries
@@ -245,7 +265,8 @@ class Ledger:
             cur = self._conn.cursor()
             cur.execute(
                 "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
-                "est_cost, outcome, reason, rule_matched, state_delta, prev_hash, hash "
+                "est_cost, outcome, reason, rule_matched, state_delta, "
+                "failure_code, authority_boundary, prev_hash, hash "
                 "FROM ledger ORDER BY seq ASC"
             )
             rows = cur.fetchall()
@@ -254,13 +275,19 @@ class Ledger:
         for r in rows:
             (seq, action_id, grant_id, ts, action_type, target, params_json,
              est_cost, outcome, reason, rule_matched, state_delta_json,
-             stored_prev_hash, stored_hash) = r
+             failure_code, authority_boundary_json, stored_prev_hash,
+             stored_hash) = r
 
             # Check the prev_hash field matches what we expect.
             if stored_prev_hash != prev_hash:
                 return False
 
+            authority_boundary = (
+                json.loads(authority_boundary_json) if authority_boundary_json else None
+            )
+
             entry_body = {
+                "entry_format": "v2",
                 "action_id": action_id,
                 "grant_id": grant_id,
                 "ts": ts,
@@ -272,6 +299,8 @@ class Ledger:
                 "reason": reason,
                 "rule_matched": rule_matched,
                 "state_delta": json.loads(state_delta_json) if state_delta_json else {},
+                "failure_code": failure_code,
+                "authority_boundary": authority_boundary,
                 "prev_hash": prev_hash,
             }
             expected_hash = _hash_entry(prev_hash, entry_body)
