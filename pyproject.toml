@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "actenon-permit"
+version = "0.1.0"
+description = "Actenon-Permit: an open-source authority broker for AI agents. Bounded, revocable capability grants with hard runtime limits."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Actenon" }]
+keywords = ["ai", "agents", "security", "authorization", "pdp", "pep", "capabilities", "policy"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "pydantic>=2.5,<3",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "httpx>=0.27",  # for FastAPI test client
+]
+
+[project.scripts]
+permit = "actenon_permit.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/Actenon/Actenon-Permit"
+Repository = "https://github.com/Actenon/Actenon-Permit"
+Issues = "https://github.com/Actenon/Actenon-Permit/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/actenon_permit"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",  # line length handled by formatter
+    "B008",  # function calls in defaults (typer uses this)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]  # assert False is fine in tests
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
