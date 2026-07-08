@@ -124,7 +124,7 @@ def test_mutation_amount_detected_at_edge(setup):
     mutated_action = _make_action(grant, amount=99999)
     with pytest.raises(ProofVerificationError) as exc_info:
         verify_pccb_at_edge(intent, pccb, grant, mutated_action)
-    assert exc_info.value.refusal_code in ("ACTION_MISMATCH", "ACTION_HASH_MISMATCH")
+    assert exc_info.value.refusal_code in ("ACTION_MISMATCH", "ACTION_HASH_MISMATCH", "INTENT_MISMATCH")
 
 
 def test_mutation_target_detected_at_edge(setup):
@@ -148,7 +148,7 @@ def test_mutation_target_detected_at_edge(setup):
     )
     with pytest.raises(ProofVerificationError) as exc_info:
         verify_pccb_at_edge(intent, pccb, grant, mutated_action)
-    assert exc_info.value.refusal_code == "TARGET_MISMATCH"
+    assert exc_info.value.refusal_code in ("TARGET_MISMATCH", "INTENT_MISMATCH")
 
 
 def test_mutation_action_type_detected_at_edge(setup):
@@ -172,6 +172,7 @@ def test_mutation_action_type_detected_at_edge(setup):
         "ACTION_MISMATCH",
         "SCOPE_CAPABILITY_MISMATCH",
         "ACTION_HASH_MISMATCH",
+        "INTENT_MISMATCH",
     )
 
 

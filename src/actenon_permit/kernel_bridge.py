@@ -237,30 +237,17 @@ def verify_pccb_at_edge(
     verifier = PCCBVerifier(signer=signer)
     context = _build_context(grant, action, audience_id=audience_id)
 
-    # CRITICAL: build a FRESH intent from the ACTUAL action being attempted
-    # at the edge. The PCCB was minted for the original action; if the agent
-    # mutated any parameter (amount, target, action type) between issuance
-    # and execution, this fresh intent will differ from the one the PCCB was
-    # bound to, and the kernel's verifier will reject it (ACTION_MISMATCH,
-    # TARGET_MISMATCH, or ACTION_HASH_MISMATCH).
-    #
-    # The fresh intent reuses the original intent_id so the verifier's
-    # intent_id check passes — what we're testing is whether the action,
-    # target, and action_hash still match.
+    # Build a FRESH intent from the ACTUAL action being attempted at the edge.
+    # The fresh intent uses the CURRENT action's action_id as intent_id —
+    # NOT the original. This means:
+    #   - Normal flow (same action): intent_id matches → passes
+    #   - Replay (different action_id): intent_id mismatches → INTENT_MISMATCH
+    #   - Mutation (same action_id, different params): intent_id matches but
+    #     action_hash differs → ACTION_HASH_MISMATCH
+    # SECURITY: do NOT preserve the original intent_id — that would allow
+    # replay attacks (found by adversarial testing).
     actual_intent = _permit_action_to_kernel_intent(
         grant, action, tenant_id=intent.tenant.tenant_id, audience_id=audience_id
-    )
-    # Preserve the original intent_id so the verifier's intent_id check
-    # doesn't spuriously fire — the intent_id IS the same request, we're
-    # checking that the ACTION hasn't drifted.
-    actual_intent = ActionIntent(
-        intent_id=intent.intent_id,
-        issued_at=intent.issued_at,
-        expires_at=intent.expires_at,
-        tenant=intent.tenant,
-        requester=intent.requester,
-        action=actual_intent.action,
-        target=actual_intent.target,
     )
     verifier.verify(actual_intent, pccb, context)
 

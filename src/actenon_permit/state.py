@@ -257,7 +257,17 @@ class SQLiteStore(StateStore):
                         return False, "rate limit", {}
 
                 # Budget check.
-                if amount > 0 and remaining - amount < 0:
+                # SECURITY: reject negative amounts — a negative est_cost would
+                # inflate the budget (remaining - (-50) = remaining + 50),
+                # which is a budget bypass. Found by adversarial testing.
+                if amount < 0:
+                    cur.execute("ROLLBACK")
+                    return (
+                        False,
+                        "negative amounts are not allowed — this is a budget bypass attempt",
+                        {},
+                    )
+                if remaining - amount < 0:
                     cur.execute("ROLLBACK")
                     return (
                         False,
