@@ -71,9 +71,13 @@ uvicorn.run(app, host="127.0.0.1", port=7781, log_level="warning")
     stdout: "pipe",
     stderr: "pipe",
     cwd: resolve(import.meta.dir, "..", ".."),
-    // Inherit PATH and UV_CACHE_DIR from the environment so this works
-    // on any machine without hard-coded user paths.
-    env: process.env as Record<string, string>,
+    // Inherit PATH from the environment so this works on any machine.
+    // Ensure UV_CACHE_DIR is set (uv requires it; fall back to the
+    // standard location if not inherited).
+    env: {
+      ...process.env,
+      UV_CACHE_DIR: process.env.UV_CACHE_DIR || `${process.env.HOME}/.cache/uv`,
+    } as Record<string, string>,
   });
 
   // Wait for server to be ready
