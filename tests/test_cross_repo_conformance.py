@@ -17,6 +17,7 @@ CI, cloud runs an identical test against permit's bridge.
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -94,13 +95,16 @@ def test_permit_and_cloud_produce_identical_action_hashes(stable_key, tmp_db, mo
     # Mint cloud's PCCB for the same action
     # We import cloud's bridge directly — this test runs in an environment
     # where both permit and cloud are installed (the cross-repo CI env).
+    cloud_path = os.environ.get("ACTENON_CLOUD_PATH", "").strip()
+    if not cloud_path:
+        pytest.skip("ACTENON_CLOUD_PATH not set — set it to a cloud repo checkout to run cross-repo conformance")
     try:
         import sys
 
-        sys.path.insert(0, "/tmp/actenon-cloud")
+        sys.path.insert(0, cloud_path)
         from app.services.kernel_bridge import export_kernel_pccb
     except ImportError:
-        pytest.skip("cloud bridge not available in this env — run in cross-repo CI")
+        pytest.skip(f"cloud bridge not importable from {cloud_path} — check ACTENON_CLOUD_PATH")
 
     cloud_inputs = _make_cloud_inputs()
     # Align the issuer + audience so the only difference is the issuer party,
@@ -165,13 +169,16 @@ def test_cloud_pccb_verifies_with_kernel_verifier(stable_key):
     from actenon.proof.service import PCCBVerifier
     from actenon.proof.signers.local import build_local_proof_signer
 
+    cloud_path = os.environ.get("ACTENON_CLOUD_PATH", "").strip()
+    if not cloud_path:
+        pytest.skip("ACTENON_CLOUD_PATH not set — set it to a cloud repo checkout to run cross-repo conformance")
     try:
         import sys
 
-        sys.path.insert(0, "/tmp/actenon-cloud")
+        sys.path.insert(0, cloud_path)
         from app.services.kernel_bridge import export_kernel_pccb
     except ImportError:
-        pytest.skip("cloud bridge not available")
+        pytest.skip(f"cloud bridge not importable from {cloud_path} — check ACTENON_CLOUD_PATH")
 
     cloud_inputs = _make_cloud_inputs()
     intent, pccb = export_kernel_pccb(**cloud_inputs)
