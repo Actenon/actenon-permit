@@ -1,3 +1,4 @@
+import { resolve } from "path";
 import { describe, expect, it } from "bun:test";
 import {
   ControlPlaneClient,
@@ -33,15 +34,14 @@ async function withServer<T>(fn: (port: number) => Promise<T>): Promise<T> {
       "-c",
       `
 import os, sys
+db_path = os.path.join(os.getcwd(), "actenon-ts-test.db")
 os.environ["ACTENON_SIGNING_KEY"] = "${SIGNING_KEY}"
-os.environ["ACTENON_DB_PATH"] = "/tmp/actenon-ts-test.db"
+os.environ["ACTENON_DB_PATH"] = db_path
 os.environ["MOCK_STRIPE_KEY"] = "sk_mock_123"
-sys.path.insert(0, "src")
-sys.path.insert(0, "examples")
 
 # Wipe DB
-for p in ["/tmp/actenon-ts-test.db", "/tmp/actenon-ts-test.db-wal", "/tmp/actenon-ts-test.db-shm"]:
-    try: os.unlink(p)
+for suffix in ["", "-wal", "-shm"]:
+    try: os.unlink(db_path + suffix)
     except: pass
 
 import uvicorn
@@ -49,7 +49,7 @@ from actenon_permit import SQLiteStore, Ledger, PDP, Broker, Gateway, ToolRegist
 from actenon_permit.control import create_app
 from actenon_permit._mock_providers import mock_stripe_refund, mock_stripe_charge, mock_send_email
 
-state = SQLiteStore("/tmp/actenon-ts-test.db")
+state = SQLiteStore(db_path)
 ledger = Ledger(state)
 pdp = PDP(state, ledger)
 broker = Broker(pdp)
@@ -70,12 +70,10 @@ uvicorn.run(app, host="127.0.0.1", port=7781, log_level="warning")
     ],
     stdout: "pipe",
     stderr: "pipe",
-    cwd: "/home/z/my-project/Actenon-Permit",
-    env: {
-      ...process.env,
-      UV_CACHE_DIR: "/home/z/.cache/uv",
-      PATH: "/home/z/.local/bin:/usr/local/bin:/usr/bin:/bin",
-    },
+    cwd: resolve(import.meta.dir, "..", ".."),
+    // Inherit PATH and UV_CACHE_DIR from the environment so this works
+    // on any machine without hard-coded user paths.
+    env: process.env as Record<string, string>,
   });
 
   // Wait for server to be ready
