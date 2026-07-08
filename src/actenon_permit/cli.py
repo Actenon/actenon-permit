@@ -344,15 +344,42 @@ def serve(
     demo works out of the box); production deployments should register their
     own tools via a custom entrypoint.
     """
+    import socket
+
     import uvicorn
 
     from .control import create_app
+
+    # Pre-check: fail fast and loud if the port is taken. Uvicorn logs the
+    # error but exits 0, which means a stranger would think the server is
+    # running when it isn't. We'd rather exit non-zero immediately.
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, port))
+    except OSError as e:
+        typer.echo(
+            f"ERROR: cannot bind {host}:{port} — {e}\n"
+            f"  Is another `permit serve` already running on that port?\n"
+            f"  Use --port <PORT> to pick a different port.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from e
 
     gateway = None
     if with_gateway:
         gateway = _build_demo_gateway()
     application = create_app(gateway=gateway)
-    uvicorn.run(application, host=host, port=port, log_level="info")
+    typer.echo(f"Actenon-Permit control plane starting on http://{host}:{port}", err=True)
+    if with_gateway:
+        typer.echo(f"  gateway proxy: POST http://{host}:{port}/proxy/<tool>", err=True)
+    try:
+        uvicorn.run(application, host=host, port=port, log_level="info")
+    except OSError as e:
+        # Race: the port was free during pre-check but taken before uvicorn
+        # bound it. Still fail loud.
+        typer.echo(f"ERROR: uvicorn failed to bind: {e}", err=True)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -425,12 +452,19 @@ def attenuate(
 @app.command()
 def mint_token(
     grant_id: str = typer.Argument(..., help="Grant id to mint a bearer token for."),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the token (no warnings)."),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the token (suppress warnings to stderr)."),
 ) -> None:
     """Mint a v1 bearer token for a grant. The token is presented to the
     gateway as the X-Actenon-Grant header."""
+    from .model import suppress_dev_key_warning
     from .state import get_default_store
     from .token import grant_to_token
+
+    # --quiet suppresses the signing-key warning at the source so the token
+    # can be captured cleanly in shell pipelines like:
+    #   TOKEN=$(permit mint-token $GRANT_ID --quiet)
+    if quiet:
+        suppress_dev_key_warning(True)
 
     store = get_default_store()
     g = store.get_grant(grant_id)

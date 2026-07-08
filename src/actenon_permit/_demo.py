@@ -30,6 +30,7 @@ from actenon_permit import (  # noqa: E402
     GuardRegistry,
     Ledger,
     SQLiteStore,
+    StdinApprovalGate,
     guard,
 )
 from actenon_permit._mock_providers import (  # noqa: E402
@@ -110,13 +111,13 @@ def run_demo(*, auto_approve: bool = False) -> list[dict[str, Any]]:
     print(f"  approval:     {grant.approval_rules}")
     print()
 
-    # Approval gate — auto-approve in CI mode, blocking otherwise.
+    # Approval gate — auto-approve in CI mode, stdin-blocking otherwise.
     if auto_approve:
         registry.set_approval_gate(AutoApproveGate())
         print("  approval mode: AUTO (CI)")
     else:
-        print("  approval mode: INTERACTIVE")
-        print("  >>> Open another terminal and run `permit watch` to approve step 4 <<<")
+        registry.set_approval_gate(StdinApprovalGate())
+        print("  approval mode: INTERACTIVE (will prompt on step 4)")
     print()
 
     # Define guarded tools. The wrapped functions take `secret` as the first

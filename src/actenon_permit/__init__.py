@@ -19,6 +19,7 @@ from .enforce import (
     AutoApproveGate,
     BlockingApprovalGate,
     GuardRegistry,
+    StdinApprovalGate,
     guard,
     wrap,
 )
@@ -86,6 +87,7 @@ __all__ = [
     "GuardRegistry",
     "AutoApproveGate",
     "BlockingApprovalGate",
+    "StdinApprovalGate",
     # policy
     "compile_policy",
     "load_policy",

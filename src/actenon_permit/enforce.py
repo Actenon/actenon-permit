@@ -58,6 +58,38 @@ class AutoApproveGate:
         return True
 
 
+class StdinApprovalGate:
+    """Prompts on stdin for each approval. Used by the interactive demo.
+
+    When a REQUIRE_APPROVAL decision arrives, this gate prints the action
+    details and asks the user to press Enter to approve (or Ctrl+C / 'n' to
+    deny). This is the honest "human-in-the-loop" behavior for the demo
+    without requiring a separate `permit watch` terminal + running server.
+    """
+
+    def __init__(self, *, auto_approve_after: float | None = None):
+        self.auto_approve_after = auto_approve_after
+
+    def request(self, grant: Grant, action: Action, decision: Decision) -> bool:  # noqa: ARG002
+
+        print()
+        print("  ┌─ APPROVAL REQUIRED ─────────────────────────────────────")
+        print(f"  │ grant:   {grant.id} ({grant.agent_id})")
+        print(f"  │ action:  {action.type}  target={action.target}")
+        print(f"  │ params:  {action.params}")
+        print(f"  │ reason:  {decision.reason}")
+        print("  └─────────────────────────────────────────────────────────")
+        try:
+            resp = input("  approve? [Enter]=yes, 'n'=no, 'q'=quit: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("  (denied)")
+            return False
+        if resp == "q":
+            print("  (quit — denying and exiting demo)")
+            raise SystemExit(0)
+        return resp != "n"
+
+
 class BlockingApprovalGate:
     """Polls an approval store until a decision is made or timeout hits.
 

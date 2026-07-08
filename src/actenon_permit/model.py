@@ -25,6 +25,18 @@ from pydantic import BaseModel, Field, field_validator
 
 _DEV_KEY: str | None = None
 _WARNED_ABOUT_DEV_KEY = False
+_SUPPRESS_DEV_KEY_WARNING = False
+
+
+def suppress_dev_key_warning(suppress: bool = True) -> None:
+    """Suppress the 'ACTENON_SIGNING_KEY is not set' warning.
+
+    Used by CLI commands with ``--quiet`` so the warning doesn't pollute
+    shell-pipeline output. The warning is a hygiene nudge for interactive
+    use; in scripts it's just noise.
+    """
+    global _SUPPRESS_DEV_KEY_WARNING
+    _SUPPRESS_DEV_KEY_WARNING = suppress
 
 
 def _get_signing_key() -> bytes:
@@ -40,7 +52,7 @@ def _get_signing_key() -> bytes:
         return env_val.encode("utf-8")
     if _DEV_KEY is None:
         _DEV_KEY = secrets.token_hex(32)
-    if not _WARNED_ABOUT_DEV_KEY:
+    if not _WARNED_ABOUT_DEV_KEY and not _SUPPRESS_DEV_KEY_WARNING:
         import sys
 
         print(
