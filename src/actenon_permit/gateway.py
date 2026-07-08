@@ -243,7 +243,11 @@ class Gateway:
             est_cost=est_cost,
         )
 
-        decision = self.pdp.decide(grant, action, ctx={})
+        # Use decide_and_mint_pccb so we get a kernel PCCB on ALLOW.
+        # The PCCB is verified at the edge before the broker releases the
+        # real credential — this is the "agent physically cannot exceed"
+        # guarantee from ARCHITECTURE.md §3.
+        decision, intent, pccb = self.pdp.decide_and_mint_pccb(grant, action, ctx={})
 
         if decision.outcome == DecisionOutcome.DENY:
             return self._deny_response(action, decision, grant)
@@ -259,13 +263,38 @@ class Gateway:
                     "grant_id": grant.id,
                     "remaining_budget": grant.budget.remaining,
                 }
-            # Re-run decision after approval — state and clock have moved.
+            # Re-run decision + PCCB mint after approval — state and clock moved.
             grant = self.state.get_grant(grant.id) or grant
-            decision = self.pdp.decide(
+            decision, intent, pccb = self.pdp.decide_and_mint_pccb(
                 grant, action, ctx={"approved_action_id": action.action_id}
             )
             if decision.outcome != DecisionOutcome.ALLOW:
                 return self._deny_response(action, decision, grant)
+
+        # EDGE VERIFICATION — the kernel verifies the PCCB is bound to the
+        # EXACT action before we release the credential. This is the call
+        # that makes "the agent physically cannot exceed" true: a mutated
+        # amount, a different target, a replayed proof, an expired grant —
+        # any of these raises ProofVerificationError and we DENY.
+        if intent is not None and pccb is not None:
+            try:
+                from .kernel_bridge import verify_pccb_at_edge
+
+                verify_pccb_at_edge(intent, pccb, grant, action)
+            except Exception as e:
+                # Kernel verification failed — release the reservation and
+                # fail closed. The credential is NOT released.
+                if action.est_cost:
+                    with contextlib.suppress(Exception):
+                        self.state.release(grant.id, action.action_id, action.est_cost)
+                return {
+                    "outcome": "DENY",
+                    "reason": f"proof verification failed at edge: {e}",
+                    "rule_matched": "kernel:proof_verification_failed",
+                    "action_id": action.action_id,
+                    "grant_id": grant.id,
+                    "remaining_budget": grant.budget.remaining,
+                }
 
         # ALLOW — execute the real call via the broker (or directly if no
         # credential is needed).

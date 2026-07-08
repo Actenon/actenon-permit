@@ -27,6 +27,7 @@ dependencies = [
     "uvicorn>=0.27",
     "typer>=0.12",
     "pyyaml>=6.0",
+    "actenon-kernel @ git+https://github.com/Actenon/actenon-kernel.git",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +47,9 @@ Issues = "https://github.com/Actenon/Actenon-Permit/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/actenon_permit"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 line-length = 100

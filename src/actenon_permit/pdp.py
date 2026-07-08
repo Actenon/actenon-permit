@@ -374,3 +374,51 @@ class PDP:
         """
         reserved = action.est_cost or 0.0
         return self.state.commit(grant.id, action.action_id, actual_cost, reserved)
+
+    # ------------------------------------------------------------------
+    # Kernel PCCB emission (the spine wire)
+    # ------------------------------------------------------------------
+
+    def decide_and_mint_pccb(
+        self,
+        grant: Grant,
+        action: Action,
+        ctx: dict[str, Any] | None = None,
+    ) -> tuple[Decision, Any, Any]:
+        """Run the decision algorithm AND, on ALLOW, mint a kernel PCCB.
+
+        Returns ``(decision, intent, pccb)``. On non-ALLOW outcomes,
+        ``intent`` and ``pccb`` are ``None``.
+
+        The PCCB is the kernel-signed proof bound to the exact action. The
+        gateway verifies it before broker release — see
+        ``kernel_bridge.verify_pccb_at_edge``.
+
+        This method is the concrete implementation of ARCHITECTURE.md §3:
+        permit issues real kernel PCCBs, not parallel HMAC grants.
+        """
+        decision = self.decide(grant, action, ctx)
+        if decision.outcome != DecisionOutcome.ALLOW:
+            return decision, None, None
+
+        # Import here so the kernel dep is only required when PCCB emission
+        # is actually used (keeps `permit demo` working even if the kernel
+        # isn't installed, for the v0 in-process path).
+        from .kernel_bridge import KernelBridgeError, mint_pccb_for_action
+
+        try:
+            intent, pccb = mint_pccb_for_action(grant, action, decision)
+            return decision, intent, pccb
+        except KernelBridgeError:
+            # If the kernel bridge fails, fail closed: downgrade the decision
+            # to DENY. We never release a credential without a valid PCCB.
+            return (
+                Decision(
+                    outcome=DecisionOutcome.DENY,
+                    reason="PCCB emission failed — failing closed",
+                    rule_matched="kernel_bridge:emission_failed",
+                    state_delta=decision.state_delta,
+                ),
+                None,
+                None,
+            )

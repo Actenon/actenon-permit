@@ -5,6 +5,10 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  schedule:
+    # Nightly live-compat: run against current kernel main so drift is
+    # caught in a day, not at a customer. (ARCHITECTURE.md §6)
+    - cron: "0 3 * * *"
 
 jobs:
   test-python:
@@ -38,6 +42,30 @@ jobs:
 
       - name: Run v1 gateway demo (smoke test)
         run: uv run permit demo --mode gateway --auto-approve
+
+  kernel-conformance:
+    # Phase 2: cross-repo conformance — run the kernel's own conformance
+    # suite against the installed kernel to prove the spine is intact.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install permit (which pulls actenon-kernel)
+        run: uv sync --extra dev
+
+      - name: Run kernel conformance suite
+        run: uv run python -m actenon.cli conformance run --require-complete
+
+      - name: Run cross-repo PCCB conformance test
+        run: uv run pytest tests/test_cross_repo_conformance.py -v
 
   test-ts:
     runs-on: ubuntu-latest
