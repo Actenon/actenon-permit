@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -31,6 +32,26 @@ from actenon_permit import (
 )
 from actenon_permit.model import Action
 from actenon_permit.policy import compile_policy
+
+
+def _find_cloud_checkout() -> str:
+    """Find a cloud checkout: env var, sibling dir, or common locations."""
+    env_path = os.environ.get("ACTENON_CLOUD_PATH", "").strip()
+    if env_path and Path(env_path).is_dir():
+        return env_path
+    repo_root = Path(__file__).resolve().parent.parent
+    for candidate in [
+        repo_root.parent / "actenon-cloud",
+        repo_root.parent / "actenon-cloud-fresh",
+        repo_root.parent / "cloud",
+        Path("/tmp/actenon-cloud"),
+        Path("/tmp/actenon-cloud-fresh"),
+        Path("/tmp/fix-c"),
+    ]:
+        if candidate.is_dir() and (candidate / "app" / "services" / "kernel_bridge.py").is_file():
+            return str(candidate)
+    return ""
+
 
 
 def _make_permit_grant_and_action() -> tuple[Grant, Action]:
@@ -95,9 +116,9 @@ def test_permit_and_cloud_produce_identical_action_hashes(stable_key, tmp_db, mo
     # Mint cloud's PCCB for the same action
     # We import cloud's bridge directly — this test runs in an environment
     # where both permit and cloud are installed (the cross-repo CI env).
-    cloud_path = os.environ.get("ACTENON_CLOUD_PATH", "").strip()
+    cloud_path = os.environ.get("ACTENON_CLOUD_PATH", "").strip() or _find_cloud_checkout()
     if not cloud_path:
-        pytest.skip("ACTENON_CLOUD_PATH not set — set it to a cloud repo checkout to run cross-repo conformance")
+        pytest.skip("cloud checkout not found — set ACTENON_CLOUD_PATH or clone actenon-cloud as a sibling directory")
     try:
         import sys
 
@@ -169,9 +190,9 @@ def test_cloud_pccb_verifies_with_kernel_verifier(stable_key):
     from actenon.proof.service import PCCBVerifier
     from actenon.proof.signers.local import build_local_proof_signer
 
-    cloud_path = os.environ.get("ACTENON_CLOUD_PATH", "").strip()
+    cloud_path = os.environ.get("ACTENON_CLOUD_PATH", "").strip() or _find_cloud_checkout()
     if not cloud_path:
-        pytest.skip("ACTENON_CLOUD_PATH not set — set it to a cloud repo checkout to run cross-repo conformance")
+        pytest.skip("cloud checkout not found — set ACTENON_CLOUD_PATH or clone actenon-cloud as a sibling directory")
     try:
         import sys
 
