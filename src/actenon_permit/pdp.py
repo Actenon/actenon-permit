@@ -477,14 +477,16 @@ class PDP:
         # Import here so the kernel dep is only required when PCCB emission
         # is actually used (keeps `permit demo` working even if the kernel
         # isn't installed, for the v0 in-process path).
-        from .kernel_bridge import KernelBridgeError, mint_pccb_for_action
+        from .kernel_bridge import mint_pccb_for_action
 
         try:
             intent, pccb = mint_pccb_for_action(grant, action, decision)
             return decision, intent, pccb
-        except KernelBridgeError:
-            # If the kernel bridge fails, fail closed: downgrade the decision
-            # to DENY. We never release a credential without a valid PCCB.
+        except Exception:
+            # If the kernel bridge fails for ANY reason (including
+            # JSONInputTooLargeError from oversized params), fail closed:
+            # downgrade the decision to DENY. We never release a credential
+            # without a valid PCCB. Found by adversarial testing (round 3).
             return (
                 Decision(
                     outcome=DecisionOutcome.DENY,
