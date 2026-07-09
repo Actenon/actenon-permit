@@ -14,6 +14,7 @@ import os
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -113,7 +114,16 @@ def _get_signing_key() -> bytes:
 
 def canonical_json(obj: Any) -> str:
     """Deterministic JSON for signing/hashing."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=_json_default)
+
+
+def _json_default(obj: Any) -> Any:
+    """Handle Decimal and other non-JSON-native types."""
+    from decimal import Decimal
+    if isinstance(obj, Decimal):
+        # Use str() for exact representation (e.g. '0.1' not 0.10000000000000001)
+        return str(obj)
+    return str(obj)
 
 
 def sign(payload: dict[str, Any]) -> str:
@@ -158,12 +168,27 @@ class Scopes(BaseModel):
 
 class Budget(BaseModel):
     currency: str = "USD"
-    limit: float = 0.0
-    remaining: float = 0.0
+    limit: Decimal = Decimal("0")
+    remaining: Decimal = Decimal("0")
+
+    @field_validator("limit", "remaining", mode="before")
+    @classmethod
+    def _to_decimal(cls, v):
+        """Convert float/int/str to Decimal for exact monetary arithmetic.
+
+        This fixes F2: 3 x $0.10 against $0.30 should be 3 ALLOWs, but
+        with floats 0.30 - 0.10 - 0.10 = 0.09999999999999998, so the
+        third $0.10 was wrongly DENIED.
+        """
+        if isinstance(v, Decimal):
+            return v
+        if isinstance(v, float):
+            return Decimal(str(v))
+        return Decimal(v)
 
     @field_validator("limit", "remaining")
     @classmethod
-    def _non_negative(cls, v: float) -> float:
+    def _non_negative(cls, v: Decimal) -> Decimal:
         if v < 0:
             raise ValueError("budget values must be non-negative")
         return v
@@ -225,7 +250,7 @@ class Grant(BaseModel):
         expires_at: datetime | None = None,
         scopes_allow: list[str] | None = None,
         scopes_deny: list[str] | None = None,
-        budget_limit: float | None = None,
+        budget_limit: Decimal | float | int | None = None,
         rate_max: int | None = None,
         rate_per_seconds: int | None = None,
         extra_approval_rules: list[str] | None = None,
@@ -303,7 +328,7 @@ class Action(BaseModel):
     type: str  # e.g. "payment.refund", "email.send", "shell.exec"
     target: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
-    est_cost: float | None = None
+    est_cost: Decimal | float | int | None = None
 
 
 class Decision(BaseModel):

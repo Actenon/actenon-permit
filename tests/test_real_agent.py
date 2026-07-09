@@ -233,7 +233,7 @@ def test_real_llm_agent_through_gateway(gateway_url):
     # Verify the agent can fetch grant state.
     grant = client.get_grant()
     assert grant["status"] == "active"
-    assert grant["budget"]["remaining"] == 50.0
+    assert float(grant["budget"]["remaining"]) == 50.0
 
     agent = LLMAgent(client, verbose=False)
     # A simple request the LLM should be able to plan: refund $10.

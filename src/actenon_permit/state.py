@@ -27,6 +27,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from .model import Grant, GrantStatus
@@ -60,7 +61,7 @@ class StateStore(ABC):
         self,
         grant_id: str,
         action_id: str,
-        amount: float,
+        amount: float | Decimal | int,
         rate_max: int,
         rate_per_seconds: int,
     ) -> tuple[bool, str, dict[str, Any]]:
@@ -77,15 +78,15 @@ class StateStore(ABC):
         self,
         grant_id: str,
         action_id: str,
-        actual_cost: float,
-        reserved_amount: float,
+        actual_cost: float | Decimal | int,
+        reserved_amount: float | Decimal | int,
     ) -> float:
         """Commit the actual cost of an action, releasing the difference
         between reservation and actual. Returns the new ``remaining``.
         """
 
     @abstractmethod
-    def release(self, grant_id: str, action_id: str, reserved_amount: float) -> float:
+    def release(self, grant_id: str, action_id: str, reserved_amount: float | Decimal | int) -> float:
         """Release a reservation without recording an actual cost (e.g. on
         DENY-after-reserve failure paths). Returns the new ``remaining``.
         """
@@ -160,7 +161,7 @@ class SQLiteStore(StateStore):
                     grant.agent_id,
                     body,
                     grant.status.value,
-                    grant.budget.remaining,
+                    float(grant.budget.remaining),
                     now,
                 ),
             )
@@ -218,7 +219,7 @@ class SQLiteStore(StateStore):
         self,
         grant_id: str,
         action_id: str,
-        amount: float,
+        amount: float | Decimal | int,
         rate_max: int,
         rate_per_seconds: int,
     ) -> tuple[bool, str, dict[str, Any]]:
@@ -256,18 +257,19 @@ class SQLiteStore(StateStore):
                         cur.execute("ROLLBACK")
                         return False, "rate limit", {}
 
-                # Budget check.
-                # SECURITY: reject negative amounts — a negative est_cost would
-                # inflate the budget (remaining - (-50) = remaining + 50),
-                # which is a budget bypass. Found by adversarial testing.
-                if amount < 0:
+                # Convert to Decimal for exact arithmetic (F2 fix)
+                dec_amount = Decimal(str(amount)) if not isinstance(amount, Decimal) else amount
+                dec_remaining = Decimal(str(remaining)) if not isinstance(remaining, Decimal) else remaining
+
+                # SECURITY: reject negative amounts
+                if dec_amount < 0:
                     cur.execute("ROLLBACK")
                     return (
                         False,
                         "negative amounts are not allowed — this is a budget bypass attempt",
                         {},
                     )
-                if remaining - amount < 0:
+                if dec_remaining - dec_amount < 0:
                     cur.execute("ROLLBACK")
                     return (
                         False,
@@ -276,7 +278,7 @@ class SQLiteStore(StateStore):
                     )
 
                 # Reserve.
-                new_remaining = remaining - amount
+                new_remaining = float(dec_remaining - dec_amount)
                 now_iso = datetime.now(UTC).isoformat()
                 cur.execute(
                     "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
@@ -292,7 +294,7 @@ class SQLiteStore(StateStore):
                 # get_grant() (which reads body, not the column) returns the
                 # live value. Without this, concurrent reserves see stale
                 # remaining from body and over-spend.
-                grant.budget.remaining = new_remaining
+                grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
                 new_status = grant.status
                 if new_remaining <= 0 and amount > 0:
                     new_status = GrantStatus.EXHAUSTED
@@ -320,8 +322,8 @@ class SQLiteStore(StateStore):
         self,
         grant_id: str,
         action_id: str,
-        actual_cost: float,
-        reserved_amount: float,
+        actual_cost: float | Decimal | int,
+        reserved_amount: float | Decimal | int,
     ) -> float:
         """Commit actual cost and release the over-reservation."""
         # SECURITY: reject negative actual costs — a negative actual_cost would
@@ -344,11 +346,13 @@ class SQLiteStore(StateStore):
                 body, remaining = row
                 grant = Grant.model_validate_json(body)
 
-                # Release the difference back.
-                # Clamp release to [0, reserved] so a weird actual_cost
-                # can't inflate budget or release more than was reserved.
-                release_amount = max(0.0, min(reserved_amount, reserved_amount - actual_cost))
-                new_remaining = remaining + release_amount
+                # Decimal arithmetic (F2 fix)
+                dec_reserved = Decimal(str(reserved_amount)) if not isinstance(reserved_amount, Decimal) else reserved_amount
+                dec_actual = Decimal(str(actual_cost)) if not isinstance(actual_cost, Decimal) else actual_cost
+                if dec_actual < 0:
+                    dec_actual = Decimal("0")
+                release_amount = max(Decimal("0"), min(dec_reserved, dec_reserved - dec_actual))
+                new_remaining = float(Decimal(str(remaining)) + release_amount)
 
                 cur.execute(
                     "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
@@ -359,7 +363,7 @@ class SQLiteStore(StateStore):
                     (actual_cost, action_id),
                 )
                 # Reflect in body
-                grant.budget.remaining = new_remaining
+                grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
                 cur.execute(
                     "UPDATE grants SET body = ? WHERE id = ?",
                     (grant.model_dump_json(), grant_id),
@@ -371,7 +375,7 @@ class SQLiteStore(StateStore):
                     cur.execute("ROLLBACK")
                 raise
 
-    def release(self, grant_id: str, action_id: str, reserved_amount: float) -> float:
+    def release(self, grant_id: str, action_id: str, reserved_amount: float | Decimal | int) -> float:
         """Release a reservation without an actual cost (failure path)."""
         now_iso = datetime.now(UTC).isoformat()
         with self._lock:
@@ -386,7 +390,8 @@ class SQLiteStore(StateStore):
                 body, remaining = row
                 grant = Grant.model_validate_json(body)
 
-                new_remaining = remaining + reserved_amount
+                dec_reserved = Decimal(str(reserved_amount)) if not isinstance(reserved_amount, Decimal) else reserved_amount
+                new_remaining = float(Decimal(str(remaining)) + dec_reserved)
                 cur.execute(
                     "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
                     (new_remaining, now_iso, grant_id),
@@ -394,7 +399,7 @@ class SQLiteStore(StateStore):
                 # Remove the rate_events row entirely — a released action
                 # should not count toward rate limit (the action didn't fire).
                 cur.execute("DELETE FROM rate_events WHERE action_id = ?", (action_id,))
-                grant.budget.remaining = new_remaining
+                grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
                 cur.execute(
                     "UPDATE grants SET body = ? WHERE id = ?",
                     (grant.model_dump_json(), grant_id),

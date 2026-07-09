@@ -78,7 +78,7 @@ def test_attenuate_creates_weaker_child(tmp_db, monkeypatch):
     assert resp.status_code == 200
     child = resp.json()
     assert child["agent_id"] == "child-agent"
-    assert child["budget"]["limit"] == 20
+    assert float(child["budget"]["limit"]) == 20
     assert child["scopes"]["allow"] == ["payment.refund"]
     assert child["id"] != parent.id
     # The child must be signed.

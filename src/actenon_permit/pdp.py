@@ -121,7 +121,7 @@ def _build_authority_boundary(grant: Grant, action: Action) -> dict[str, Any]:
         "envelope": {
             "scopes_allow": list(grant.scopes.allow),
             "scopes_deny": list(grant.scopes.deny),
-            "budget_remaining_at_decision": grant.budget.remaining,
+            "budget_remaining_at_decision": float(grant.budget.remaining),
             "expires_at": grant.expires_at.isoformat(),
             "rate_max": grant.rate.max,
             "rate_per_seconds": grant.rate.per_seconds,

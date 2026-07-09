@@ -24,9 +24,26 @@ from .model import canonical_json
 GENESIS_PREV_HASH = "0" * 64
 
 
+def _json_normalize(obj: Any) -> Any:
+    """Recursively normalize to JSON-safe types with consistent numeric representation.
+
+    Decimal -> float, int -> float (so 20 and 20.0 hash identically),
+    because SQLite REAL columns convert int to float on storage.
+    """
+    from decimal import Decimal
+    if isinstance(obj, (Decimal, int)) and not isinstance(obj, bool):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: _json_normalize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_normalize(item) for item in obj]
+    return obj
+
+
 def _hash_entry(prev_hash: str, entry_body: dict[str, Any]) -> str:
     """``sha256(prev_hash + canonical_json(entry_without_hash))``."""
-    payload = (prev_hash + canonical_json(entry_body)).encode("utf-8")
+    normalized = _json_normalize(entry_body)
+    payload = (prev_hash + canonical_json(normalized)).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -273,10 +290,27 @@ class Ledger:
 
         prev_hash = GENESIS_PREV_HASH
         for r in rows:
-            (seq, action_id, grant_id, ts, action_type, target, params_json,
-             est_cost, outcome, reason, rule_matched, state_delta_json,
-             failure_code, authority_boundary_json, stored_prev_hash,
-             stored_hash) = r
+            # Use dict to avoid column-order fragility (ALTER TABLE adds cols at end)
+            cols = ['seq', 'action_id', 'grant_id', 'ts', 'action_type', 'target',
+                    'params', 'est_cost', 'outcome', 'reason', 'rule_matched',
+                    'state_delta', 'failure_code', 'authority_boundary',
+                    'prev_hash', 'hash']
+            row_dict = dict(zip(cols, r, strict=True))
+            action_id = row_dict['action_id']
+            grant_id = row_dict['grant_id']
+            ts = row_dict['ts']
+            action_type = row_dict['action_type']
+            target = row_dict['target']
+            params_json = row_dict['params']
+            est_cost = row_dict['est_cost']
+            outcome = row_dict['outcome']
+            reason = row_dict['reason']
+            rule_matched = row_dict['rule_matched']
+            state_delta_json = row_dict['state_delta']
+            failure_code = row_dict['failure_code']
+            authority_boundary_json = row_dict['authority_boundary']
+            stored_prev_hash = row_dict['prev_hash']
+            stored_hash = row_dict['hash']
 
             # Check the prev_hash field matches what we expect.
             if stored_prev_hash != prev_hash:

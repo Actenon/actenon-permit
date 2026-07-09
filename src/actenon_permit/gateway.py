@@ -261,7 +261,7 @@ class Gateway:
                     "rule_matched": decision.rule_matched,
                     "action_id": action.action_id,
                     "grant_id": grant.id,
-                    "remaining_budget": grant.budget.remaining,
+                    "remaining_budget": float(grant.budget.remaining),
                 }
             # Re-run decision + PCCB mint after approval — state and clock moved.
             grant = self.state.get_grant(grant.id) or grant
@@ -293,7 +293,7 @@ class Gateway:
                     "rule_matched": "kernel:proof_verification_failed",
                     "action_id": action.action_id,
                     "grant_id": grant.id,
-                    "remaining_budget": grant.budget.remaining,
+                    "remaining_budget": float(grant.budget.remaining),
                 }
 
         # ALLOW — execute the real call via the broker (or directly if no
@@ -322,7 +322,7 @@ class Gateway:
                 "rule_matched": "broker:credential_missing",
                 "action_id": action.action_id,
                 "grant_id": grant.id,
-                "remaining_budget": grant.budget.remaining,
+                "remaining_budget": float(grant.budget.remaining),
             }
         except Exception as e:
             # The real call raised. Reconcile cost as 0 (nothing happened
@@ -336,7 +336,7 @@ class Gateway:
                 "rule_matched": "broker:execution_error",
                 "action_id": action.action_id,
                 "grant_id": grant.id,
-                "remaining_budget": grant.budget.remaining,
+                "remaining_budget": float(grant.budget.remaining),
             }
 
         # Reload grant to get the post-commit remaining.
@@ -348,7 +348,7 @@ class Gateway:
             "result": result,
             "action_id": action.action_id,
             "grant_id": grant.id,
-            "remaining_budget": live.budget.remaining,
+            "remaining_budget": float(live.budget.remaining),
         }
 
     @staticmethod
@@ -359,7 +359,7 @@ class Gateway:
             "rule_matched": decision.rule_matched,
             "action_id": action.action_id,
             "grant_id": grant.id,
-            "remaining_budget": grant.budget.remaining,
+            "remaining_budget": float(grant.budget.remaining),
         }
 
 
