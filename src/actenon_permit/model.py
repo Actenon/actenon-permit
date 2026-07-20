@@ -19,7 +19,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Signing key handling
@@ -167,6 +167,8 @@ class Scopes(BaseModel):
 
 
 class Budget(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     currency: str = "USD"
     limit: Decimal = Decimal("0")
     remaining: Decimal = Decimal("0")
