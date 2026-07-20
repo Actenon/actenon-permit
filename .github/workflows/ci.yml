@@ -62,7 +62,10 @@ jobs:
         run: uv sync --extra dev
 
       - name: Run kernel conformance suite
-        run: uv run python -m actenon.cli conformance run --require-complete
+        # Run from /tmp so permit's local examples/ directory doesn't
+        # shadow the kernel's examples.invoice_payment_guard_local
+        # package installed in site-packages (namespace collision).
+        run: cd /tmp && uv run --project ${{ github.workspace }} python -m actenon.cli conformance run --require-complete
 
       - name: Run cross-repo PCCB conformance test
         run: uv run pytest tests/test_cross_repo_conformance.py -v

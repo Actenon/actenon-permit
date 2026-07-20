@@ -17,6 +17,32 @@ export interface ControlPlaneClientOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Coerce a value that may arrive as a Decimal-serialised string (e.g. "50.0")
+ * into a number. The Python backend uses Decimal for exact monetary arithmetic
+ * and serialises it as a JSON string; the TS SDK presents it as a number.
+ */
+function coerceNumber(v: unknown): number {
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (!isNaN(n)) return n;
+  }
+  return 0;
+}
+
+/** Normalise a Grant's budget fields from wire format (strings) to numbers. */
+function coerceGrant(g: Grant): Grant {
+  if (g?.budget) {
+    g.budget.limit = coerceNumber(g.budget.limit);
+    g.budget.remaining = coerceNumber(g.budget.remaining);
+  }
+  if (g?.rate) {
+    g.rate.max = coerceNumber(g.rate.max);
+  }
+  return g;
+}
+
 export class ControlPlaneClient {
   private baseUrl: string;
   private fetchFn: typeof fetch;
@@ -36,16 +62,17 @@ export class ControlPlaneClient {
   }
 
   async issueGrant(policy: Policy): Promise<Grant> {
-    return this.postJson("/grants", { policy });
+    return coerceGrant(await this.postJson<Grant>("/grants", { policy }));
   }
 
   async listGrants(agentId?: string): Promise<Grant[]> {
     const qs = agentId ? `?agent_id=${encodeURIComponent(agentId)}` : "";
-    return this.getJson(`/grants${qs}`);
+    const grants = await this.getJson<Grant[]>(`/grants${qs}`);
+    return grants.map(coerceGrant);
   }
 
   async getGrant(grantId: string): Promise<Grant> {
-    return this.getJson(`/grants/${encodeURIComponent(grantId)}`);
+    return coerceGrant(await this.getJson<Grant>(`/grants/${encodeURIComponent(grantId)}`));
   }
 
   async revokeGrant(grantId: string): Promise<{ grant_id: string; status: string }> {
@@ -53,7 +80,7 @@ export class ControlPlaneClient {
   }
 
   async attenuateGrant(grantId: string, req: AttenuateRequest): Promise<Grant> {
-    return this.postJson(`/grants/${encodeURIComponent(grantId)}/attenuate`, req);
+    return coerceGrant(await this.postJson<Grant>(`/grants/${encodeURIComponent(grantId)}/attenuate`, req));
   }
 
   async mintToken(grantId: string): Promise<{ grant_id: string; token: string }> {

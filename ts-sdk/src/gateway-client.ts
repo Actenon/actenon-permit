@@ -82,6 +82,11 @@ export class GatewayClient {
       throw new PermitError(`empty response from ${url} (status ${resp.status})`);
     }
     if (payload.outcome === "ALLOW") {
+      // Coerce remaining_budget from Decimal-string to number if needed.
+      if (payload.remaining_budget != null && typeof payload.remaining_budget !== "number") {
+        const n = Number(payload.remaining_budget);
+        payload.remaining_budget = isNaN(n) ? null : n;
+      }
       return payload.result;
     }
     throw new PermitDenied(payload.reason, {
