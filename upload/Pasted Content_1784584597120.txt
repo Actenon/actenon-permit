@@ -1,0 +1,1151 @@
+ACTENON THREE-REPOSITORY SECURITY, CONSISTENCY AND ADOPTION UPGRADE
+
+You are acting as the principal security engineer and maintainer for three related repositories:
+
+* https://github.com/Actenon/actenon-kernel
+* https://github.com/Actenon/actenon-permit
+* https://github.com/Actenon/actenon-cloud
+
+Your task is to implement a tightly scoped, production-quality upgrade across all three repositories.
+
+The purpose of this pass is to:
+
+1. fix confirmed security and semantic weaknesses;
+2. remove documentation contradictions;
+3. connect Permit grants to Kernel proofs cleanly;
+4. distinguish replay protection from idempotent delivery;
+5. make receipt chaining enforceable by issuer policy;
+6. add one credible brokered GitHub publication integration;
+7. improve cross-repository conformance;
+8. remove stale, misleading or unfinished production states;
+9. preserve Actenon’s existing architecture rather than inventing a parallel system.
+
+The central invariant remains:
+
+No valid proof, no execution.
+
+Do not build a probabilistic “trajectory monitor.”
+Do not introduce a second mission-envelope format.
+Do not weaken existing fail-closed behaviour.
+Do not claim that Actenon prevents sandbox escape or prompt injection.
+Do not replace existing active-v1 artifacts where an additive extension will work.
+
+⸻
+
+OPERATING RULES
+
+1. Inspect before changing
+
+Before making any changes:
+
+* locate all three repositories;
+* pull the latest default branch;
+* inspect their current status;
+* read the main README, architecture, guarantee, threat-model, blocker, ship-status and conformance documents;
+* locate the real implementation paths rather than assuming filenames from this prompt;
+* run the complete existing test suites;
+* run lint, formatting, type checking, verification scripts, judge scripts and builds where present;
+* record baseline test counts and failures.
+
+Do not overwrite uncommitted user work.
+
+If a repository has uncommitted changes:
+
+* inspect them;
+* preserve them;
+* do not discard them;
+* report the conflict before altering overlapping files.
+
+Create a working branch in each repository:
+
+security/cross-repo-hardening
+
+Use small, logically separated commits. Do not create one giant commit.
+
+Suggested commit groups:
+
+1. verifier oracle hardening;
+2. canonicalisation profile;
+3. idempotency and reconciliation;
+4. Permit authority binding;
+5. receipt-chain policy enforcement;
+6. Cloud readiness consistency;
+7. GitHub brokered integration;
+8. documentation and final cleanup.
+
+⸻
+
+PHASE 1 — BASELINE AND ARCHITECTURAL INVENTORY
+
+Produce a concise internal baseline report before editing anything.
+
+For each repository, capture:
+
+* current branch and commit;
+* total tests passing/failing;
+* lint/type/build status;
+* current public artifact versions;
+* signing algorithms;
+* proof/grant/receipt schemas;
+* replay implementation;
+* idempotency implementation, if any;
+* receipt-chain implementation;
+* credential-broker implementation;
+* provider adapters;
+* production-readiness claims;
+* TODO, FIXME, placeholder, simulated, mock, temporary and “not implemented” occurrences;
+* cross-repository dependencies and conformance tests.
+
+Explicitly verify whether the following observations are still true before changing them:
+
+* Kernel performs semantic proof checks before signature verification.
+* Unexpected handler failure consumes replay authority.
+* Canonicalisation is labelled RFC8785-JCS while rejecting floating-point values.
+* Receipt-chain evidence exists but is not universally enforceable as an issuer policy prerequisite.
+* Permit grants are not cryptographically referenced from PCCBs.
+* Cloud README readiness claims conflict with BLOCKERS.md or SHIP_STATUS.md.
+* Cloud lacks a real optional GitHub provider route.
+* Public examples use mocks without a live-provider option.
+
+Do not implement a fix for an observation that is no longer true. Document what you verified.
+
+⸻
+
+PHASE 2 — HARDEN KERNEL PROOF VERIFICATION
+
+Repository:
+
+actenon-kernel
+
+Objective
+
+Prevent unauthenticated forged proofs from using detailed refusal codes as a field-by-field oracle.
+
+Required design
+
+The verifier may perform only the minimum safe work necessary before signature authentication:
+
+1. bounded structural parsing;
+2. JSON depth and total-size checks;
+3. required-field presence checks needed to resolve the verification key;
+4. strict type and encoding validation;
+5. safe issuer/key lookup;
+6. canonicalisation of the unsigned proof;
+7. signature verification.
+
+Only after the signature is valid should it return detailed semantic failures for:
+
+* time bounds;
+* audience;
+* scope;
+* capability;
+* intent identifier;
+* tenant;
+* subject;
+* action;
+* target;
+* action hash;
+* policy constraints.
+
+Public refusal behaviour
+
+Introduce an explicit refusal-disclosure policy.
+
+Support at least:
+
+public_generic
+trusted_detailed
+local_debug
+
+Expected behaviour:
+
+public_generic
+
+For an untrusted or invalidly signed proof, return one non-oracular public result such as:
+
+PROOF_INVALID
+
+Do not expose whether the forged proof had the wrong:
+
+* tenant;
+* target;
+* audience;
+* action;
+* subject;
+* capability;
+* expiry;
+* hash.
+
+Detailed diagnostics may still be written to a protected internal diagnostic sink, but must not be placed in public receipts, API bodies or caller-visible exception fields.
+
+trusted_detailed
+
+Once the proof is cryptographically authentic, permit existing detailed refusal codes such as:
+
+* AUDIENCE_MISMATCH
+* TENANT_MISMATCH
+* ACTION_MISMATCH
+* TARGET_MISMATCH
+* PROOF_EXPIRED
+
+local_debug
+
+Allow full details for explicit local-development mode only. It must be impossible to enable accidentally in a production-like environment.
+
+Important distinction
+
+Preserve the semantic difference between:
+
+INTENT_MISMATCH
+
+and:
+
+ACTION_MISMATCH
+
+Use:
+
+* INTENT_MISMATCH only when the signed intent_id differs;
+* ACTION_MISMATCH when the bound action or action parameters differ;
+* TARGET_MISMATCH when the target differs.
+
+Update examples that incorrectly describe parameter drift as INTENT_MISMATCH.
+
+Do not silently rename public refusal codes without a compatibility strategy.
+
+Security tests
+
+Add adversarial tests proving:
+
+1. forged proof with wrong audience returns only PROOF_INVALID;
+2. forged proof with wrong tenant returns only PROOF_INVALID;
+3. forged proof with wrong target returns only PROOF_INVALID;
+4. forged proof with expired timestamp returns only PROOF_INVALID;
+5. forged proof with multiple changed fields returns the same public result;
+6. validly signed but audience-mismatched proof returns AUDIENCE_MISMATCH;
+7. validly signed but action-mismatched proof returns ACTION_MISMATCH;
+8. validly signed but target-mismatched proof returns TARGET_MISMATCH;
+9. trusted logs retain precise internal diagnostics without leaking secrets;
+10. public receipts do not include untrusted forged field values;
+11. key-discovery and issuer-resolution paths remain SSRF-safe;
+12. malformed or oversized proofs fail before expensive cryptographic work;
+13. no timing-sensitive secret comparison is changed to a non-constant-time comparison.
+
+Document the verifier order as a security invariant.
+
+⸻
+
+PHASE 3 — DEFINE AN HONEST CANONICALISATION PROFILE
+
+Repository:
+
+actenon-kernel
+
+Problem
+
+The implementation rejects floating-point numbers but labels its canonicalisation as:
+
+RFC8785-JCS
+
+That is a stricter profile and must be named accurately.
+
+Required change
+
+Create a versioned Actenon canonicalisation profile, for example:
+
+ACTENON-JCS-STRICT-1
+
+The exact final name may differ if the repository already has a naming convention, but it must be:
+
+* explicit;
+* versioned;
+* documented;
+* stable;
+* testable across implementations.
+
+Define normative behaviour:
+
+* UTF-8 JSON;
+* object keys must be strings;
+* deterministic key ordering;
+* integers supported;
+* floating-point values prohibited;
+* NaN and Infinity prohibited;
+* bounded nesting depth;
+* bounded canonical output size;
+* deterministic handling of lists, booleans, null and strings;
+* no implementation-dependent numeric coercion.
+
+Compatibility
+
+Do not invalidate existing stored proofs without a migration path.
+
+Implement:
+
+* legacy verification support for the existing RFC8785-JCS identifier where required;
+* new proof minting using the new strict profile;
+* explicit compatibility tests;
+* documentation explaining that the legacy identifier represented Actenon’s historical strict subset;
+* conformance vectors for independent implementations.
+
+Add positive and negative test vectors in a machine-readable format.
+
+Test at least:
+
+* key ordering;
+* Unicode strings;
+* nested structures;
+* maximum depth;
+* maximum output size;
+* integer boundaries;
+* float rejection;
+* NaN/Infinity rejection;
+* non-string key rejection;
+* legacy proof verification;
+* new-profile proof verification;
+* cross-language portability assumptions.
+
+⸻
+
+PHASE 4 — SEPARATE REPLAY, IDEMPOTENCY AND RECONCILIATION
+
+Primary repository:
+
+actenon-kernel
+
+Supporting changes may be required in:
+
+actenon-permit
+actenon-cloud
+
+Problem
+
+Single-use proof replay protection is not equivalent to business-operation idempotency.
+
+An unexpected provider exception can leave this ambiguous state:
+
+* authority consumed;
+* provider operation may have succeeded;
+* caller received no definitive acknowledgement;
+* automatic retry risks duplication;
+* automatic reissuance risks duplication.
+
+Required model
+
+Introduce a first-class operation identity.
+
+Use an immutable identifier such as:
+
+operation_id
+
+or:
+
+idempotency_key
+
+The field must be bound to the exact action and included in the signed/hash-bound material.
+
+Define behaviour:
+
+First request
+
+* validate proof;
+* atomically claim the operation;
+* execute the handler;
+* pass the same operation identifier to provider adapters that support idempotency;
+* record the terminal outcome;
+* persist the receipt;
+* mark the proof consumed.
+
+Same operation ID and same bound action
+
+* do not execute the handler again;
+* return the recorded prior outcome or receipt;
+* expose an explicit result such as:
+
+IDEMPOTENT_REPLAY
+
+This is not an error if the original operation completed.
+
+Same operation ID and different action hash
+
+Refuse:
+
+IDEMPOTENCY_CONFLICT
+
+Do not execute.
+
+Unknown provider outcome
+
+If the handler fails after dispatch and the provider outcome cannot be known:
+
+* consume the proof;
+* mark the operation:
+
+OUTCOME_UNKNOWN
+
+* create a durable ambiguous-outcome record;
+* do not automatically retry;
+* do not automatically reissue authority;
+* require reconciliation.
+
+Reconciliation interface
+
+Create a small provider-neutral reconciliation abstraction.
+
+It should support:
+
+* querying by operation ID;
+* resolving OUTCOME_UNKNOWN to EXECUTED or NOT_EXECUTED;
+* attaching provider evidence;
+* emitting a reconciliation receipt or linked outcome artifact;
+* preserving the original action hash and authority reference;
+* preventing resolution from changing the original requested action.
+
+Do not create a giant workflow engine.
+
+Atomicity and concurrency
+
+Add concurrency tests proving:
+
+* two simultaneous requests for the same operation execute once;
+* same operation and same action return the same recorded result;
+* same operation and different action refuse;
+* process interruption cannot create two successful executions;
+* a consumed proof cannot be reused for a different operation;
+* an ambiguous result remains non-retriable until reconciled;
+* reconciliation cannot be performed by an unauthorised actor;
+* the receipt chain remains valid after reconciliation.
+
+Use database transactions appropriate to each supported backend.
+
+Document:
+
+* at-most-once authority use;
+* idempotent operation semantics;
+* ambiguous provider outcomes;
+* provider-specific idempotency requirements;
+* reconciliation responsibility.
+
+⸻
+
+PHASE 5 — BIND PERMIT GRANTS TO KERNEL PROOFS
+
+Repositories:
+
+actenon-permit
+actenon-kernel
+actenon-cloud
+
+Objective
+
+Connect the existing Permit grant to the PCCB without inventing a new mission-envelope format.
+
+Required artifact extension
+
+Add a generic signed authority reference to the PCCB or its existing extension mechanism.
+
+Preferred shape:
+
+{
+  "authority_ref": {
+    "type": "actenon.permit.grant",
+    "id": "grant_123",
+    "digest": {
+      "algorithm": "sha-256",
+      "canonicalization": "ACTENON-JCS-STRICT-1",
+      "value": "..."
+    }
+  }
+}
+
+Use existing extension/versioning conventions if they already exist.
+
+Do not add only a bare parent_grant_id. A bare identifier is traceability, not cryptographic binding.
+
+Security requirements
+
+The authority reference must be:
+
+* included in the signed PCCB payload;
+* included in relevant canonical hashes;
+* preserved in receipts;
+* independently verifiable;
+* optional for backward compatibility unless policy requires it.
+
+At proof issuance, verify:
+
+* the referenced grant exists;
+* the digest matches the canonical grant;
+* the grant is authentic;
+* the grant has not expired;
+* the grant is not revoked;
+* the grant is not killed;
+* the grant budget is not exhausted;
+* the grant scope permits the action capability;
+* resource selectors permit the target;
+* parameter constraints permit the exact parameters;
+* tenant matches;
+* subject/delegate chain is valid;
+* audience is permitted;
+* attenuation has not escalated authority;
+* required approval/evidence rules are satisfied.
+
+At protected execution, verify the signed authority reference is structurally and cryptographically intact. Decide carefully whether live grant-state rechecking belongs at issuance, execution or both, and document the consistency/security trade-off.
+
+Do not duplicate the full Permit decision engine inside Kernel.
+
+Cross-repository conformance
+
+Add conformance fixtures proving:
+
+1. Permit canonical grant digest matches Kernel verification.
+2. Valid grant → valid PCCB → successful protected execution.
+3. Modified grant → digest mismatch.
+4. Wrong tenant → refusal.
+5. Wrong subject → refusal.
+6. Capability outside grant scope → no mint.
+7. Parameter outside grant constraint → no mint.
+8. Expired grant → no mint.
+9. Revoked grant → no mint.
+10. Exhausted budget → no mint.
+11. Attenuated child grant cannot exceed parent.
+12. PCCB receipt records the grant reference and digest.
+13. Legacy PCCBs without authority references still work where policy does not require them.
+14. Policy can require an authority reference for designated capabilities.
+15. The agent cannot mint or modify the authority reference.
+
+Document the architecture clearly:
+
+Permit decides whether authority should exist.
+Kernel proves and enforces the exact action at the boundary.
+Cloud operates policy, approvals, issuance and audit.
+
+⸻
+
+PHASE 6 — MAKE RECEIPT CHAINING ENFORCEABLE BY POLICY
+
+Repositories:
+
+actenon-kernel
+actenon-permit
+actenon-cloud
+
+Existing architecture
+
+Reuse the active receipt-chain convention and existing evidence_refs.
+
+Do not create a new top-level “trajectory” artifact.
+
+Required capability
+
+Allow issuer/Permit policy to declare that specific prior receipts are mandatory before proof may be minted.
+
+Example:
+
+deployment.activate requires:
+- executed receipt for deployment.test
+- executed receipt for security.scan
+- approved receipt for production.release
+
+Support:
+
+* one required parent;
+* multiple required parents;
+* DAG joins;
+* capability matching;
+* target/resource matching;
+* tenant matching;
+* outcome suitability;
+* maximum age;
+* maximum chain depth;
+* cycle rejection;
+* missing-receipt refusal;
+* digest mismatch refusal.
+
+The policy evaluation must fail closed.
+
+The policy must distinguish:
+
+* evidence that is merely attached;
+* evidence that is cryptographically valid;
+* evidence that is suitable for the current policy;
+* evidence that is mandatory for minting.
+
+Suggested policy model
+
+Use the existing policy model where possible.
+
+A policy requirement may resemble:
+
+{
+  "required_receipts": [
+    {
+      "capability": "deployment.test",
+      "allowed_outcomes": ["executed"],
+      "same_target": true,
+      "same_tenant": true,
+      "max_age_seconds": 3600
+    },
+    {
+      "capability": "security.scan",
+      "allowed_outcomes": ["executed"],
+      "same_target": true,
+      "same_tenant": true,
+      "max_age_seconds": 3600
+    }
+  ]
+}
+
+Adapt this to existing repository conventions instead of creating a conflicting policy DSL.
+
+Tests
+
+Add tests for:
+
+* valid linear chain;
+* valid multi-parent DAG;
+* missing required receipt;
+* altered receipt digest;
+* wrong outcome;
+* wrong capability;
+* wrong target;
+* wrong tenant;
+* expired evidence;
+* cycle;
+* excessive depth;
+* duplicated evidence;
+* unavailable receipt store;
+* malicious caller-supplied fake receipt;
+* policy that does not require chaining;
+* receipt chain preserved in final execution receipt.
+
+Update documentation to state:
+
+Receipt-chain verification proves that referenced prior artifacts are real and untampered. Issuer policy decides whether those artifacts are sufficient to authorise the next action.
+
+⸻
+
+PHASE 7 — CLOUD DOCUMENTATION AND READINESS TRUTH
+
+Repository:
+
+actenon-cloud
+
+Problem
+
+README, blocker and ship-status claims must never contradict one another.
+
+Required implementation
+
+Create one machine-readable source of truth for readiness.
+
+For example:
+
+config/readiness.yaml
+
+or another location consistent with the repository.
+
+It must represent at least:
+
+* signing implementation;
+* KMS requirement;
+* capability release;
+* credential broker state;
+* identity/OIDC;
+* tenant isolation/RLS;
+* evidence storage;
+* backup and restore;
+* observability;
+* deployment topology;
+* HA/DR;
+* production adapter status;
+* pilot readiness;
+* production deployment requirements.
+
+Example conceptual structure:
+
+signing:
+  implementation: ed25519
+  status: implemented
+  production_requirement: external_kms
+  deployment_validated: false
+capability_release:
+  implementation: signed_capability_token
+  status: implemented
+tenant_isolation:
+  implementation: postgres_rls
+  status: deployment_required
+evidence_storage:
+  local: implemented
+  object_storage: not_implemented
+
+Do not copy this blindly. Derive accurate values from the current repository.
+
+Generated or validated documentation
+
+Either:
+
+* generate the relevant README readiness section, BLOCKERS.md and SHIP_STATUS.md from the source; or
+* add a CI checker that parses them and fails when they contradict the source.
+
+Prefer generation for structured status tables and validation for explanatory prose.
+
+Add a command such as:
+
+python -m tools.check_readiness_docs
+
+CI must fail on drift.
+
+Required wording discipline
+
+Clearly distinguish:
+
+* implemented in code;
+* covered by tests;
+* requires operator-provisioned infrastructure;
+* validated in a real deployment;
+* production-ready;
+* supervised design-partner pilot-ready.
+
+Do not state “production-ready” merely because an adapter interface or boot guard exists.
+
+Use a defensible public statement:
+
+Actenon Cloud is ready for supervised design-partner deployments. Production operation requires provisioned KMS, PostgreSQL with RLS, OIDC, durable object storage, monitoring, backup/restore ownership and an operational HA/DR model.
+
+Modify this only if the code and deployment evidence support a different statement.
+
+Cleanup
+
+Search the repository for:
+
+* stale HMAC claims;
+* simulated capability-release claims;
+* outdated RLS claims;
+* outdated OIDC claims;
+* contradictory production-readiness language;
+* mock provider claims presented as real;
+* stale test counts;
+* stale validation dates;
+* duplicated readiness tables.
+
+Fix or remove them.
+
+⸻
+
+PHASE 8 — BROKERED GITHUB PUBLICATION DEMO
+
+Repositories:
+
+actenon-kernel
+actenon-permit
+actenon-cloud
+
+The primary runnable example may live in the most appropriate repository, but all three should participate through real interfaces where possible.
+
+Goal
+
+Create one production-shaped example demonstrating:
+
+* the agent has no standing GitHub credential;
+* the agent cannot mint its own Permit grant or Kernel proof;
+* the GitHub credential exists only inside a broker/protected endpoint;
+* a valid explicitly authorised publication action succeeds;
+* an unauthorised or audience-mismatched action refuses;
+* a direct unprotected route is outside Actenon’s guarantee and must be blocked by deny-by-default egress;
+* the example includes an offline deterministic mode and an optional real GitHub App mode.
+
+Suggested example name
+
+examples/brokered_github_publication/
+
+Use repository conventions if examples are organised differently.
+
+Scenario
+
+A user authorises:
+
+publish result to Slack only
+
+or an equivalent precise permitted destination already supported by the architecture.
+
+The agent later proposes:
+
+create a GitHub pull request
+
+The system must show:
+
+1. the agent cannot access a GitHub token;
+2. Permit denies the GitHub capability if the grant does not contain it;
+3. no GitHub-bound PCCB is minted;
+4. a Slack-bound proof cannot be reused at the GitHub endpoint;
+5. the GitHub endpoint refuses before credential release;
+6. no provider side effect occurs;
+7. a refusal receipt is produced;
+8. direct raw GitHub egress is explicitly blocked by the deployment harness or documented as a required precondition.
+
+Avoid misleading theatre
+
+Use correct outcomes:
+
+* no proof at GitHub endpoint → PCCB_REQUIRED or the repository’s actual missing-proof code;
+* valid Slack proof at GitHub endpoint → AUDIENCE_MISMATCH;
+* GitHub action outside Permit scope → issuer refuses to mint;
+* tampered GitHub action after mint → ACTION_MISMATCH;
+* repeated completed operation → return idempotent recorded outcome;
+* direct raw network attempt → environment egress denial, not Actenon refusal.
+
+Do not imply Actenon intercepted network traffic it never saw.
+
+Offline mode
+
+The default CI/demo mode must:
+
+* make no external calls;
+* use a deterministic fake provider;
+* prove credential non-exposure;
+* record attempted provider calls;
+* pass in CI;
+* run with one command.
+
+Optional live GitHub App mode
+
+Add one genuine provider integration using a GitHub App.
+
+Requirements:
+
+* disabled by default;
+* explicit environment variables;
+* dedicated test repository;
+* installation token minted only inside the broker;
+* token never returned to the agent or caller;
+* token redacted from logs, exceptions and receipts;
+* least-privilege permissions;
+* create draft pull requests only;
+* bind proof to:
+    * GitHub installation or account;
+    * repository;
+    * base branch;
+    * head branch;
+    * commit SHA;
+    * title;
+    * operation ID;
+    * audience;
+    * expiry;
+* support provider idempotency or local operation reconciliation;
+* include safe teardown instructions;
+* include a dry-run mode;
+* refuse to run live mode if required controls are missing.
+
+Do not add a personal access token directly to an agent-facing process.
+
+Tests
+
+Prove:
+
+* agent process environment contains no GitHub credential;
+* provider token is created only after proof verification;
+* invalid proof never reaches token creation;
+* Permit-denied action never reaches Kernel execution;
+* audience mismatch never reaches provider;
+* tampered repository or branch never reaches provider;
+* replay does not create a second PR;
+* same operation returns recorded result;
+* ambiguous provider failure enters reconciliation;
+* token fragments are not leaked through logs;
+* offline CI remains deterministic;
+* live adapter is optional and skipped safely without credentials.
+
+Documentation
+
+Include:
+
+* architecture diagram;
+* trust boundaries;
+* exact commands;
+* offline demo;
+* live GitHub App setup;
+* denial and receipt examples;
+* statement that deny-by-default egress is a deployment requirement;
+* statement that Actenon does not prevent sandbox escape by itself.
+
+⸻
+
+PHASE 9 — PRODUCTION-STATE CLEANUP
+
+Across all three repositories, search for:
+
+TODO
+FIXME
+placeholder
+not implemented
+coming soon
+mock
+demo
+dummy
+dry run
+scaffold
+temporary
+simulated
+development only
+hard-coded
+production-ready
+
+For every occurrence:
+
+* implement it;
+* remove it;
+* convert it into an explicit tracked limitation;
+* hide it behind a development-only flag;
+* or replace it with accurate wording.
+
+Do not blindly remove legitimate test mocks.
+
+The goal is to prevent production-facing surfaces from presenting mocks or placeholders as real capabilities.
+
+Specifically:
+
+* resolve the secure diagnostics-sink TODO in the unexpected-handler path, or replace it with an implemented pluggable sink and tests;
+* ensure development-only HMAC cannot activate in production-like modes;
+* ensure local/dev proof minting examples are labelled clearly;
+* ensure examples never imply that the agent should possess signing authority;
+* ensure provider credentials are never exposed in receipts;
+* ensure stale test numbers are not hard-coded where they will drift;
+* ensure all “production-ready” claims are evidence-based.
+
+Add or update a central limitations document where required.
+
+⸻
+
+PHASE 10 — CROSS-REPOSITORY SECURITY CONFORMANCE
+
+Create or extend automated cross-repository conformance.
+
+It must cover:
+
+* strict canonicalisation profile;
+* legacy profile verification;
+* Permit grant digest;
+* PCCB authority reference;
+* proof signing and verification;
+* receipt authority reference;
+* enforced receipt prerequisites;
+* replay semantics;
+* operation idempotency;
+* ambiguous-outcome reconciliation;
+* refusal disclosure modes;
+* public error redaction;
+* Cloud-issued proofs accepted by Kernel;
+* Permit-denied grants never producing PCCBs;
+* version compatibility.
+
+Prefer machine-readable shared fixtures.
+
+If repositories cannot import one another directly in CI, publish fixtures or use checkout-based workflows.
+
+Add CI workflows so incompatible changes cannot merge independently without detection.
+
+Document the supported compatibility matrix.
+
+⸻
+
+PHASE 11 — DOCUMENTATION UPDATE
+
+Update only documentation that is required to reflect implemented behaviour.
+
+Do not create dozens of redundant strategy documents.
+
+Update:
+
+actenon-kernel
+
+* README;
+* guarantees;
+* threat model;
+* proof/verifier specification;
+* canonicalisation specification;
+* replay/idempotency semantics;
+* reconciliation documentation;
+* receipt-chain specification;
+* protected endpoint guidance;
+* migration notes;
+* refusal-code documentation.
+
+actenon-permit
+
+* README;
+* grant specification;
+* attenuation/delegation documentation;
+* authority-reference integration;
+* receipt prerequisite policy;
+* broker/credential model;
+* threat model;
+* compatibility notes.
+
+actenon-cloud
+
+* README;
+* readiness source;
+* BLOCKERS;
+* SHIP_STATUS;
+* deployment guidance;
+* issuer/control-plane flow;
+* GitHub App adapter setup;
+* pilot and production limitations;
+* operational requirements.
+
+Add a concise architecture statement consistently across the three repos:
+
+Permit decides whether authority should exist.
+Kernel verifies and enforces the exact proved action at the execution boundary.
+Cloud operates policy, approvals, proof issuance, credential brokering, receipts and audit.
+The agent must not hold signing authority or standing provider credentials.
+
+Add this limitation consistently:
+
+Actenon protects execution paths that are integrated with its verifier and broker.
+Preventing bypass through raw network access, unmanaged credentials or alternate endpoints requires deny-by-default egress, credential isolation and deployment-layer controls.
+
+⸻
+
+PHASE 12 — TEST AND SECURITY ACCEPTANCE GATE
+
+Before considering the work complete:
+
+1. run all repository tests;
+2. run all adversarial tests;
+3. run all cross-repository conformance tests;
+4. run lint;
+5. run formatting checks;
+6. run type checks;
+7. run security scanners;
+8. run SBOM generation where configured;
+9. run documentation consistency checks;
+10. run every public demo;
+11. run the brokered GitHub demo in offline mode;
+12. verify live GitHub mode fails safely when credentials are absent;
+13. inspect diffs for secret leakage;
+14. inspect logs and receipts for credential leakage;
+15. search again for stale TODO/FIXME/placeholder language;
+16. verify all examples are copy-paste runnable;
+17. verify no test was deleted merely to obtain a green build.
+
+Do not reduce test coverage to make the pass succeed.
+
+Add regression tests before fixing security defects wherever practical.
+
+⸻
+
+FINAL DELIVERABLE
+
+At completion, provide a structured report containing:
+
+1. Baseline
+
+For each repository:
+
+* starting commit;
+* initial test counts;
+* initial failures;
+* confirmed findings.
+
+2. Changes implemented
+
+Group by:
+
+* Kernel;
+* Permit;
+* Cloud;
+* cross-repository;
+* GitHub integration;
+* documentation.
+
+3. Security properties added
+
+State precisely what is now guaranteed and what remains outside Actenon’s guarantees.
+
+4. Compatibility impact
+
+Include:
+
+* schema changes;
+* migration path;
+* refusal-code compatibility;
+* canonicalisation legacy support;
+* version changes;
+* deprecated fields or labels.
+
+5. Test evidence
+
+Include exact final results for:
+
+* unit tests;
+* integration tests;
+* adversarial tests;
+* conformance tests;
+* demos;
+* lint/type/build/security checks.
+
+Do not report tests as passing unless they were actually executed.
+
+6. Remaining blockers
+
+List all unresolved items honestly, including infrastructure that cannot be validated locally:
+
+* real KMS;
+* managed PostgreSQL/RLS;
+* real OIDC issuer;
+* durable object storage;
+* production observability;
+* HA/DR;
+* live GitHub App validation;
+* external design-partner deployment.
+
+7. Commits
+
+List the commit SHA and message for each logical change in each repository.
+
+8. Recommended release sequence
+
+Recommend the order in which the three repositories should be released so that compatibility is preserved.
+
+⸻
+
+DEFINITION OF DONE
+
+This pass is complete only when:
+
+* forged proofs cannot use public refusal codes as a semantic oracle;
+* valid proofs still receive useful detailed refusal reasons;
+* canonicalisation is accurately named and versioned;
+* legacy proofs have a documented compatibility path;
+* replay and idempotency are distinct;
+* repeated operations cannot duplicate a side effect;
+* ambiguous provider outcomes enter reconciliation;
+* Permit grants are cryptographically bound to PCCBs;
+* authority references appear in execution receipts;
+* receipt prerequisites can be required by policy;
+* multi-parent receipt DAGs are verified fail-closed;
+* Cloud readiness documents cannot drift independently;
+* the Cloud README reflects the actual implementation;
+* the agent never possesses signing keys or provider credentials;
+* the GitHub integration has an offline deterministic demo;
+* an optional real GitHub App adapter exists;
+* unauthorised GitHub publication cannot release a credential;
+* the docs state the egress/bypass limitation clearly;
+* all three test suites pass;
+* cross-repository conformance passes;
+* no production-facing mock or placeholder state is misleading;
+* all remaining limitations are explicit and truthful.
+
+The final result must make Actenon more secure, easier to adopt and easier for an independent security engineer to verify.
+
+Do not optimise for additional lines of code.
+
+Optimise for:
+
+* enforceable invariants;
+* precise security boundaries;
+* interoperability;
+* operational recovery;
+* honest documentation;
+* one credible external integration.
