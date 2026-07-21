@@ -287,6 +287,37 @@ class Gateway:
                 if action.est_cost:
                     with contextlib.suppress(Exception):
                         self.state.release(grant.id, action.action_id, action.est_cost)
+                # Surface structured refusal codes per the protocol's
+                # two-layer disclosure model. The kernel's
+                # ProofVerificationError carries a refusal_code attribute
+                # (e.g. "SIGNATURE_INVALID", "ACTION_MISMATCH",
+                # "AUDIENCE_MISMATCH"). We map it to the protocol's
+                # disclosed_code (public-safe umbrella) and internal_code
+                # (detailed, only when the disclosure policy permits).
+                # See actenon-protocol/protocol/11-disclosure-policy.md.
+                from actenon.outcomes import (
+                    to_disclosed_code,
+                    to_internal_code,
+                    to_retryable,
+                )
+                refusal_code = getattr(e, "refusal_code", None)
+                # Default disclosure policy is "public" (safe for
+                # untrusted callers). Trusted callers can be upgraded by
+                # the gateway's caller in a future revision.
+                disclosure_policy = "public"
+                disclosed_code = (
+                    to_disclosed_code(refusal_code, disclosure_policy)
+                    if refusal_code
+                    else "PROOF_INVALID"
+                )
+                internal_code = (
+                    to_internal_code(refusal_code, disclosure_policy)
+                    if refusal_code
+                    else None
+                )
+                retryable = (
+                    to_retryable(refusal_code) if refusal_code else False
+                )
                 return {
                     "outcome": "DENY",
                     "reason": f"proof verification failed at edge: {e}",
@@ -294,6 +325,10 @@ class Gateway:
                     "action_id": action.action_id,
                     "grant_id": grant.id,
                     "remaining_budget": float(grant.budget.remaining),
+                    # Protocol-aligned structured refusal codes.
+                    "disclosed_code": disclosed_code,
+                    "internal_code": internal_code,
+                    "retryable": retryable,
                 }
 
         # ALLOW — execute the real call via the broker (or directly if no
