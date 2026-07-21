@@ -69,6 +69,3 @@ ignore = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
-
-[tool.uv.sources]
-actenon-protocol = { path = "../actenon-protocol" }
