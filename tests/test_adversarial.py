@@ -267,7 +267,9 @@ class TestTokenForgery:
         context = _build_context(grant, action)
         with pytest.raises(ProofVerificationError) as exc:
             wrong_verifier.verify(intent, pccb, context)
-        assert exc.value.refusal_code == "SIGNATURE_INVALID"
+        from actenon.outcomes import refusal_code_to_failure_code
+        assert refusal_code_to_failure_code(exc.value.refusal_code) == refusal_code_to_failure_code("SIGNATURE_INVALID"), \
+            f"expected FailureCode.SIGNATURE_INVALID (canonical), got {exc.value.refusal_code!r}"
 
     def test_malformed_base64_token_denied(self, adv):
         """Token with invalid base64 → DENY."""

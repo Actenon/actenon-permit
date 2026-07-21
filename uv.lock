@@ -5,7 +5,7 @@ requires-python = ">=3.11"
 [[package]]
 name = "actenon-kernel"
 version = "0.1.0"
-source = { git = "https://github.com/Actenon/actenon-kernel.git#7d377fec295c23872fd755ceb679857c5d17ff08" }
+source = { git = "https://github.com/Actenon/actenon-kernel.git#45e237a64f49f5d50e8689a6555d0d72d67e3d13" }
 
 [package.optional-dependencies]
 asymmetric = [
