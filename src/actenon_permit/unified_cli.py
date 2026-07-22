@@ -708,12 +708,15 @@ def protect_discover(
             action = _infer_action(method, route_path)
             boundary_id = f"boundary_{len(boundaries) + 1}"
 
+            # Auto-extract parameter mappings + target from the function signature
+            params, target_mapping = _extract_params_from_signature(node, route_path)
+
             boundaries.append({
                 "id": boundary_id,
                 "route": f"{method} {route_path}",
                 "action": action,
-                "target": {"type": "auto", "from": "path.id"},
-                "parameters": {},
+                "target": target_mapping,
+                "parameters": params,
                 "execution_mode": "resource_owned",
                 "audience": "",
                 "proof": {"source": "header", "name": "X-Actenon-Proof"},
@@ -806,6 +809,92 @@ def _infer_action(method: str, path: str) -> str:
         return f"{resource}.update"
     else:
         return f"{resource}.read"
+
+
+_AST_TYPE_MAP = {
+    "str": "string", "int": "integer", "float": "float",
+    "bool": "boolean", "str | None": "string", "int | None": "integer",
+    "Optional[str]": "string", "Optional[int]": "integer",
+    "Optional[float]": "float", "Optional[bool]": "boolean",
+}
+
+
+def _extract_params_from_signature(
+    node: Any,
+    route_path: str,
+) -> tuple[dict[str, dict], dict[str, str]]:
+    """Extract parameter mappings from a FastAPI route function signature.
+
+    Returns (parameters_dict, target_dict) where:
+      - parameters_dict maps param_name -> {from, type}
+      - target_dict has {type, from} for the primary target (path param or first body param)
+
+    FastAPI conventions:
+      - Params annotated as `str` / `int` / etc. without a Pydantic model
+        are body params (for POST/PUT) or query params (for GET).
+      - Params matching {param_name} in the route path are path params.
+      - Params with default values are optional query params.
+      - The first path param is the target; if no path param, the first
+        body param that looks like an ID is the target.
+    """
+    import ast
+
+    # Extract path param names from the route (e.g. {customer_id} from /customers/{customer_id})
+    import re
+
+    path_params = set(re.findall(r"\{(\w+)\}", route_path))
+
+    parameters: dict[str, dict] = {}
+    target: dict[str, str] = {"type": "auto", "from": ""}
+
+    for arg in node.args.args:
+        # Skip 'self' and 'request' (common non-business params)
+        if arg.arg in ("self", "request", "response", "db", "session", "background_tasks"):
+            continue
+
+        # Determine the type annotation
+        type_str = "string"
+        if arg.annotation is not None:
+            if isinstance(arg.annotation, ast.Name):
+                type_str = _AST_TYPE_MAP.get(arg.annotation.id, "string")
+            elif isinstance(arg.annotation, ast.Constant) and isinstance(arg.annotation.value, str):
+                type_str = _AST_TYPE_MAP.get(arg.annotation.value, "string")
+            elif isinstance(arg.annotation, ast.Subscript):
+                # Optional[str] or str | None
+                if isinstance(arg.annotation.value, ast.Name):
+                    base = arg.annotation.value.id
+                    if base == "Optional":
+                        if isinstance(arg.annotation.slice, ast.Name):
+                            type_str = _AST_TYPE_MAP.get(arg.annotation.slice.id, "string")
+                    else:
+                        type_str = _AST_TYPE_MAP.get(base, "string")
+            elif isinstance(arg.annotation, ast.BinOp) and isinstance(arg.annotation.left, ast.Name):
+                # str | None (PEP 604)
+                type_str = _AST_TYPE_MAP.get(arg.annotation.left.id, "string")
+
+        # Determine the source (path, body, or query)
+        if arg.arg in path_params:
+            source = "path"
+            # First path param is the target
+            if not target["from"]:
+                target = {"type": arg.arg, "from": f"path.{arg.arg}"}
+        else:
+            # POST/PUT/PATCH: assume body; GET/DELETE: assume query
+            source = "body"  # Default to body (most common for consequential actions)
+
+        parameters[arg.arg] = {
+            "from": f"{source}.{arg.arg}",
+            "type": type_str,
+        }
+
+    # If no path param was found as target, try to find an ID-like body param
+    if not target["from"]:
+        for pname, pinfo in parameters.items():
+            if "id" in pname.lower() or "intent" in pname.lower():
+                target = {"type": pname, "from": pinfo["from"]}
+                break
+
+    return parameters, target
 
 
 @protect_app.command("apply")
@@ -1088,12 +1177,14 @@ def protect_quickstart(
                 continue
             method, route_path = route_info
             action = _infer_action(method, route_path)
+            # Auto-extract parameter mappings + target from the function signature
+            qs_params, qs_target = _extract_params_from_signature(node, route_path)
             boundaries.append({
                 "id": f"boundary_{len(boundaries) + 1}",
                 "route": f"{method} {route_path}",
                 "action": action,
-                "target": {"type": "auto", "from": "path.id"},
-                "parameters": {},
+                "target": qs_target,
+                "parameters": qs_params,
                 "execution_mode": "resource_owned",
                 "audience": "",
                 "proof": {"source": "header", "name": "X-Actenon-Proof"},

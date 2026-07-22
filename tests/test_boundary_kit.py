@@ -282,7 +282,8 @@ def test_middleware_observe_mode_logs(app_with_middleware, manifest_dict):
 
 
 def test_cli_protect_disccover():
-    """The discover command finds FastAPI routes with sink calls."""
+    """The discover command finds FastAPI routes with sink calls AND
+    auto-extracts parameter mappings from the function signature."""
     from actenon_permit.unified_cli import main
 
     code = '''
@@ -290,8 +291,13 @@ from fastapi import FastAPI
 app = FastAPI()
 
 @app.post("/refunds")
-async def refund(payment_intent_id: str, amount: int):
+async def refund(payment_intent_id: str, amount: int, reason: str):
     stripe.Refund.create(amount=amount)
+    return {"status": "ok"}
+
+@app.delete("/customers/{customer_id}")
+async def delete_customer(customer_id: str):
+    db.delete(customer_id)
     return {"status": "ok"}
 
 @app.get("/health")
@@ -317,9 +323,32 @@ async def health():
     # Check the manifest was generated
     import yaml
     manifest = yaml.safe_load(Path(manifest_path).read_text())
-    assert len(manifest["boundaries"]) == 1  # Only /refunds, not /health
-    assert manifest["boundaries"][0]["route"] == "POST /refunds"
-    assert manifest["boundaries"][0]["action"] == "refunds.create"
+    assert len(manifest["boundaries"]) == 2  # /refunds + /customers/{id}, not /health
+
+    # Check the first boundary (POST /refunds)
+    b0 = manifest["boundaries"][0]
+    assert b0["route"] == "POST /refunds"
+    assert b0["action"] == "refunds.create"
+    # Parameters should be auto-extracted from the function signature
+    assert "payment_intent_id" in b0["parameters"]
+    assert b0["parameters"]["payment_intent_id"]["from"] == "body.payment_intent_id"
+    assert b0["parameters"]["payment_intent_id"]["type"] == "string"
+    assert "amount" in b0["parameters"]
+    assert b0["parameters"]["amount"]["from"] == "body.amount"
+    assert b0["parameters"]["amount"]["type"] == "integer"
+    assert "reason" in b0["parameters"]
+    assert b0["parameters"]["reason"]["type"] == "string"
+    # Target should be the first ID-like body param (payment_intent_id)
+    assert b0["target"]["from"] == "body.payment_intent_id"
+
+    # Check the second boundary (DELETE /customers/{customer_id})
+    b1 = manifest["boundaries"][1]
+    assert b1["route"] == "DELETE /customers/{customer_id}"
+    assert b1["action"] == "customers.delete"
+    # customer_id is a path param -> should be the target
+    assert b1["target"]["from"] == "path.customer_id"
+    assert "customer_id" in b1["parameters"]
+    assert b1["parameters"]["customer_id"]["from"] == "path.customer_id"
 
     os.unlink(f.name)
     os.unlink(manifest_path)
