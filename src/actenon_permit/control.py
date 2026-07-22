@@ -229,6 +229,19 @@ def create_app(
         if g is None:
             raise HTTPException(status_code=404, detail="grant not found")
         state.set_status(grant_id, GrantStatus.REVOKED)
+        # ── Phase 7: revocation cascade ──────────────────────────────
+        # Revoke all child grants that were attenuated from this grant.
+        # A child grant records its parent_grant_id; when the parent is
+        # revoked, all children are also revoked. (Audit finding P-05.)
+        cascaded_count = 0
+        for grant in state.list_grants():
+            if (
+                hasattr(grant, "parent_grant_id")
+                and grant.parent_grant_id == grant_id
+                and grant.status == GrantStatus.ACTIVE
+            ):
+                state.set_status(grant.id, GrantStatus.REVOKED)
+                cascaded_count += 1
         # Deny any in-flight approval waiters for this grant.
         for p in approvals.list_pending():
             if p["grant_id"] == grant_id:

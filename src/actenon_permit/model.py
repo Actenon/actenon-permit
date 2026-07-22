@@ -219,6 +219,15 @@ class Grant(BaseModel):
     approval_rules: list[str] = Field(default_factory=list)
     status: GrantStatus = GrantStatus.ACTIVE
     signature: str = ""
+    # ── Phase 7: authority-decision linkage ────────────────────────
+    # parent_grant_id records the grant from which this grant was
+    # attenuated. This enables revocation cascade: revoking the parent
+    # can revoke all children. (Audit finding P-05.)
+    parent_grant_id: str | None = None
+    # delegation_depth records how many attenuation hops from the root
+    # grant. 0 = root grant, 1 = first child, etc. This enables
+    # delegation-depth limits. (Phase 7 grant safety.)
+    delegation_depth: int = 0
 
     # ------------------------------------------------------------------
     # Signing
@@ -316,6 +325,8 @@ class Grant(BaseModel):
             rate=Rate(max=new_rate_max, per_seconds=new_rate_per),
             approval_rules=new_rules,
             status=GrantStatus.ACTIVE,
+            parent_grant_id=self.id,
+            delegation_depth=self.delegation_depth + 1,
         )
         child.sign()
         return child
