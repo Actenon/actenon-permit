@@ -5,11 +5,7 @@ requires-python = ">=3.11"
 [[package]]
 name = "actenon-kernel"
 version = "0.1.0"
-source = { git = "https://github.com/Actenon/actenon-kernel.git#0eabcdc07aeb4180ff56d5ca9ae04bc62506e64a" }
-dependencies = [
-    { name = "actenon-protocol" },
-    { name = "pyyaml" },
-]
+source = { git = "https://github.com/Actenon/actenon-kernel.git#7d377fec295c23872fd755ceb679857c5d17ff08" }
 
 [package.optional-dependencies]
 asymmetric = [
@@ -40,7 +36,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "actenon-kernel", extras = ["asymmetric"], git = "https://github.com/Actenon/actenon-kernel.git" },
-    { name = "actenon-protocol", git = "https://github.com/Actenon/actenon-protocol.git?rev=v1.0.0" },
+    { name = "actenon-protocol", directory = "../actenon-protocol" },
     { name = "fastapi", specifier = ">=0.110" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "pydantic", specifier = ">=2.5,<3" },
@@ -55,13 +51,25 @@ provides-extras = ["dev"]
 [[package]]
 name = "actenon-protocol"
 version = "1.0.0"
-source = { git = "https://github.com/Actenon/actenon-protocol.git?rev=v1.0.0#f395f0b5d919d943488df0a106866e0aee5afe54" }
+source = { directory = "../actenon-protocol" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rfc8785" },
 ]
+
+[package.metadata]
+requires-dist = [
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2" },
+    { name = "jsonschema", specifier = ">=4.23,<5" },
+    { name = "pydantic", specifier = ">=2.5,<3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pyyaml", specifier = ">=6.0,<7" },
+    { name = "rfc8785", specifier = ">=0.1.4,<1" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "annotated-doc"

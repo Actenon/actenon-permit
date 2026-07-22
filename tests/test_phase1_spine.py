@@ -170,6 +170,7 @@ def test_mutation_action_type_detected_at_edge(setup):
         verify_pccb_at_edge(intent, pccb, grant, mutated_action)
     assert exc_info.value.refusal_code in (
         "ACTION_MISMATCH",
+        "TARGET_MISMATCH",
         "SCOPE_CAPABILITY_MISMATCH",
         "ACTION_HASH_MISMATCH",
         "INTENT_MISMATCH",

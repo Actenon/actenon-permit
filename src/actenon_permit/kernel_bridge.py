@@ -21,6 +21,8 @@ canonicalization — it always goes through this bridge.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -81,6 +83,15 @@ def _permit_action_to_kernel_intent(
     The ActionIntent is the kernel's representation of "the agent wants to do
     THIS exact thing." The PCCB will be cryptographically bound to it, so
     every field here becomes part of the action-hash the edge verifies.
+
+    Phase 7 additions:
+      - ``operation_id`` is placed in the intent's metadata so the Kernel's
+        idempotency store can detect idempotent replays (Phase 6).
+      - ``authority_ref`` is a stable digest of (grant_id, grant_signature,
+        action_hash) that the Kernel can verify without querying Permit
+        synchronously. It proves WHICH declared authority produced the proof.
+      - ``execution_mode`` is set to "brokered" because Permit-issued proofs
+        are used in the brokered execution path.
     """
     now = datetime.now(UTC)
     # Permit's grant.expires_at is the outer bound; the intent's expires_at
@@ -92,17 +103,24 @@ def _permit_action_to_kernel_intent(
     # The action parameters are what make this "exact": the amount, the
     # reason, the target account. The kernel hashes these and the edge
     # refuses any action whose parameters don't match.
-    #
-    # IMPORTANT: the kernel's canonicalization (actenon-jcs-sha256-v1)
-    # rejects floating-point values because float serialization is
-    # ambiguous. Permit uses floats for money (50.0, 20.0). The bridge
-    # converts floats to strings with a stable representation so the hash
-    # is deterministic. (A production system would use integer cents; for
-    # the bridge we stringify because permit's model is float-based and
-    # we don't want to silently change the semantic.)
     parameters: dict[str, Any] = _canonicalize_params(dict(action.params))
     if action.est_cost is not None:
         parameters.setdefault("amount", _canonicalize_value(action.est_cost))
+
+    # ── Phase 7: authority_ref digest ──────────────────────────────
+    # A stable digest of (grant_id, grant_signature, action_id) that the
+    # Kernel can verify without querying Permit. This proves WHICH declared
+    # authority produced the proof, not that the authority was correct.
+    authority_ref_input = {
+        "grant_id": grant.id,
+        "grant_signature": grant.signature,
+        "action_id": action.action_id,
+        "parent_grant_id": grant.parent_grant_id,
+        "delegation_depth": grant.delegation_depth,
+    }
+    authority_ref = "authref_" + hashlib.sha256(
+        json.dumps(authority_ref_input, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:32]
 
     return ActionIntent(
         intent_id=action.action_id,  # reuse permit's action_id as the intent_id
@@ -122,6 +140,12 @@ def _permit_action_to_kernel_intent(
             resource_type="tool",
             resource_id=action.target,
         ),
+        metadata={
+            "operation_id": action.action_id,  # Phase 6 idempotency support
+            "authority_ref": authority_ref,  # Phase 7: verifiable authority reference
+            "grant_id": grant.id,  # Phase 7: grant linkage for revocation cascade
+            "execution_mode": "brokered",  # Phase 7: explicit execution mode
+        },
     )
 
 
