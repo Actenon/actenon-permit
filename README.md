@@ -4,10 +4,11 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.9–3.12](https://img.shields.io/badge/Python-3.9%E2%80%933.12-blue.svg)](https://www.python.org/)
-[![PyPI](https://img.shields.io/badge/PyPI-actenon--permit-blue.svg)](https://pypi.org/project/actenon-permit/)
+[![PyPI: actenon-permit](https://img.shields.io/pypi/v/actenon-permit?label=PyPI%20%C2%B7%20Python%20SDK)](https://pypi.org/project/actenon-permit/)
+[![npm: @actenon/sdk](https://img.shields.io/npm/v/@actenon/sdk?label=npm%20%C2%B7%20TypeScript%20SDK)](https://www.npmjs.com/package/@actenon/sdk)
 [![Grant v1.0](https://img.shields.io/badge/Grant%20Spec-v1.0-success.svg)](SPEC.md)
 [![Boundary Kit](https://img.shields.io/badge/Boundary%20Kit-auto--discovery-orange.svg)](#boundary-kit--resource-boundary-protection-in-3-commands)
-[![CI](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml/badge.svg)](https://github.com/Actenon/actenon-permit/actions)
+[![CI](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml/badge.svg)](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml)
 [![Code style: ruff](https://img.shields.io/badge/Code%20style-ruff-black.svg)](https://docs.astral.sh/ruff/)
 [![No Cloud required](https://img.shields.io/badge/Cloud-not%20required-2ea44f.svg)](#independence)
 
@@ -61,7 +62,7 @@ pip install actenon-permit              # Python SDK + unified CLI + Boundary Ki
 ```
 
 ```bash
-npm install @actenon/sdk                # TypeScript SDK (planned)
+npm install @actenon/sdk                # TypeScript SDK (v1.4.0) — discriminated result types, receipt verification, protocol parity
 ```
 
 ## Hero quickstart (6 lines)
@@ -84,6 +85,33 @@ print(f"{result.state}  {result.finality}")   # succeeded  final
 ```
 
 **The agent never sees the GitHub token.** The broker resolves it internally and passes it only to the adapter, only after the Kernel verifies the proof, only for the exact action bound to that proof, only once.
+
+### TypeScript quickstart (parity with Python)
+
+```typescript
+import { Actenon } from "@actenon/sdk";
+
+const client = Actenon.cloud({
+  baseUrl: "http://localhost:7780",
+  grantToken: "v1.YOUR_GRANT_TOKEN",
+});
+
+const intent = await client.authorisedExecutionIntents.create({
+  action: "github.issue.create",
+  target: "github",
+  parameters: { title: "Hello from TS SDK", body: "Created through authorised execution." },
+});
+
+const result = await intent.execute();
+
+// Result is a discriminated union — the TS compiler enforces mode-aware narrowing.
+if (result.mode === "brokered" && result.state === "succeeded") {
+  console.log("Issue created:", result.evidence);
+  console.log("Receipt verified:", result.receiptVerified);
+}
+```
+
+Full TypeScript docs in [`ts-sdk/README.md`](ts-sdk/README.md).
 
 ## The signed Grant — a capability token with teeth
 
@@ -280,7 +308,7 @@ The Kernel's [Insurer Clarity document](https://github.com/Actenon/actenon-cloud
 | Component | Location |
 |---|---|
 | Python SDK (sync + async) | [`src/actenon_permit/sdk/`](src/actenon_permit/sdk/) |
-| TypeScript SDK | `ts-sdk/` (planned) |
+| TypeScript SDK (`@actenon/sdk` v1.4.0) | [`ts-sdk/`](ts-sdk/) — discriminated results, receipt verification, protocol parity |
 | Unified CLI | [`src/actenon_permit/unified_cli.py`](src/actenon_permit/unified_cli.py) |
 | Boundary Kit (manifest + middleware + auto-discovery) | [`src/actenon_permit/boundary/`](src/actenon_permit/boundary/) |
 | Credential providers (5 types) | [`src/actenon_permit/credentials.py`](src/actenon_permit/credentials.py) |
@@ -297,11 +325,11 @@ The Kernel's [Insurer Clarity document](https://github.com/Actenon/actenon-cloud
 | Insurer pitch | [`docs/INSURER_PITCH.md`](docs/INSURER_PITCH.md) |
 | Demo policy | [`examples/refund-bot-policy.yaml`](examples/refund-bot-policy.yaml) |
 
-## PyPI
+## PyPI / npm
 
 ```bash
 pip install actenon-permit              # Python SDK + CLI + Boundary Kit
-npm install @actenon/sdk                # TypeScript SDK (planned)
+npm install @actenon/sdk                # TypeScript SDK v1.4.0
 ```
 
 ## Independence
