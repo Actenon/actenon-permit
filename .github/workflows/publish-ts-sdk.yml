@@ -90,7 +90,7 @@ jobs:
 
       - name: Set up npm auth
         run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM }}" > ~/.npmrc
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN_ACTENON }}" > ~/.npmrc
           echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
           echo "always-auth=true" >> ~/.npmrc
 
