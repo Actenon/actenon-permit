@@ -1,0 +1,95 @@
+name: Publish TypeScript SDK to npm
+
+# Publishes @actenon/sdk from ts-sdk/ to the npm registry.
+#
+# Triggers on:
+#   - Tag pushes matching ts-sdk-v* (e.g. ts-sdk-v1.4.0)
+#   - Manual workflow_dispatch
+#
+# Uses the org-wide NPM secret (automation token with publish rights on
+# the @actenon scope). The token must be registered as an org secret at
+# github.com/organizations/Actenon/settings/secrets/actions named `NPM`.
+
+on:
+  push:
+    tags:
+      - "ts-sdk-v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build @actenon/sdk
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.x
+
+      - name: Install dependencies
+        working-directory: ts-sdk
+        run: bun install --frozen-lockfile
+
+      - name: TypeScript typecheck
+        working-directory: ts-sdk
+        run: bun run typecheck
+
+      - name: Run tests
+        working-directory: ts-sdk
+        run: bun test
+
+      - name: Build
+        working-directory: ts-sdk
+        run: bun run build
+
+      - name: Verify package contents (npm pack dry-run)
+        working-directory: ts-sdk
+        run: bun run pack:test
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ts-sdk-dist
+          path: ts-sdk/dist/
+
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/ts-sdk-v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.x
+
+      - name: Install dependencies
+        working-directory: ts-sdk
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        working-directory: ts-sdk
+        run: bun run build
+
+      - name: Set up npm auth
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM }}" > ~/.npmrc
+          echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
+          echo "always-auth=true" >> ~/.npmrc
+
+      - name: Publish @actenon/sdk
+        working-directory: ts-sdk
+        run: npm publish --access public
+
+      - name: Verify publication
+        run: |
+          sleep 5
+          PACKAGE_VERSION=$(node -p "require('./ts-sdk/package.json').version")
+          echo "Published @actenon/sdk@${PACKAGE_VERSION}"
+          echo "View at: https://www.npmjs.com/package/@actenon/sdk/v/${PACKAGE_VERSION}"
