@@ -400,72 +400,94 @@ def test_sdk_version():
 
 
 # ---------------------------------------------------------------------------
-# 9. Async client tests
+# 9. Async client tests (native pytest-asyncio — no asyncio.run wrapper)
 # ---------------------------------------------------------------------------
 
 
-def test_async_local_client_creates_and_executes():
+async def test_async_local_client_creates_and_executes():
     """AsyncActenonClient can create + execute intents via async API."""
-    import asyncio
-
-    async def run():
-        client = Actenon.async_local(
-            agent_id="async-test-agent",
-            scopes=["github.issue.create"],
-            signing_key="async-test-key-not-for-production",
-        )
-        assert client.capabilities.supports_async is True
-        client.register_credential("GITHUB_TOKEN", "ghp_ASYNC_TEST_NOT_REAL")
-        client.register_adapter_tool(
-            "github_issue",
-            action_type="github.issue.create",
-            adapter=GitHubAdapter(test_mode=True),
-            credential_ref="GITHUB_TOKEN",
-            target="github",
-        )
-        intent = await client.authorised_execution_intents.create(
-            action="github.issue.create",
-            target="github",
-            parameters={"owner": "Actenon", "repo": "example", "title": "async test"},
-        )
-        result = await intent.execute_async()
-        assert isinstance(result, BrokeredResult)
-        assert result.succeeded
-        return result
-
-    result = asyncio.run(run())
+    client = Actenon.async_local(
+        agent_id="async-test-agent",
+        scopes=["github.issue.create"],
+        signing_key="async-test-key-not-for-production",
+    )
+    assert client.capabilities.supports_async is True
+    client.register_credential("GITHUB_TOKEN", "ghp_ASYNC_TEST_NOT_REAL")
+    client.register_adapter_tool(
+        "github_issue",
+        action_type="github.issue.create",
+        adapter=GitHubAdapter(test_mode=True),
+        credential_ref="GITHUB_TOKEN",
+        target="github",
+    )
+    intent = await client.authorised_execution_intents.create(
+        action="github.issue.create",
+        target="github",
+        parameters={"owner": "Actenon", "repo": "example", "title": "async test"},
+    )
+    result = await intent.execute_async()
+    assert isinstance(result, BrokeredResult)
+    assert result.succeeded
     assert result.mode == "brokered"
 
 
-def test_async_client_execute_refused():
+async def test_async_client_execute_refused():
     """Async client raises ExecutionRefusedError on out-of-scope actions."""
-    import asyncio
+    client = Actenon.async_local(
+        agent_id="async-test-agent",
+        scopes=["github.issue.create"],
+        signing_key="async-test-key",
+    )
+    client.register_credential("GITHUB_TOKEN", "ghp_test")
+    client.register_adapter_tool(
+        "github_issue",
+        action_type="github.issue.create",
+        adapter=GitHubAdapter(test_mode=True),
+        credential_ref="GITHUB_TOKEN",
+        target="github",
+    )
+    intent = await client.authorised_execution_intents.create(
+        action="github.repo.delete",  # out of scope
+        target="github",
+        parameters={"owner": "a", "repo": "b"},
+    )
+    with pytest.raises(ExecutionRefusedError):
+        await intent.execute_async()
 
-    from actenon_permit import Actenon, ExecutionRefusedError, GitHubAdapter
 
-    async def run():
-        client = Actenon.async_local(
-            agent_id="async-test-agent",
-            scopes=["github.issue.create"],
-            signing_key="async-test-key",
-        )
-        client.register_credential("GITHUB_TOKEN", "ghp_test")
-        client.register_adapter_tool(
-            "github_issue",
-            action_type="github.issue.create",
-            adapter=GitHubAdapter(test_mode=True),
-            credential_ref="GITHUB_TOKEN",
-            target="github",
-        )
-        intent = await client.authorised_execution_intents.create(
-            action="github.repo.delete",  # out of scope
-            target="github",
-            parameters={"owner": "a", "repo": "b"},
-        )
-        with pytest.raises(ExecutionRefusedError):
-            await intent.execute_async()
+async def test_async_client_credential_never_leaks():
+    """Async path: the raw GitHub token must not appear in the result."""
+    raw_token = "ghp_ASYNC_LEAK_TEST_0123456789abcdef"
+    client = Actenon.async_local(
+        agent_id="async-leak-test",
+        scopes=["github.issue.create"],
+        signing_key="async-leak-key",
+    )
+    client.register_credential("GITHUB_TOKEN", raw_token)
+    client.register_adapter_tool(
+        "github_issue",
+        action_type="github.issue.create",
+        adapter=GitHubAdapter(test_mode=True),
+        credential_ref="GITHUB_TOKEN",
+        target="github",
+    )
+    intent = await client.authorised_execution_intents.create(
+        action="github.issue.create",
+        target="github",
+        parameters={"owner": "a", "repo": "b", "title": "t"},
+    )
+    result = await intent.execute_async()
+    result_str = repr(result) + repr(result.evidence)
+    assert raw_token not in result_str
 
-    asyncio.run(run())
+
+async def test_async_cloud_client_capabilities():
+    """Async cloud client reports correct capabilities."""
+    client = Actenon.async_cloud(base_url="https://cloud.example.com", grant_token="tok")
+    caps = client.capabilities
+    assert caps.transport == "cloud"
+    assert caps.supports_async is True
+    assert caps.durable is True
 
 
 # ---------------------------------------------------------------------------
