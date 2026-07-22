@@ -371,8 +371,10 @@ def create_app(
     # v1: out-of-process gateway proxy (mounted only if a Gateway is provided)
     # ------------------------------------------------------------------
     if gateway is not None:
-        from .gateway import mount_proxy
+        from .gateway import mount_intent_routes, mount_proxy
 
         mount_proxy(app, gateway)
+        # v1.3 (Prompt 10): AEI developer surface.
+        mount_intent_routes(app, gateway)
 
     return app

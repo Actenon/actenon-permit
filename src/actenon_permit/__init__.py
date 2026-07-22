@@ -73,7 +73,7 @@ from .execution_modes import (
     ExecutionCoordinatorError,
     ResourceOwnedSubmissionClient,
 )
-from .gateway import Gateway, ToolRegistry, ToolSpec, mcp_serve, mount_proxy
+from .gateway import Gateway, ToolRegistry, ToolSpec, mcp_serve, mount_intent_routes, mount_proxy
 from .intent import (
     INTENT_TRANSITIONS,
     MAX_METADATA_BYTES,
@@ -178,6 +178,7 @@ __all__ = [
     "ToolRegistry",
     "ToolSpec",
     "mount_proxy",
+    "mount_intent_routes",
     "mcp_serve",
     # v1: remote PEP client
     "remote_guard",

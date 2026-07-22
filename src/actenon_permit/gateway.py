@@ -216,6 +216,7 @@ class Gateway:
         tools: ToolRegistry | None = None,
         approval_gate: ApprovalGate | None = None,
         brokered_coordinator: Any = None,
+        intent_manager: Any = None,
     ):
         self.state = state or SQLiteStore()
         self.ledger = ledger or Ledger(self.state)
@@ -228,6 +229,9 @@ class Gateway:
         # v1.2 (Prompt 9): brokered execution coordinator for adapter-backed tools.
         # Constructed lazily from self.broker if not provided.
         self.brokered_coordinator = brokered_coordinator
+        # v1.3 (Prompt 10): intent manager for the AEI developer surface.
+        # Constructed lazily with an EphemeralIntentStore if not provided.
+        self.intent_manager = intent_manager
 
     # ------------------------------------------------------------------
     # Grant token handling
@@ -240,6 +244,196 @@ class Gateway:
 
             self.brokered_coordinator = BrokeredExecutionCoordinator(broker=self.broker)
         return self.brokered_coordinator
+
+    def _get_intent_manager(self) -> Any:
+        """Lazily construct an IntentManager with an EphemeralIntentStore
+        if not provided. Production deployments SHOULD inject a
+        ``DurableLocal`` or ``DurableCloud`` store."""
+        if self.intent_manager is None:
+            from .intent import EphemeralIntentStore, IntentManager
+
+            self.intent_manager = IntentManager(store=EphemeralIntentStore())
+        return self.intent_manager
+
+    # ------------------------------------------------------------------
+    # v1.3 (Prompt 10): AEI developer surface
+    # ------------------------------------------------------------------
+
+    def create_intent(
+        self,
+        *,
+        action_type: str,
+        action_params: dict[str, Any],
+        target_type: str,
+        target_id: str,
+        requested_execution_mode: str,
+        requester_subject: str,
+        requester_agent_id: str,
+        requester_tenant_id: str | None = None,
+        idempotency_key: str | None = None,
+        expiry_seconds: int | None = 3600,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a new AuthorisedExecutionIntent. Returns the intent
+        as a JSON-safe dict (suitable for HTTP response).
+
+        The intent starts in the ``created`` lifecycle state. Call
+        ``execute_intent`` to advance it.
+        """
+        mgr = self._get_intent_manager()
+        intent = mgr.create(
+            action_type=action_type,
+            action_params=action_params,
+            target_type=target_type,
+            target_id=target_id,
+            requested_execution_mode=requested_execution_mode,
+            requester_subject=requester_subject,
+            requester_agent_id=requester_agent_id,
+            requester_tenant_id=requester_tenant_id,
+            idempotency_key=idempotency_key,
+            expiry_seconds=expiry_seconds,
+            metadata=metadata,
+        )
+        return intent.to_dict()
+
+    def get_intent(self, intent_id: str) -> dict[str, Any] | None:
+        """Return the intent with the given id, or None if not found."""
+        mgr = self._get_intent_manager()
+        intent = mgr.store.get(intent_id)
+        return intent.to_dict() if intent is not None else None
+
+    def list_intents(self, *, requester_subject: str | None = None) -> list[dict[str, Any]]:
+        """List intents, optionally filtered by requester_subject."""
+        mgr = self._get_intent_manager()
+        return [i.to_dict() for i in mgr.store.list(requester_subject=requester_subject)]
+
+    def execute_intent(
+        self,
+        intent_id: str,
+        *,
+        grant_token: str,
+    ) -> dict[str, Any]:
+        """Execute an existing intent.
+
+        For ``brokered`` mode: the gateway looks up a registered
+        adapter tool whose ``action_type`` matches the intent's, runs
+        the PDP on the grant, and invokes the coordinator. The grant
+        token is the same v1 bearer token used by ``call_tool``.
+
+        For ``resource_owned`` mode: the gateway requires a
+        ``resource_client`` to be registered on the intent manager
+        (not yet supported via HTTP; resource-owned submission is
+        currently in-process only). HTTP callers should use the
+        ``submit_to_resource`` API directly.
+
+        Returns a dict that combines the AEI lifecycle fields with
+        the Prompt-9 execution-mode fields:
+
+            {
+              "intent": <AuthorisedExecutionIntent dict>,
+              "outcome": "ALLOW" | "DENY",
+              "execution_mode": "brokered" | "resource_owned",
+              "execution_state": "succeeded" | "failed" | ...,
+              "finality": "final" | "non_final",
+              "provider_execution_observed": bool,
+              "receipt_received": bool (brokered only),
+              "receipt_verified": bool (brokered only),
+              "result": <redacted provider evidence>,
+            }
+        """
+        mgr = self._get_intent_manager()
+        intent = mgr.store.get(intent_id)
+        if intent is None:
+            return {
+                "outcome": "DENY",
+                "reason": f"intent not found: {intent_id}",
+                "rule_matched": "intent:unknown",
+            }
+
+        # Resolve the grant token -> live Grant.
+        try:
+            grant = self.resolve_grant(grant_token)
+        except TokenError as e:
+            return {
+                "outcome": "DENY",
+                "reason": f"invalid grant token: {e}",
+                "rule_matched": "token:invalid",
+            }
+
+        # Build the Action + decision via the PDP.
+        action = Action(
+            action_id=f"act_{uuid.uuid4().hex[:16]}",
+            grant_id=grant.id,
+            ts=datetime.now(UTC),
+            type=intent.action_type,
+            target=intent.target_id,
+            params=dict(intent.action_params),
+            est_cost=0.0,
+        )
+        decision, _intent_obj, _pccb = self.pdp.decide_and_mint_pccb(grant, action, ctx={})
+        if decision.outcome == DecisionOutcome.DENY:
+            # Record the denial on the intent.
+            from .intent import IntentLifecycle
+
+            mgr.transition(intent.intent_id, IntentLifecycle.EVALUATING)
+            mgr.transition(intent.intent_id, IntentLifecycle.DENIED)
+            updated = mgr.store.get(intent.intent_id)
+            assert updated is not None
+            return {
+                "intent": updated.to_dict(),
+                "outcome": "DENY",
+                "reason": decision.reason,
+                "rule_matched": decision.rule_matched,
+            }
+
+        # Locate a registered adapter tool whose action_type matches.
+        tool = None
+        for t in self.tools.list():
+            if t.action_type == intent.action_type and t.adapter is not None:
+                tool = t
+                break
+        if tool is None:
+            return {
+                "intent": intent.to_dict(),
+                "outcome": "DENY",
+                "reason": f"no adapter tool registered for action_type {intent.action_type!r}",
+                "rule_matched": "intent:no_adapter",
+            }
+
+        # Execute via the manager. The manager advances the lifecycle
+        # and returns the ModeAwareExecutionResult.
+        try:
+            updated, mode_result = mgr.execute(
+                intent,
+                grant=grant,
+                decision=decision,
+                broker=self.broker,
+                adapter=tool.adapter,
+                credential_ref=tool.credential_ref or "",
+            )
+        except Exception as e:
+            return {
+                "intent": intent.to_dict(),
+                "outcome": "DENY",
+                "reason": f"intent execution error: {type(e).__name__}: {e}",
+                "rule_matched": "intent:execution_error",
+            }
+
+        # Map the result state to outcome.
+        outcome = "ALLOW" if mode_result.state == "succeeded" else "DENY"
+        response: dict[str, Any] = {
+            "intent": updated.to_dict(),
+            "outcome": outcome,
+            "execution_mode": mode_result.mode,
+            "execution_state": mode_result.state,
+            "finality": mode_result.finality.value,
+            "provider_execution_observed": mode_result.protocol_result.provider_execution_observed,
+            "result": mode_result.protocol_result.provider_evidence,
+        }
+        if mode_result.mode == "brokered":
+            response["receipt_received"] = mode_result.protocol_result.receipt_received
+            response["receipt_verified"] = mode_result.protocol_result.receipt_verified
+        return response
 
     def resolve_grant(self, token: str) -> Grant:
         """Decode a bearer token and return the live Grant from the state store.
@@ -567,6 +761,18 @@ def mount_proxy(app, gateway: Gateway) -> None:
     _proxy_routes.mount(app, gateway)
 
 
+def mount_intent_routes(app, gateway: Gateway) -> None:
+    """Mount /intents/* endpoints on an existing FastAPI app (Prompt 10).
+
+    Same pattern as ``mount_proxy``: delegates to ``_intent_routes.mount``,
+    a module without ``from __future__ import annotations`` so FastAPI's
+    Request-type detection works.
+    """
+    from . import _intent_routes
+
+    _intent_routes.mount(app, gateway)
+
+
 # ---------------------------------------------------------------------------
 # MCP stdio server (JSON-RPC 2.0 over stdin/stdout)
 # ---------------------------------------------------------------------------
@@ -690,5 +896,6 @@ __all__ = [
     "ToolRegistry",
     "Gateway",
     "mount_proxy",
+    "mount_intent_routes",
     "mcp_serve",
 ]
