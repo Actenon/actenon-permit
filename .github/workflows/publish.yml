@@ -29,16 +29,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-
       - name: Set up Python
-        run: uv python install 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install build dependencies
-        run: uv pip install --system build
+        run: pip install build
 
       - name: Build sdist + wheel
         run: python -m build --sdist --wheel --outdir dist/
@@ -46,6 +43,7 @@ jobs:
       - name: Verify the wheel installs in a clean venv
         run: |
           python -m venv /tmp/test-install
+          /tmp/test-install/bin/pip install --upgrade pip
           /tmp/test-install/bin/pip install dist/actenon_permit-*.whl
           /tmp/test-install/bin/python -c "
           from actenon_permit import Actenon, GitHubAdapter
