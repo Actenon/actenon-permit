@@ -5,10 +5,14 @@ requires-python = ">=3.11"
 [[package]]
 name = "actenon-kernel"
 version = "0.1.0"
-source = { git = "https://github.com/Actenon/actenon-kernel.git#426d38ef4983d332d1d9da2e9fc46a10fe2bcd02" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "actenon-protocol" },
     { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f9/b4/42ec85fdbd7d8bae7e10add44d1186a00532f0c26b15c1d09b89b4547671/actenon_kernel-0.1.0.tar.gz", hash = "sha256:e5971576a7ad1dfd0f31bf63099a6d3d8090d7c196a3a4bfd9c1a7571b35ce6e", size = 360734, upload-time = "2026-07-22T18:57:13.665Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/50/28/9b6c0d76ab73ab0b99d04de6e88d60ce1b4e1df73d8bc8e8babca2647860/actenon_kernel-0.1.0-py3-none-any.whl", hash = "sha256:4e0760f734b2dfa4c471578ec56d30603b1d0e8ebdc8be896dafcf9f82ddf5d2", size = 468631, upload-time = "2026-07-22T18:57:12.29Z" },
 ]
 
 [package.optional-dependencies]
@@ -40,8 +44,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "actenon-kernel", extras = ["asymmetric"], git = "https://github.com/Actenon/actenon-kernel.git" },
-    { name = "actenon-protocol", git = "https://github.com/Actenon/actenon-protocol.git?rev=v1.1.0" },
+    { name = "actenon-kernel", extras = ["asymmetric"], specifier = ">=0.1.0" },
+    { name = "actenon-protocol", specifier = ">=1.1.0,<2" },
     { name = "fastapi", specifier = ">=0.110" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "pydantic", specifier = ">=2.5,<3" },
@@ -57,12 +61,16 @@ provides-extras = ["dev"]
 [[package]]
 name = "actenon-protocol"
 version = "1.1.0"
-source = { git = "https://github.com/Actenon/actenon-protocol.git?rev=v1.1.0#5b5017be439930a1254a46b9407e22b8a517b797" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rfc8785" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/83/5b/c886710d55e03146f3b94ad9391ce9fd9d2daba0f6bd29b04d083d58dd05/actenon_protocol-1.1.0.tar.gz", hash = "sha256:94395185508a0cbb23ea375c7079c70ed40a12ee73111971360ef21d61802994", size = 36700, upload-time = "2026-07-22T19:09:52.618Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/75/35/9bf7b40600fe725295125e6a554ec6bcd12fb1060b287feb7f19118a72f3/actenon_protocol-1.1.0-py3-none-any.whl", hash = "sha256:ee6d1dbf8bd5c8a01a942d6e3e852d3d3e1f90aa6b83112631f0102d2643682c", size = 45902, upload-time = "2026-07-22T19:09:51.29Z" },
 ]
 
 [[package]]

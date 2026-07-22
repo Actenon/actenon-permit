@@ -41,6 +41,7 @@ dev = [
 
 [project.scripts]
 permit = "actenon_permit.cli:app"
+actenon = "actenon_permit.unified_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/Actenon/Actenon-Permit"
