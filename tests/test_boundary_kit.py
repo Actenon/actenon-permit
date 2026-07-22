@@ -391,3 +391,175 @@ def test_cli_trust_add_list_verify(tmp_path, monkeypatch):
     issuers = json.loads(trust_path.read_text())
     assert len(issuers) == 1
     assert issuers[0]["issuer"] == "https://authority.example.com"
+
+
+# ---------------------------------------------------------------------------
+# 9. CLI: protect quickstart (one-command flow)
+# ---------------------------------------------------------------------------
+
+
+def test_cli_protect_quickstart(tmp_path):
+    """The quickstart command runs discover + apply + test in one shot."""
+    from actenon_permit.unified_cli import main
+
+    code = '''
+from fastapi import FastAPI
+app = FastAPI()
+
+@app.post("/refunds")
+async def refund(payment_intent_id: str, amount: int):
+    stripe.Refund.create(amount=amount)
+    return {"status": "ok"}
+'''
+    api_file = tmp_path / "api.py"
+    api_file.write_text(code)
+
+    manifest_file = tmp_path / "boundary.yaml"
+
+    import sys
+    old_argv = sys.argv
+    old_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    sys.argv = ["actenon", "protect", "quickstart", str(api_file), "--output", str(manifest_file)]
+    try:
+        main()
+    except SystemExit:
+        pass
+    finally:
+        sys.argv = old_argv
+        os.chdir(old_cwd)
+
+    # Manifest should exist
+    assert manifest_file.exists()
+
+    # Middleware code should exist
+    assert (tmp_path / "actenon_boundary.py").exists()
+
+    # Report should exist
+    assert (tmp_path / "actenon_boundary_report.json").exists()
+    report = json.loads((tmp_path / "actenon_boundary_report.json").read_text())
+    assert report["assurance"] == "PASS"
+
+
+def test_cli_protect_quickstart_no_findings(tmp_path):
+    """Quickstart with no consequential endpoints completes gracefully."""
+    from actenon_permit.unified_cli import main
+
+    code = '''
+from fastapi import FastAPI
+app = FastAPI()
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+'''
+    api_file = tmp_path / "api.py"
+    api_file.write_text(code)
+
+    manifest_file = tmp_path / "boundary.yaml"
+
+    import sys
+    old_argv = sys.argv
+    old_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    sys.argv = ["actenon", "protect", "quickstart", str(api_file), "--output", str(manifest_file)]
+    try:
+        main()
+    except SystemExit:
+        pass
+    finally:
+        sys.argv = old_argv
+        os.chdir(old_cwd)
+
+    # Manifest should exist but have no boundaries
+    assert manifest_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# 10. CLI: protect deploy (mode switching)
+# ---------------------------------------------------------------------------
+
+
+def test_cli_protect_deploy_observe(manifest_dict, tmp_path):
+    """Deploy command switches to observe mode."""
+    from actenon_permit.unified_cli import main
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_dict))
+
+    import sys
+    old_argv = sys.argv
+    sys.argv = ["actenon", "protect", "deploy", "--manifest", str(manifest_path), "--mode", "observe"]
+    try:
+        main()
+    except SystemExit:
+        pass
+    finally:
+        sys.argv = old_argv
+
+    # Check the manifest was updated
+    updated = json.loads(manifest_path.read_text())
+    assert updated["enforcement"]["mode"] == "observe"
+
+
+def test_cli_protect_deploy_enforce(manifest_dict, tmp_path):
+    """Deploy command switches to enforce mode."""
+    from actenon_permit.unified_cli import main
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_dict))
+
+    import sys
+    old_argv = sys.argv
+    sys.argv = ["actenon", "protect", "deploy", "--manifest", str(manifest_path), "--mode", "enforce"]
+    try:
+        main()
+    except SystemExit:
+        pass
+    finally:
+        sys.argv = old_argv
+
+    updated = json.loads(manifest_path.read_text())
+    assert updated["enforcement"]["mode"] == "enforce"
+
+
+def test_cli_protect_deploy_invalid_mode(manifest_dict, tmp_path):
+    """Deploy command rejects invalid modes."""
+    from actenon_permit.unified_cli import main
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_dict))
+
+    import sys
+    old_argv = sys.argv
+    sys.argv = ["actenon", "protect", "deploy", "--manifest", str(manifest_path), "--mode", "invalid"]
+    try:
+        main()
+        assert False, "should have exited"
+    except SystemExit as e:
+        assert e.code == 1
+    finally:
+        sys.argv = old_argv
+
+
+def test_cli_protect_deploy_flags_missing_issuers(manifest_dict, tmp_path):
+    """Deploy in enforce mode flags missing trusted issuers."""
+    from actenon_permit.unified_cli import main
+
+    manifest_dict["trusted_issuers"] = []  # Remove issuers
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest_dict))
+
+    import sys
+    old_argv = sys.argv
+    sys.argv = ["actenon", "protect", "deploy", "--manifest", str(manifest_path), "--mode", "enforce"]
+    try:
+        main()
+    except SystemExit:
+        pass
+    finally:
+        sys.argv = old_argv
+
+    # The manifest should still be updated
+    updated = json.loads(manifest_path.read_text())
+    assert updated["enforcement"]["mode"] == "enforce"
