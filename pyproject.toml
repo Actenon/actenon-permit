@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "actenon-permit"
-version = "0.1.0"
+version = "1.4.0"
 description = "Actenon-Permit: an open-source authority broker for AI agents. Bounded, revocable capability grants with hard runtime limits."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,7 @@ license = "Apache-2.0"
 authors = [{ name = "Actenon" }]
 keywords = ["ai", "agents", "security", "authorization", "pdp", "pep", "capabilities", "policy"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
@@ -49,6 +49,32 @@ Issues = "https://github.com/Actenon/Actenon-Permit/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/actenon_permit"]
+
+[tool.hatch.build.targets.sdist]
+# Only include the source package + essential files in the sdist.
+# Exclude vendored/accidental content (skills, submodules, tool-results).
+include = [
+    "/src/actenon_permit",
+    "/tests",
+    "/scripts",
+    "/examples",
+    "/README.md",
+    "/SPEC.md",
+    "/ARCHITECTURE.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
+exclude = [
+    "skills",
+    "upload",
+    "tool-results",
+    "Actenon-Permit",
+    "actenon-cloud",
+    "actenon-kernel",
+    "docs",
+    ".venv",
+    "dist",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true

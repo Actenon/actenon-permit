@@ -1,0 +1,75 @@
+name: Publish to PyPI
+
+# Build the wheel + sdist and publish to PyPI on tag pushes.
+# Tags must match the pattern v* (e.g. v1.4.0).
+#
+# Trusted publishing (OIDC) is used — no PyPI API token needed in
+# GitHub secrets. The PyPI project must be configured to trust this
+# GitHub Actions workflow. See:
+#   https://docs.pypi.org/trusted-publishers/
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Allow manual triggers for testing the build step without publishing.
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install build dependencies
+        run: uv pip install --system build
+
+      - name: Build sdist + wheel
+        run: python -m build --sdist --wheel --outdir dist/
+
+      - name: Verify the wheel installs in a clean venv
+        run: |
+          python -m venv /tmp/test-install
+          /tmp/test-install/bin/pip install dist/actenon_permit-*.whl
+          /tmp/test-install/bin/python -c "
+          from actenon_permit import Actenon, GitHubAdapter
+          client = Actenon.local(agent_id='ci-test', scopes=['github.issue.create'], signing_key='ci-test-key')
+          print('OK:', type(client).__name__, client.capabilities.transport)
+          "
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Only publish on tag pushes (not workflow_dispatch).
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: pypi
+    permissions:
+      # Required for trusted publishing (OIDC).
+      id-token: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Uncomment the next line to publish to TestPyPI first.
+          # repository-url: https://test.pypi.org/legacy/
+          print-hash: true
