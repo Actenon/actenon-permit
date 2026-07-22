@@ -8,13 +8,58 @@ Public API:
     # v1:
     from actenon_permit import Gateway, ToolRegistry, grant_to_token, token_to_grant
     from actenon_permit import remote_guard, RemoteGuardRegistry
+    # v1.1 (Prompt 8 — brokered execution + provider adapter contract):
+    from actenon_permit import (
+        BrokerExecutionError,
+        CredentialProvider,
+        CredentialProviderRegistry,
+        CredentialResolutionError,
+        EnvironmentSecretProvider,
+        LocalDevSecretProvider,
+        CloudManagedRefProvider,
+        OIDCShortLivedProvider,
+        CustomerResolverProvider,
+        ProviderAdapter,
+        ProviderResponse,
+        ValidationResult,
+        AdapterError,
+        UnsupportedActionError,
+        InvalidParametersError,
+        ProviderTimeoutError,
+        ProviderPartialResponseError,
+        ReconciliationConflictError,
+        GitHubAdapter,
+    )
 """
 
 from __future__ import annotations
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
-from .broker import Broker, CredentialMissing, extract_cost
+from .adapters import (
+    AdapterError,
+    InvalidParametersError,
+    ProviderAdapter,
+    ProviderPartialResponseError,
+    ProviderResponse,
+    ProviderTimeoutError,
+    ReconciliationConflictError,
+    UnsupportedActionError,
+    ValidationResult,
+)
+from .adapters.github import GitHubAdapter
+from .broker import Broker, BrokerExecutionError, CredentialMissing, extract_cost
+from .credentials import (
+    CloudManagedRefProvider,
+    Credential,
+    CredentialProvider,
+    CredentialProviderRegistry,
+    CredentialResolutionError,
+    CustomerResolverProvider,
+    EnvironmentSecretProvider,
+    LocalDevSecretProvider,
+    OIDCShortLivedProvider,
+)
 from .enforce import (
     AutoApproveGate,
     BlockingApprovalGate,
@@ -118,4 +163,26 @@ __all__ = [
     "RemoteGuardRegistry",
     "RemoteGuardError",
     "RemoteGuardDenied",
+    # v1.1 (Prompt 8): credential providers + adapter contract
+    "BrokerExecutionError",
+    "Credential",
+    "CredentialProvider",
+    "CredentialProviderRegistry",
+    "CredentialResolutionError",
+    "CustomerResolverProvider",
+    "EnvironmentSecretProvider",
+    "LocalDevSecretProvider",
+    "CloudManagedRefProvider",
+    "OIDCShortLivedProvider",
+    "ProviderAdapter",
+    "ProviderResponse",
+    "ValidationResult",
+    "AdapterError",
+    "UnsupportedActionError",
+    "InvalidParametersError",
+    "ProviderTimeoutError",
+    "ProviderPartialResponseError",
+    "ReconciliationConflictError",
+    "GitHubAdapter",
 ]
+
