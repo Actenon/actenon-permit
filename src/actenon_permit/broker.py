@@ -212,7 +212,13 @@ class Broker:
         # The check below is a defensive duplicate - the gateway
         # enforces this at registration time too.
         adapter_actions = set(adapter.supported_actions())
-        if action.type not in adapter_actions:
+        # Adapters MAY accept both namespaced (e.g. "github.issue.create")
+        # and bare (e.g. "issue.create") action names. The adapter's
+        # supported_actions() returns the canonical names. We accept
+        # the action if either the canonical form or a known alias
+        # matches. The adapter itself normalises the action before
+        # execution.
+        if not _adapter_supports_action(adapter, action.type, adapter_actions):
             raise BrokerExecutionError(
                 f"adapter '{adapter.provider_id}' does not support action '{action.type}'",
                 rule="broker:action_not_supported",
@@ -381,3 +387,35 @@ def extract_cost(result: Any, action: Action) -> float:
                 return float(result[k])
     # Fall back to the reservation. The broker does NOT inflate cost.
     return float(action.est_cost or 0.0)
+
+
+def _adapter_supports_action(
+    adapter: ProviderAdapter, action_type: str, adapter_actions: set[str]
+) -> bool:
+    """Check whether the adapter supports the given action type.
+
+    Adapters MAY accept both namespaced (e.g. "github.issue.create")
+    and bare (e.g. "issue.create") action names. The adapter's
+    ``supported_actions()`` returns the canonical names. This helper
+    accepts the action if:
+      1. ``action_type`` is in ``adapter_actions`` (exact match), OR
+      2. The adapter has a ``_normalise_action`` method (or equivalent
+         alias mapping) that maps ``action_type`` to a canonical name
+         in ``adapter_actions``.
+
+    For the GitHub adapter, this means both ``issue.create`` and
+    ``github.issue.create`` are accepted.
+    """
+    if action_type in adapter_actions:
+        return True
+    # Check if the adapter module exposes a _normalise_action helper
+    # (the GitHub adapter does). We import it lazily to avoid a
+    # hard dependency.
+    try:
+        from .adapters.github import _normalise_action as _gh_normalise
+        normalised = _gh_normalise(action_type)
+        if normalised in adapter_actions:
+            return True
+    except ImportError:
+        pass
+    return False

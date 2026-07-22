@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 import warnings
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .config import CapabilityInfo, CloudTransportConfig, LocalRuntimeConfig
 from .exceptions import (
@@ -30,6 +30,10 @@ from .models import (
     IntentHandle,
     ResourceOwnedResult,
 )
+
+if TYPE_CHECKING:
+    from .async_client import AsyncActenonClient
+    from .config import ResourceClientConfig
 
 
 class _AuthorisedExecutionIntentsAPI:
@@ -222,6 +226,45 @@ class LocalActenonClient(ActenonClient):
     def register_resource_client(self, resource_id: str, client: Any) -> None:
         """Register a ResourceOwnedSubmissionClient for resource-owned execution."""
         self._gateway.register_resource_client(resource_id, client)
+
+    def register_resource_from_config(self, config: ResourceClientConfig) -> None:
+        """Register a resource client from a ResourceClientConfig.
+
+        This is the config-driven helper: instead of manually
+        constructing a ``ResourceReceiptVerifier`` + ``ResourceOwnedSubmissionClient``,
+        the caller passes a ``ResourceClientConfig`` with the resource's
+        endpoint URL + signing key, and this method builds and registers
+        the client.
+
+        Usage::
+
+            from actenon_permit.sdk import Actenon, ResourceClientConfig
+
+            client = Actenon.local(agent_id="my-agent")
+            client.register_resource_from_config(ResourceClientConfig(
+                resource_id="iam-control-plane",
+                endpoint_url="https://iam.example.invalid/submit",
+                signing_key_id="iam-key-1",
+                signing_key_secret=b"the-secret-bytes",
+            ))
+        """
+        from actenon.execution import ResourceReceiptVerifier, ResourceSigningKey
+
+        from ..execution_modes import ResourceOwnedSubmissionClient
+
+        verifier = ResourceReceiptVerifier()
+        verifier.register_key(ResourceSigningKey(
+            resource_id=config.resource_id,
+            key_id=config.signing_key_id,
+            secret=config.signing_key_secret,
+        ))
+        r_client = ResourceOwnedSubmissionClient(
+            resource_endpoint=config.endpoint_url,
+            resource_id=config.resource_id,
+            receipt_verifier=verifier,
+            timeout_seconds=config.timeout_seconds,
+        )
+        self._gateway.register_resource_client(config.resource_id, r_client)
 
     @property
     def capabilities(self) -> CapabilityInfo:
@@ -508,6 +551,75 @@ class Actenon:
             verify_tls=verify_tls,
         )
         return CloudActenonClient(config)
+
+    @staticmethod
+    def async_local(
+        *,
+        agent_id: str = "dev-agent",
+        scopes: list[str] | None = None,
+        budget_limit: float = 100.0,
+        signing_key: str | None = None,
+        intent_store_path: str | None = None,
+        production_mode: bool = False,
+    ) -> AsyncActenonClient:
+        """Create an async local (in-process) client.
+
+        Same as ``Actenon.local()`` but returns an ``AsyncActenonClient``
+        whose methods are coroutines. The sync broker/adapter calls run
+        in ``asyncio.to_thread()`` so the event loop is never blocked.
+
+        Usage::
+
+            import asyncio
+            from actenon_permit import Actenon
+
+            async def main():
+                client = await Actenon.async_local(agent_id="my-agent")
+                intent = await client.authorised_execution_intents.create(
+                    action="github.issue.create",
+                    target="github",
+                    parameters={"title": "async test"},
+                )
+                result = await intent.execute_async()
+                print(result.state)
+
+            asyncio.run(main())
+        """
+        from .async_client import AsyncActenonClient
+
+        sync_client = Actenon.local(
+            agent_id=agent_id,
+            scopes=scopes,
+            budget_limit=budget_limit,
+            signing_key=signing_key,
+            intent_store_path=intent_store_path,
+            production_mode=production_mode,
+        )
+        return AsyncActenonClient(sync_client)
+
+    @staticmethod
+    def async_cloud(
+        *,
+        base_url: str,
+        grant_token: str | None = None,
+        timeout_seconds: float = 30.0,
+        verify_tls: bool = True,
+    ) -> AsyncActenonClient:
+        """Create an async Cloud (HTTP transport) client.
+
+        Same as ``Actenon.cloud()`` but returns an ``AsyncActenonClient``
+        whose methods are coroutines. HTTP calls run in
+        ``asyncio.to_thread()`` so the event loop is never blocked.
+        """
+        from .async_client import AsyncActenonClient
+
+        sync_client = Actenon.cloud(
+            base_url=base_url,
+            grant_token=grant_token,
+            timeout_seconds=timeout_seconds,
+            verify_tls=verify_tls,
+        )
+        return AsyncActenonClient(sync_client)
 
 
 __all__ = [

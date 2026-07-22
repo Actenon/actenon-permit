@@ -41,11 +41,12 @@ def main() -> int:
     # ─── Setup ──────────────────────────────────────────────────────
     # Create a local client with a stable signing key.
     # The GitHubAdapter is in test_mode (no network).
-    # The adapter supports action types: issue.create, issue.comment,
-    # branch.create, pr.open (without the 'github.' prefix).
+    # The adapter supports namespaced action types: github.issue.create,
+    # github.issue.comment, github.branch.create, github.pr.open.
+    # (Bare aliases like 'issue.create' also work for backward compat.)
     client = Actenon.local(
         agent_id="quickstart-agent",
-        scopes=["issue.create"],
+        scopes=["github.issue.create"],
         signing_key="quickstart-signing-key-not-for-production",
     )
 
@@ -57,7 +58,7 @@ def main() -> int:
     # Register the GitHub adapter tool.
     client.register_adapter_tool(
         "github_issue",
-        action_type="issue.create",
+        action_type="github.issue.create",
         adapter=GitHubAdapter(test_mode=True),
         credential_ref="GITHUB_TOKEN",
         target="github",
@@ -73,7 +74,7 @@ def main() -> int:
     # ─── 1. A permitted action executes ─────────────────────────────
     print("\n  --- 1. Permitted action executes ---")
     intent = client.authorised_execution_intents.create(
-        action="issue.create",
+        action="github.issue.create",
         target="github",
         parameters={"owner": "Actenon", "repo": "example", "title": "Hello from Actenon SDK"},
     )
@@ -96,7 +97,7 @@ def main() -> int:
     # Build a client with a grant that only allows issue.create, then
     # try to execute a different action type.
     intent2 = client.authorised_execution_intents.create(
-        action="repo.delete",  # NOT in scopes
+        action="github.repo.delete",  # NOT in scopes
         target="github",
         parameters={"owner": "Actenon", "repo": "example"},
     )
@@ -113,7 +114,7 @@ def main() -> int:
     # ("malicious_field") causes a refusal.
     print("\n  --- 3. Parameter-mutated action is refused ---")
     intent3 = client.authorised_execution_intents.create(
-        action="issue.create",
+        action="github.issue.create",
         target="github",
         parameters={
             "owner": "Actenon", "repo": "example", "title": "test",

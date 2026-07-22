@@ -159,11 +159,34 @@ def test_execution_refused_is_not_retryable():
 # ---------------------------------------------------------------------------
 
 
-def test_local_config_warns_on_ephemeral_key():
-    with warnings.catch_warnings(record=True) as w:
+def test_local_config_auto_generates_dev_key(tmp_path, monkeypatch):
+    """When no signing_key is provided, the SDK auto-generates a stable
+    dev key persisted to disk (or falls back to ephemeral with a warning
+    if the filesystem is not writable)."""
+    # Point HOME at a temp dir so we don't clobber the real dev key.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("ACTENON_SIGNING_KEY", raising=False)
+    with warnings.catch_warnings():
         warnings.simplefilter("always")
-        LocalRuntimeConfig(signing_key=None)
-        assert any("ephemeral" in str(warning.message).lower() for warning in w)
+        cfg = LocalRuntimeConfig()
+        assert cfg.signing_key is not None
+        # The key should be persisted to disk.
+        key_path = tmp_path / ".actenon-permit" / "dev-signing-key"
+        assert key_path.is_file()
+
+
+def test_local_config_uses_env_var(monkeypatch):
+    """ACTENON_SIGNING_KEY env var takes precedence over the auto-generated key."""
+    monkeypatch.setenv("ACTENON_SIGNING_KEY", "env-key-123")
+    cfg = LocalRuntimeConfig()
+    assert cfg.signing_key == "env-key-123"
+
+
+def test_local_config_explicit_key_overrides_env(monkeypatch):
+    """An explicit signing_key= argument takes precedence over the env var."""
+    monkeypatch.setenv("ACTENON_SIGNING_KEY", "env-key-123")
+    cfg = LocalRuntimeConfig(signing_key="explicit-key")
+    assert cfg.signing_key == "explicit-key"
 
 
 def test_cloud_config_rejects_non_http_url():
@@ -374,3 +397,163 @@ def test_sdk_imports_succeed():
 def test_sdk_version():
     from actenon_permit.sdk import __version__
     assert __version__ == "1.4.0"
+
+
+# ---------------------------------------------------------------------------
+# 9. Async client tests
+# ---------------------------------------------------------------------------
+
+
+def test_async_local_client_creates_and_executes():
+    """AsyncActenonClient can create + execute intents via async API."""
+    import asyncio
+
+    async def run():
+        client = Actenon.async_local(
+            agent_id="async-test-agent",
+            scopes=["github.issue.create"],
+            signing_key="async-test-key-not-for-production",
+        )
+        assert client.capabilities.supports_async is True
+        client.register_credential("GITHUB_TOKEN", "ghp_ASYNC_TEST_NOT_REAL")
+        client.register_adapter_tool(
+            "github_issue",
+            action_type="github.issue.create",
+            adapter=GitHubAdapter(test_mode=True),
+            credential_ref="GITHUB_TOKEN",
+            target="github",
+        )
+        intent = await client.authorised_execution_intents.create(
+            action="github.issue.create",
+            target="github",
+            parameters={"owner": "Actenon", "repo": "example", "title": "async test"},
+        )
+        result = await intent.execute_async()
+        assert isinstance(result, BrokeredResult)
+        assert result.succeeded
+        return result
+
+    result = asyncio.run(run())
+    assert result.mode == "brokered"
+
+
+def test_async_client_execute_refused():
+    """Async client raises ExecutionRefusedError on out-of-scope actions."""
+    import asyncio
+
+    from actenon_permit import Actenon, ExecutionRefusedError, GitHubAdapter
+
+    async def run():
+        client = Actenon.async_local(
+            agent_id="async-test-agent",
+            scopes=["github.issue.create"],
+            signing_key="async-test-key",
+        )
+        client.register_credential("GITHUB_TOKEN", "ghp_test")
+        client.register_adapter_tool(
+            "github_issue",
+            action_type="github.issue.create",
+            adapter=GitHubAdapter(test_mode=True),
+            credential_ref="GITHUB_TOKEN",
+            target="github",
+        )
+        intent = await client.authorised_execution_intents.create(
+            action="github.repo.delete",  # out of scope
+            target="github",
+            parameters={"owner": "a", "repo": "b"},
+        )
+        with pytest.raises(ExecutionRefusedError):
+            await intent.execute_async()
+
+    asyncio.run(run())
+
+
+# ---------------------------------------------------------------------------
+# 10. register_resource_from_config tests
+# ---------------------------------------------------------------------------
+
+
+def test_register_resource_from_config():
+    """register_resource_from_config builds + registers a resource client
+    from a ResourceClientConfig without the caller having to construct
+    the verifier + client manually."""
+    from actenon_permit import ResourceClientConfig
+
+    client = Actenon.local(
+        agent_id="test", scopes=["iam.grant_role"], signing_key="test-key",
+    )
+    assert client.capabilities.supports_resource_owned is False
+
+    client.register_resource_from_config(ResourceClientConfig(
+        resource_id="iam-control-plane",
+        endpoint_url="https://iam.example.invalid/submit",
+        signing_key_id="iam-key-1",
+        signing_key_secret=b"iam-secret-bytes",
+    ))
+
+    # The resource client is now registered.
+    assert "iam-control-plane" in client._gateway.resource_clients
+    # Capabilities reflect the new resource.
+    assert client.capabilities.supports_resource_owned is True
+
+
+def test_register_resource_from_config_multiple():
+    """Multiple ResourceClientConfigs can be registered."""
+    from actenon_permit import ResourceClientConfig
+
+    client = Actenon.local(
+        agent_id="test", scopes=["*"], signing_key="test-key",
+    )
+    client.register_resource_from_config(ResourceClientConfig(
+        resource_id="iam-1",
+        endpoint_url="https://iam1.example.invalid/submit",
+        signing_key_id="k1",
+        signing_key_secret=b"s1",
+    ))
+    client.register_resource_from_config(ResourceClientConfig(
+        resource_id="iam-2",
+        endpoint_url="https://iam2.example.invalid/submit",
+        signing_key_id="k2",
+        signing_key_secret=b"s2",
+    ))
+    assert len(client._gateway.resource_clients) == 2
+    assert "iam-1" in client._gateway.resource_clients
+    assert "iam-2" in client._gateway.resource_clients
+
+
+# ---------------------------------------------------------------------------
+# 11. GitHub adapter namespaced action names
+# ---------------------------------------------------------------------------
+
+
+def test_github_adapter_supports_namespaced_actions():
+    """The GitHub adapter accepts both namespaced (github.issue.create)
+    and bare (issue.create) action names."""
+    adapter = GitHubAdapter(test_mode=True)
+    actions = adapter.supported_actions()
+    assert "github.issue.create" in actions
+    assert "github.issue.comment" in actions
+    assert "github.branch.create" in actions
+    assert "github.pr.open" in actions
+
+    # Bare aliases also validate.
+    vr = adapter.validate_params("issue.create", {"owner": "a", "repo": "b", "title": "t"})
+    assert vr.ok
+    vr = adapter.validate_params("github.issue.create", {"owner": "a", "repo": "b", "title": "t"})
+    assert vr.ok
+
+
+def test_github_adapter_bare_and_namespaced_produce_same_result():
+    """Executing with bare vs namespaced action names produces equivalent
+    results (the adapter normalises internally)."""
+    from actenon_permit import Credential
+
+    adapter = GitHubAdapter(test_mode=True)
+    cred = Credential(ref="GITHUB_TOKEN", value="ghp_test", source="test")
+    r1 = adapter.execute("issue.create", {"owner": "a", "repo": "b", "title": "t"}, cred)
+    r2 = adapter.execute("github.issue.create", {"owner": "a", "repo": "b", "title": "t"}, cred)
+    # Both should produce the same issue_number (deterministic from params).
+    assert r1.provider_evidence["issue_number"] == r2.provider_evidence["issue_number"]
+    # The response action is the canonical (namespaced) form.
+    assert r1.action == "github.issue.create"
+    assert r2.action == "github.issue.create"

@@ -67,26 +67,56 @@ GITHUB_API = "https://api.github.com"
 #   required: list[str]            - fields that MUST be present
 #   optional: dict[str, Any]       - fields that MAY be present, with defaults
 # All other fields are "unknown" and cause validation failure.
+#
+# Action keys are the canonical (namespaced) form: ``github.issue.create``,
+# ``github.issue.comment``, etc. The adapter also accepts the bare form
+# (``issue.create``) for backward compatibility with v1.0-3 callers.
 # ---------------------------------------------------------------------------
 
 _ACTION_SCHEMAS: dict[str, dict[str, Any]] = {
-    "issue.create": {
+    "github.issue.create": {
         "required": ["owner", "repo", "title"],
         "optional": {"body": "", "labels": []},
     },
-    "issue.comment": {
+    "github.issue.comment": {
         "required": ["owner", "repo", "issue_number", "body"],
         "optional": {},
     },
-    "branch.create": {
+    "github.branch.create": {
         "required": ["owner", "repo", "branch"],
         "optional": {"from": None},  # None means "repo default branch"
     },
-    "pr.open": {
+    "github.pr.open": {
         "required": ["owner", "repo", "title", "head", "base"],
         "optional": {"body": "", "draft": False},
     },
 }
+
+# Backward-compat aliases: bare action name -> canonical namespaced name.
+_ACTION_ALIASES: dict[str, str] = {
+    "github.issue.create": "github.issue.create",
+    "github.issue.comment": "github.issue.comment",
+    "github.branch.create": "github.branch.create",
+    "github.pr.open": "github.pr.open",
+    # Bare aliases (v1.0-3 callers):
+    "issue.create": "github.issue.create",
+    "issue.comment": "github.issue.comment",
+    "branch.create": "github.branch.create",
+    "pr.open": "github.pr.open",
+}
+
+
+def _normalise_action(action: str) -> str:
+    """Normalise an action name to its canonical form.
+
+    Accepts both ``github.issue.create`` (canonical) and
+    ``issue.create`` (backward-compat alias). Returns the canonical
+    form, or the original string if it's not a known alias (in which
+    case validate_params will reject it as unknown).
+    """
+    if action in _ACTION_ALIASES:
+        return _ACTION_ALIASES[action]
+    return action
 
 
 class GitHubAdapter(ProviderAdapter):
@@ -114,9 +144,11 @@ class GitHubAdapter(ProviderAdapter):
     # ------------------------------------------------------------------
 
     def supported_actions(self) -> list[str]:
+        # Return the canonical (namespaced) action names.
         return list(_ACTION_SCHEMAS.keys())
 
     def validate_params(self, action: str, params: dict[str, Any]) -> ValidationResult:
+        action = _normalise_action(action)
         schema = _ACTION_SCHEMAS.get(action)
         if schema is None:
             return ValidationResult(
@@ -158,6 +190,7 @@ class GitHubAdapter(ProviderAdapter):
         idempotency_key: str | None = None,
         timeout_seconds: float | None = None,
     ) -> ProviderResponse:
+        action = _normalise_action(action)
         if action not in _ACTION_SCHEMAS:
             raise UnsupportedActionError(
                 f"github adapter does not support action '{action}'",
@@ -210,7 +243,7 @@ class GitHubAdapter(ProviderAdapter):
                 action=action,
                 missing_fields=["*"],
             )
-        if action == "issue.create":
+        if action == "github.issue.create":
             required = ["number", "node_id", "html_url"]
             missing = [f for f in required if f not in raw]
             if missing:
@@ -228,7 +261,7 @@ class GitHubAdapter(ProviderAdapter):
                 },
                 raw=raw,
             )
-        if action == "issue.comment":
+        if action == "github.issue.comment":
             required = ["id", "node_id", "html_url"]
             missing = [f for f in required if f not in raw]
             if missing:
@@ -246,7 +279,7 @@ class GitHubAdapter(ProviderAdapter):
                 },
                 raw=raw,
             )
-        if action == "branch.create":
+        if action == "github.branch.create":
             required = ["ref", "node_id", "url"]
             missing = [f for f in required if f not in raw]
             if missing:
@@ -264,7 +297,7 @@ class GitHubAdapter(ProviderAdapter):
                 },
                 raw=raw,
             )
-        if action == "pr.open":
+        if action == "github.pr.open":
             required = ["number", "node_id", "html_url"]
             missing = [f for f in required if f not in raw]
             if missing:
@@ -302,23 +335,23 @@ class GitHubAdapter(ProviderAdapter):
         try:
             owner = params["owner"]
             repo = params["repo"]
-            if action == "issue.create":
+            if action == "github.issue.create":
                 issue_num = response.provider_evidence.get("issue_number")
                 self._http_get(
                     credential_value=None,  # reconcile doesn't strictly need auth for public repos
                     path=f"/repos/{owner}/{repo}/issues/{issue_num}",
                 )
-            elif action == "issue.comment":
+            elif action == "github.issue.comment":
                 # Comments are visible via the issue timeline; we trust
                 # the create response.
                 pass
-            elif action == "branch.create":
+            elif action == "github.branch.create":
                 branch = params["branch"]
                 self._http_get(
                     credential_value=None,
                     path=f"/repos/{owner}/{repo}/branches/{branch}",
                 )
-            elif action == "pr.open":
+            elif action == "github.pr.open":
                 pr_num = response.provider_evidence.get("pr_number")
                 self._http_get(
                     credential_value=None,
@@ -410,7 +443,7 @@ class GitHubAdapter(ProviderAdapter):
         # Build the request.
         owner = params["owner"]
         repo = params["repo"]
-        if action == "issue.create":
+        if action == "github.issue.create":
             path = f"/repos/{owner}/{repo}/issues"
             body: dict[str, Any] = {"title": params["title"]}
             if params.get("body"):
@@ -418,18 +451,18 @@ class GitHubAdapter(ProviderAdapter):
             if params.get("labels"):
                 body["labels"] = params["labels"]
             return self._http_post(credential.value, path, body, timeout_seconds)
-        if action == "issue.comment":
+        if action == "github.issue.comment":
             issue_num = params["issue_number"]
             path = f"/repos/{owner}/{repo}/issues/{issue_num}/comments"
             body = {"body": params["body"]}
             return self._http_post(credential.value, path, body, timeout_seconds)
-        if action == "branch.create":
+        if action == "github.branch.create":
             branch = params["branch"]
             sha = params.get("from") or self._default_branch_sha(credential.value, owner, repo, timeout_seconds)
             path = f"/repos/{owner}/{repo}/git/refs"
             body = {"ref": f"refs/heads/{branch}", "sha": sha}
             return self._http_post(credential.value, path, body, timeout_seconds)
-        if action == "pr.open":
+        if action == "github.pr.open":
             path = f"/repos/{owner}/{repo}/pulls"
             body: dict[str, Any] = {
                 "title": params["title"],
@@ -460,7 +493,7 @@ class GitHubAdapter(ProviderAdapter):
         if not sha:
             raise ProviderPartialResponseError(
                 provider=self.provider_id,
-                action="branch.create",
+                action="github.branch.create",
                 missing_fields=["object.sha"],
             )
         return sha
@@ -536,7 +569,7 @@ class GitHubAdapter(ProviderAdapter):
         # Deterministic synthetic IDs based on params so test assertions
         # are reproducible.
         seed = _hash_params(action, params)
-        if action == "issue.create":
+        if action == "github.issue.create":
             return {
                 "id": 1_000_000 + (seed % 9_000_000),
                 "number": 1 + (seed % 999),
@@ -545,21 +578,21 @@ class GitHubAdapter(ProviderAdapter):
                 "title": params["title"],
                 "state": "open",
             }
-        if action == "issue.comment":
+        if action == "github.issue.comment":
             return {
                 "id": 10_000_000 + (seed % 9_000_000),
                 "node_id": f"IC_kwD{seed:016x}",
                 "html_url": f"https://github.com/{params['owner']}/{params['repo']}/issues/{params['issue_number']}#issuecomment-{10_000_000 + (seed % 9_000_000)}",
                 "body": params["body"],
             }
-        if action == "branch.create":
+        if action == "github.branch.create":
             return {
                 "ref": f"refs/heads/{params['branch']}",
                 "node_id": f"BR_kwD{seed:016x}",
                 "url": f"https://api.github.com/repos/{params['owner']}/{params['repo']}/git/refs/heads/{params['branch']}",
                 "object": {"sha": f"{seed:040x}", "type": "commit"},
             }
-        if action == "pr.open":
+        if action == "github.pr.open":
             return {
                 "id": 100_000 + (seed % 9_000_000),
                 "number": 1 + (seed % 999),

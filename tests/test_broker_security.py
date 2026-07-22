@@ -719,7 +719,7 @@ def test_github_adapter_test_mode_does_not_touch_network(tmp_db):
         idempotency_key="smoke",
     )
     assert response.ok is True
-    assert response.action == "issue.create"
+    assert response.action == "github.issue.create"
     assert response.provider_action_id is not None
     assert "issue_url" in response.provider_evidence
     assert response.provider_evidence["issue_url"].startswith("https://github.com/actenon/broker-demo/issues/")
