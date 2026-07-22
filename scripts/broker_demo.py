@@ -39,19 +39,18 @@ from typing import Any
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-from actenon_permit import (
+from actenon_permit import (  # noqa: E402
+    PDP,
     Broker,
     BrokerExecutionError,
     CredentialProviderRegistry,
     EnvironmentSecretProvider,
     GitHubAdapter,
-    LocalDevSecretProvider,
-    PDP,
+    Ledger,
     ProviderResponse,
     SQLiteStore,
-    Ledger,
 )
-from actenon_permit.model import (
+from actenon_permit.model import (  # noqa: E402
     Action,
     Budget,
     Decision,
@@ -60,7 +59,6 @@ from actenon_permit.model import (
     Rate,
     Scopes,
 )
-
 
 BANNER = r"""
 ======================================================================
@@ -169,17 +167,17 @@ def main() -> int:
 
     # ─── 2. Credential provider registry ────────────────────────────────
     registry = CredentialProviderRegistry()
-    # The credential ref is "github_token". The EnvironmentSecretProvider
+    # The credential ref is "GITHUB_TOKEN". The EnvironmentSecretProvider
     # looks up the env var of the same name. We set it explicitly here
     # (overwriting any pre-existing value) so the demo is self-contained.
-    os.environ["github_token"] = token
+    os.environ["GITHUB_TOKEN"] = token
     env_provider = EnvironmentSecretProvider()
-    registry.register("github_token", env_provider)
+    registry.register("GITHUB_TOKEN", env_provider)
     if live:
-        _print("\n  Credential provider: EnvironmentSecretProvider (ref='github_token')")
+        _print("\n  Credential provider: EnvironmentSecretProvider (ref='GITHUB_TOKEN')")
         _print("  (token value never printed; resolved only inside broker.execute_via_adapter)")
     else:
-        _print("\n  Credential provider: EnvironmentSecretProvider (ref='github_token', value is test mock)")
+        _print("\n  Credential provider: EnvironmentSecretProvider (ref='GITHUB_TOKEN', value is test mock)")
 
     broker = Broker(pdp, credential_providers=registry, production_mode=False)
     adapter = GitHubAdapter(test_mode=not live)
@@ -203,7 +201,7 @@ def main() -> int:
         try:
             r, c = broker.execute_via_adapter(
                 grant, action, decision, adapter,
-                credential_ref="github_token",
+                credential_ref="GITHUB_TOKEN",
                 idempotency_key=key,
             )
             _print(f"  ok={r.ok}  action={r.action}  cost={c}")

@@ -41,8 +41,6 @@ Design choices
 from __future__ import annotations
 
 import json
-import os
-import time
 import urllib.error
 import urllib.request
 from typing import Any
@@ -126,7 +124,7 @@ class GitHubAdapter(ProviderAdapter):
                 errors=[{"field": "action", "reason": f"unknown action: {action}"}],
             )
         known = set(schema["required"]) | set(schema["optional"].keys())
-        unknown = [k for k in params.keys() if k not in known]
+        unknown = [k for k in params if k not in known]
         missing = [k for k in schema["required"] if k not in params]
         errors: list[dict[str, str]] = []
         for k in unknown:
@@ -137,12 +135,10 @@ class GitHubAdapter(ProviderAdapter):
         for k in schema["required"]:
             if k in params:
                 v = params[k]
-                if k in ("owner", "repo", "title", "body", "branch", "head", "base", "from"):
-                    if not isinstance(v, str):
-                        errors.append({"field": k, "reason": f"expected string, got {type(v).__name__}"})
-                if k == "issue_number":
-                    if not isinstance(v, int) or v < 1:
-                        errors.append({"field": k, "reason": "expected positive integer"})
+                if k in ("owner", "repo", "title", "body", "branch", "head", "base", "from") and not isinstance(v, str):
+                    errors.append({"field": k, "reason": f"expected string, got {type(v).__name__}"})
+                if k == "issue_number" and (not isinstance(v, int) or v < 1):
+                    errors.append({"field": k, "reason": "expected positive integer"})
         if "labels" in params and not isinstance(params["labels"], list):
             errors.append({"field": "labels", "reason": "expected list of strings"})
         if "draft" in params and not isinstance(params["draft"], bool):

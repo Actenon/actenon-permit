@@ -30,6 +30,7 @@ is preserved for backward compatibility with the v1 gateway.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from collections.abc import Callable
@@ -44,7 +45,6 @@ from .adapters import (
 )
 from .credentials import (
     Credential,
-    CredentialProvider,
     CredentialProviderRegistry,
     CredentialResolutionError,
 )
@@ -307,10 +307,8 @@ class Broker:
         # reference and let GC reclaim it. We also clear the dataclass
         # field so accidental logging of the Credential object doesn't
         # leak the value.
-        try:
+        with contextlib.suppress(Exception):
             object.__setattr__(credential, "value", "")
-        except Exception:
-            pass
 
     @staticmethod
     def _final_redact(response: ProviderResponse, credential: Credential) -> ProviderResponse:
