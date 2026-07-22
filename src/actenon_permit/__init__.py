@@ -115,6 +115,26 @@ from .pep_client import (
     remote_wrap,
 )
 from .policy import PolicyError, compile_policy, load_policy
+
+# v1.4 (Prompt 11): Official Python SDK — the developer-facing surface.
+from .sdk import (
+    Actenon,
+    ActenonError,
+    BrokeredResult,
+    CloudTransportConfig,
+    ExecutionFailedError,
+    ExecutionRefusedError,
+    ExecutionResult,
+    IntentCreateRequest,
+    IntentHandle,
+    IntentNotFoundError,
+    LocalRuntimeConfig,
+    OutcomeUnknownError,
+    ProofMissingError,
+    ProviderError,
+    ResourceOwnedResult,
+    RetryableError,
+)
 from .state import SQLiteStore, StateError, StateStore, get_default_store
 from .token import TokenError, grant_to_token, token_to_grant
 
@@ -227,5 +247,22 @@ __all__ = [
     "store_capabilities",
     "validate_metadata",
     "validate_transition",
+    # v1.4 (Prompt 11): Official Python SDK
+    "Actenon",
+    "ActenonError",
+    "BrokeredResult",
+    "CloudTransportConfig",
+    "ExecutionFailedError",
+    "ExecutionRefusedError",
+    "ExecutionResult",
+    "IntentCreateRequest",
+    "IntentHandle",
+    "IntentNotFoundError",
+    "LocalRuntimeConfig",
+    "OutcomeUnknownError",
+    "ProofMissingError",
+    "ProviderError",
+    "ResourceOwnedResult",
+    "RetryableError",
 ]
 
