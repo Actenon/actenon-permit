@@ -68,6 +68,11 @@ from .enforce import (
     guard,
     wrap,
 )
+from .execution_modes import (
+    BrokeredExecutionCoordinator,
+    ExecutionCoordinatorError,
+    ResourceOwnedSubmissionClient,
+)
 from .gateway import Gateway, ToolRegistry, ToolSpec, mcp_serve, mount_proxy
 from .ledger import Ledger
 from .model import (
@@ -184,5 +189,9 @@ __all__ = [
     "ProviderPartialResponseError",
     "ReconciliationConflictError",
     "GitHubAdapter",
+    # v1.2 (Prompt 9): brokered + resource_owned execution coordinators
+    "BrokeredExecutionCoordinator",
+    "ResourceOwnedSubmissionClient",
+    "ExecutionCoordinatorError",
 ]
 
