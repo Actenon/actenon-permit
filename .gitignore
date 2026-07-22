@@ -49,3 +49,12 @@ ts-sdk/.bun/
 
 # OS
 Thumbs.db
+
+# Do not commit accidental nested repos / tool output / skill bundles.
+# These have no place in the permit repo.
+skills/
+upload/
+tool-results/
+Actenon-Permit/
+actenon-cloud/
+actenon-kernel/

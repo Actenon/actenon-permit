@@ -44,9 +44,9 @@ permit = "actenon_permit.cli:app"
 actenon = "actenon_permit.unified_cli:main"
 
 [project.urls]
-Homepage = "https://github.com/Actenon/Actenon-Permit"
-Repository = "https://github.com/Actenon/Actenon-Permit"
-Issues = "https://github.com/Actenon/Actenon-Permit/issues"
+Homepage = "https://github.com/Actenon/actenon-permit"
+Repository = "https://github.com/Actenon/actenon-permit"
+Issues = "https://github.com/Actenon/actenon-permit/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/actenon_permit"]
