@@ -217,6 +217,7 @@ class Gateway:
         approval_gate: ApprovalGate | None = None,
         brokered_coordinator: Any = None,
         intent_manager: Any = None,
+        resource_clients: dict[str, Any] | None = None,
     ):
         self.state = state or SQLiteStore()
         self.ledger = ledger or Ledger(self.state)
@@ -232,6 +233,12 @@ class Gateway:
         # v1.3 (Prompt 10): intent manager for the AEI developer surface.
         # Constructed lazily with an EphemeralIntentStore if not provided.
         self.intent_manager = intent_manager
+        # v1.3.1 (Prompt 10 follow-up): resource-owned submission clients,
+        # keyed by resource_id. Each entry is a ResourceOwnedSubmissionClient
+        # pre-configured with the resource's endpoint URL + signing key.
+        # The HTTP /intents/{id}/submit endpoint looks up the client by
+        # the intent's target_id.
+        self.resource_clients: dict[str, Any] = resource_clients or {}
 
     # ------------------------------------------------------------------
     # Grant token handling
@@ -434,6 +441,127 @@ class Gateway:
             response["receipt_received"] = mode_result.protocol_result.receipt_received
             response["receipt_verified"] = mode_result.protocol_result.receipt_verified
         return response
+
+    def register_resource_client(self, resource_id: str, client: Any) -> None:
+        """Register a ``ResourceOwnedSubmissionClient`` for a resource_id.
+
+        The client must be pre-configured with the resource's endpoint
+        URL and a ``ResourceReceiptVerifier`` holding the resource's
+        published signing key. The HTTP ``POST /intents/{id}/submit``
+        endpoint looks up the client by the intent's ``target_id``.
+
+        This is the deployment-specific wiring that the HTTP surface
+        needs: resource-owned submission requires per-resource signing
+        keys, which the gateway cannot guess.
+        """
+        self.resource_clients[resource_id] = client
+
+    def submit_intent_to_resource(
+        self,
+        intent_id: str,
+        *,
+        proof: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Submit a resource-owned intent to its resource boundary.
+
+        Looks up the ``ResourceOwnedSubmissionClient`` registered for
+        the intent's ``target_id``. If none is registered, returns
+        DENY with rule_matched='intent:no_resource_client'.
+
+        The ``proof`` is the authority-issued ExecutionProof that the
+        resource boundary will verify independently. The gateway does
+        NOT verify the proof here — that is the resource's job. The
+        gateway's job is to (a) locate the right client, (b) advance
+        the intent lifecycle through SUBMITTED, and (c) return the
+        ModeAwareExecutionResult.
+
+        Returns a dict combining the AEI lifecycle fields with the
+        Prompt-9 resource-owned execution-mode fields:
+
+            {
+              "intent": <AuthorisedExecutionIntent dict>,
+              "outcome": "ALLOW" | "DENY",
+              "execution_mode": "resource_owned",
+              "execution_state": "submitted" | "accepted" | "succeeded" | ...,
+              "finality": "final" | "non_final",
+              "provider_execution_observed": bool,
+              "resource_receipt_received": bool,
+              "resource_receipt_verified": bool,
+              "submission_reference": str | None,
+              "result": <redacted provider evidence>,
+            }
+        """
+        mgr = self._get_intent_manager()
+        intent = mgr.store.get(intent_id)
+        if intent is None:
+            return {
+                "outcome": "DENY",
+                "reason": f"intent not found: {intent_id}",
+                "rule_matched": "intent:unknown",
+            }
+        if intent.requested_execution_mode != "resource_owned":
+            return {
+                "intent": intent.to_dict(),
+                "outcome": "DENY",
+                "reason": (
+                    f"intent {intent_id!r} requested_execution_mode is "
+                    f"{intent.requested_execution_mode!r}, not 'resource_owned'"
+                ),
+                "rule_matched": "intent:mode_mismatch",
+            }
+
+        client = self.resource_clients.get(intent.target_id)
+        if client is None:
+            return {
+                "intent": intent.to_dict(),
+                "outcome": "DENY",
+                "reason": (
+                    f"no resource client registered for target_id "
+                    f"{intent.target_id!r}"
+                ),
+                "rule_matched": "intent:no_resource_client",
+            }
+
+        try:
+            updated, mode_result = mgr.submit_to_resource(
+                intent,
+                resource_client=client,
+                proof=proof,
+            )
+        except Exception as e:
+            return {
+                "intent": intent.to_dict(),
+                "outcome": "DENY",
+                "reason": f"resource submission error: {type(e).__name__}: {e}",
+                "rule_matched": "intent:submission_error",
+            }
+
+        outcome = "ALLOW" if mode_result.state == "succeeded" else "DENY"
+        # For resource-owned results, the evidence is the resource_receipt
+        # (not provider_evidence, which is brokered-only).
+        if mode_result.mode == "resource_owned":
+            evidence: dict[str, Any] = {}
+            if mode_result.protocol_result.resource_receipt is not None:
+                # The receipt has already been redacted by the adapter /
+                # coordinator; safe to surface.
+                evidence = dict(mode_result.protocol_result.resource_receipt)
+                # Drop the signature from the HTTP response — it's
+                # cryptographic material the caller doesn't need.
+                evidence.pop("signature", None)
+        else:
+            evidence = mode_result.protocol_result.provider_evidence
+        return {
+            "intent": updated.to_dict(),
+            "outcome": outcome,
+            "execution_mode": mode_result.mode,
+            "execution_state": mode_result.state,
+            "finality": mode_result.finality.value,
+            "provider_execution_observed": mode_result.protocol_result.provider_execution_observed,
+            "resource_receipt_received": mode_result.protocol_result.resource_receipt_received,
+            "resource_receipt_verified": mode_result.protocol_result.resource_receipt_verified,
+            "submission_reference": mode_result.protocol_result.submission_reference,
+            "result": evidence,
+        }
 
     def resolve_grant(self, token: str) -> Grant:
         """Decode a bearer token and return the live Grant from the state store.

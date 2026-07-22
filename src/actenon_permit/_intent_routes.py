@@ -126,3 +126,53 @@ def mount(app, gateway: Gateway) -> None:
         outcome = result.get("outcome", "DENY")
         status = {"ALLOW": 200, "DENY": 403, "REQUIRE_APPROVAL": 202}.get(outcome, 500)
         return JSONResponse(content=result, status_code=status)
+
+    @app.post("/intents/{intent_id}/submit")
+    async def submit_intent(intent_id: str, request: Request) -> JSONResponse:
+        """Submit a resource-owned intent to its resource boundary.
+
+        The request body MUST contain a ``proof`` field: the
+        authority-issued ExecutionProof that the resource boundary
+        will verify independently. The gateway does NOT verify the
+        proof; the resource does.
+
+        No X-Actenon-Grant header is required for this endpoint —
+        resource-owned mode does not use a Permit grant. The proof
+        IS the authority. The resource boundary verifies it using
+        its own Kernel deployment.
+
+        The gateway looks up the ``ResourceOwnedSubmissionClient``
+        registered for the intent's ``target_id``. If none is
+        registered, returns DENY with rule_matched='intent:no_resource_client'.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "request body must be valid JSON"},
+            )
+        if not isinstance(body, dict):
+            return JSONResponse(
+                status_code=400,
+                content={"error": "request body must be a JSON object"},
+            )
+        proof = body.get("proof")
+        if not isinstance(proof, dict):
+            return JSONResponse(
+                status_code=422,
+                content={"error": "missing or invalid 'proof' field (must be a JSON object)"},
+            )
+
+        result = gateway.submit_intent_to_resource(intent_id, proof=proof)
+        outcome = result.get("outcome", "DENY")
+        # For resource-owned submission, "submitted" and "accepted" are
+        # non-final but NOT failures. We return 202 (Accepted) for those
+        # to signal "we got it but the outcome is pending". 200 for
+        # succeeded, 403 for refused/failed/mode_mismatch/no_client.
+        if outcome == "ALLOW":
+            status = 200
+        else:
+            state = result.get("execution_state")
+            status = 202 if state in ("submitted", "accepted", "outcome_unknown") else 403
+        return JSONResponse(content=result, status_code=status)
