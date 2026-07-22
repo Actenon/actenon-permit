@@ -188,40 +188,79 @@ def _verify_proof(
     action_hash: str,
     trusted_issuers: list,
 ) -> dict[str, Any]:
-    """Verify a proof token.
+    """Verify a proof token using the Kernel's BoundaryVerifier.
 
-    In the full implementation, this calls the Kernel's PCCBVerifier.
-    For the Phase 1 boundary kit, we do a structural check + trusted-issuer
-    check. A full implementation would call verify_pccb_at_edge().
+    This method delegates to the Kernel's BoundaryVerifier, which wraps
+    PCCBVerifier with replay protection and receipt construction. The
+    middleware does NOT implement proof verification itself — that's
+    the Kernel's job.
 
     Returns a dict with:
       - valid: bool
       - reason: str
       - proof_id: str (if valid)
+      - refusal_code: str (if invalid)
     """
-    if not proof_token:
-        return {"valid": False, "reason": "no proof token provided"}
+    # Lazy-import the Kernel's BoundaryVerifier. If the Kernel is not
+    # installed (e.g. in a minimal deployment), fall back to the
+    # structural check.
+    try:
+        from actenon.boundary import BoundaryVerificationRequest
 
-    # Structural check: proof must be a non-empty string.
-    if len(proof_token) < 16:
-        return {"valid": False, "reason": "proof token too short (malformed)"}
+        verifier = _get_or_create_verifier()
+        request = BoundaryVerificationRequest(
+            proof_token=proof_token,
+            action_type=boundary.action,
+            action_hash=action_hash,
+            audience=boundary.audience,
+            boundary_id=boundary.id,
+        )
+        result = verifier.verify_boundary(request)
 
-    # In the full implementation, we'd parse the proof (JWS/JWT),
-    # verify the signature, check the action_hash, audience, expiry,
-    # and replay. For Phase 1, we accept any non-empty token and
-    # record the proof_id for replay detection.
+        if result.valid:
+            return {
+                "valid": True,
+                "reason": "verified",
+                "proof_id": result.proof_id,
+            }
+        else:
+            return {
+                "valid": False,
+                "reason": result.reason,
+                "refusal_code": result.refusal_code,
+            }
+    except ImportError:
+        # Kernel not installed — fall back to structural check.
+        # This is the Phase 1 behaviour (for environments without Kernel).
+        if not proof_token:
+            return {"valid": False, "reason": "no proof token provided"}
+        if len(proof_token) < 16:
+            return {"valid": False, "reason": "proof token too short (malformed)"}
+        return {
+            "valid": True,
+            "reason": "verified (structural — Kernel not installed)",
+            "proof_id": f"proof_{hashlib.sha256(proof_token.encode()).hexdigest()[:16]}",
+        }
 
-    # Check audience if configured.
-    if boundary.audience:
-        # In the full implementation, we'd check the proof's audience claim.
-        # For Phase 1, we accept the proof if an audience is configured.
-        pass
 
-    return {
-        "valid": True,
-        "reason": "verified",
-        "proof_id": f"proof_{hashlib.sha256(proof_token.encode()).hexdigest()[:16]}",
-    }
+# Singleton verifier instance (created on first use).
+_verifier_instance: Any = None
+
+
+def _get_or_create_verifier() -> Any:
+    """Get or create the singleton BoundaryVerifier instance."""
+    global _verifier_instance
+    if _verifier_instance is None:
+        from actenon.boundary import BoundaryVerifier
+
+        _verifier_instance = BoundaryVerifier()
+    return _verifier_instance
+
+
+def reset_verifier() -> None:
+    """Reset the singleton verifier (for testing)."""
+    global _verifier_instance
+    _verifier_instance = None
 
 
 def _build_refusal(boundary: BoundaryEntry, verification: dict, action_hash: str) -> dict[str, Any]:
