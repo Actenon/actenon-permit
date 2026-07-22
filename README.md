@@ -5,7 +5,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.9–3.12](https://img.shields.io/badge/Python-3.9%E2%80%933.12-blue.svg)](https://www.python.org/)
 [![PyPI: actenon-permit](https://img.shields.io/pypi/v/actenon-permit?label=PyPI%20%C2%B7%20Python%20SDK)](https://pypi.org/project/actenon-permit/)
-[![npm: @actenon/sdk](https://img.shields.io/npm/v/@actenon/sdk?label=npm%20%C2%B7%20TypeScript%20SDK)](https://www.npmjs.com/package/@actenon/sdk)
+[![TypeScript SDK v1.4.0](https://img.shields.io/badge/TypeScript%20SDK-v1.4.0%20(source)-orange.svg)](ts-sdk/)
 [![Grant v1.0](https://img.shields.io/badge/Grant%20Spec-v1.0-success.svg)](SPEC.md)
 [![Boundary Kit](https://img.shields.io/badge/Boundary%20Kit-auto--discovery-orange.svg)](#boundary-kit--resource-boundary-protection-in-3-commands)
 [![CI](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml/badge.svg)](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml)
@@ -61,8 +61,13 @@ The agent walks away with a Receipt it could not forge; the protected endpoint w
 pip install actenon-permit              # Python SDK + unified CLI + Boundary Kit
 ```
 
+The TypeScript SDK is at v1.4.0 in [`ts-sdk/`](ts-sdk/) — full feature parity with the Python SDK (discriminated result types, receipt verification, protocol parity). It is built and tested in CI but **not yet published to npm**; install from source:
+
 ```bash
-npm install @actenon/sdk                # TypeScript SDK (v1.4.0) — discriminated result types, receipt verification, protocol parity
+git clone https://github.com/Actenon/actenon-permit.git
+cd actenon-permit/ts-sdk
+npm install && npm run build
+npm link                              # then `npm link @actenon/sdk` in your project
 ```
 
 ## Hero quickstart (6 lines)
@@ -308,7 +313,7 @@ The Kernel's [Insurer Clarity document](https://github.com/Actenon/actenon-cloud
 | Component | Location |
 |---|---|
 | Python SDK (sync + async) | [`src/actenon_permit/sdk/`](src/actenon_permit/sdk/) |
-| TypeScript SDK (`@actenon/sdk` v1.4.0) | [`ts-sdk/`](ts-sdk/) — discriminated results, receipt verification, protocol parity |
+| TypeScript SDK (v1.4.0, source — npm publish pending) | [`ts-sdk/`](ts-sdk/) — discriminated results, receipt verification, protocol parity |
 | Unified CLI | [`src/actenon_permit/unified_cli.py`](src/actenon_permit/unified_cli.py) |
 | Boundary Kit (manifest + middleware + auto-discovery) | [`src/actenon_permit/boundary/`](src/actenon_permit/boundary/) |
 | Credential providers (5 types) | [`src/actenon_permit/credentials.py`](src/actenon_permit/credentials.py) |
@@ -328,8 +333,8 @@ The Kernel's [Insurer Clarity document](https://github.com/Actenon/actenon-cloud
 ## PyPI / npm
 
 ```bash
-pip install actenon-permit              # Python SDK + CLI + Boundary Kit
-npm install @actenon/sdk                # TypeScript SDK v1.4.0
+pip install actenon-permit              # Python SDK + CLI + Boundary Kit (PyPI)
+# TypeScript SDK: clone and build from ts-sdk/ — npm publication pending
 ```
 
 ## Independence
