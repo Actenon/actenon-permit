@@ -194,7 +194,9 @@ def test_cross_signer_rejected(setup):
     context = _build_context(grant, action)
     with pytest.raises(ProofVerificationError) as exc_info:
         wrong_verifier.verify(intent, pccb, context)
-    assert exc_info.value.refusal_code == "SIGNATURE_INVALID"
+    from actenon.outcomes import refusal_code_to_failure_code
+    assert refusal_code_to_failure_code(exc_info.value.refusal_code) == refusal_code_to_failure_code("SIGNATURE_INVALID"), \
+        f"expected FailureCode.SIGNATURE_INVALID (canonical), got {exc_info.value.refusal_code!r}"
 
 
 def test_pccb_not_minted_on_deny(setup):
