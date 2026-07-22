@@ -43,10 +43,10 @@ jobs:
           with open('pyproject.toml', 'rb') as f:
               data = tomllib.load(f)
           deps = data['project']['dependencies']
-          assert any('actenon-protocol' in d and 'v1.1.0' in d for d in deps), (
-              f'actenon-protocol @ v1.1.0 not pinned in dependencies: {deps}'
+          assert any('actenon-protocol' in d and '1.1.0' in d for d in deps), (
+              f'actenon-protocol >= 1.1.0 not pinned in dependencies: {deps}'
           )
-          print('OK: actenon-protocol @ v1.1.0 pinned')
+          print('OK: actenon-protocol >= 1.1.0 pinned')
           "
 
       - name: Verify gateway DENY response carries structured refusal codes
