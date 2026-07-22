@@ -74,6 +74,23 @@ from .execution_modes import (
     ResourceOwnedSubmissionClient,
 )
 from .gateway import Gateway, ToolRegistry, ToolSpec, mcp_serve, mount_proxy
+from .intent import (
+    INTENT_TRANSITIONS,
+    MAX_METADATA_BYTES,
+    AuthorisedExecutionIntent,
+    DurabilityProfile,
+    EphemeralIntentStore,
+    IntentLifecycle,
+    IntentManager,
+    IntentStore,
+    IntentTransitionError,
+    MetadataValidationError,
+    SQLiteIntentStore,
+    can_transition,
+    store_capabilities,
+    validate_metadata,
+    validate_transition,
+)
 from .ledger import Ledger
 from .model import (
     Action,
@@ -193,5 +210,21 @@ __all__ = [
     "BrokeredExecutionCoordinator",
     "ResourceOwnedSubmissionClient",
     "ExecutionCoordinatorError",
+    # v1.3 (Prompt 10): AuthorisedExecutionIntent + lifecycle + stores
+    "AuthorisedExecutionIntent",
+    "DurabilityProfile",
+    "EphemeralIntentStore",
+    "IntentLifecycle",
+    "IntentManager",
+    "IntentStore",
+    "IntentTransitionError",
+    "INTENT_TRANSITIONS",
+    "MAX_METADATA_BYTES",
+    "MetadataValidationError",
+    "SQLiteIntentStore",
+    "can_transition",
+    "store_capabilities",
+    "validate_metadata",
+    "validate_transition",
 ]
 
