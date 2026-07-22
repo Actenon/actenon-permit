@@ -16,26 +16,24 @@ Run with: `uv run pytest tests/test_protocol_drift.py -v`
 from __future__ import annotations
 
 import pytest
-
-from actenon_protocol import (
-    PROTOCOL_VERSION,
-    RefusalCode,
-    resolve_alias,
-    PUBLIC_SAFE_CODES,
-    DETAILED_CODES,
+from actenon.outcomes import (
+    TAXONOMY_VERSION as KERNEL_TAXONOMY_VERSION,
 )
-from actenon_protocol.canonicalisation import canonicalize_json
 
 # Permit imports FailureCode transitively via actenon-kernel.
 from actenon.outcomes import (
     FailureCode,
-    TAXONOMY_VERSION as KERNEL_TAXONOMY_VERSION,
     refusal_code_to_failure_code,
     to_disclosed_code,
     to_internal_code,
     to_retryable,
 )
-
+from actenon_protocol import (
+    PROTOCOL_VERSION,
+    RefusalCode,
+    resolve_alias,
+)
+from actenon_protocol.canonicalisation import canonicalize_json
 
 # ---------------------------------------------------------------------------
 # 0. Pinned protocol version
@@ -58,7 +56,7 @@ def test_permit_uses_kernel_sourced_taxonomy():
     catalogue). The ``canonical`` property maps each refusal member to
     its canonical protocol code.
     """
-    from actenon_protocol import RefusalCode, TAXONOMY_VERSION as PROTOCOL_TAXONOMY_VERSION
+    from actenon_protocol import TAXONOMY_VERSION as PROTOCOL_TAXONOMY_VERSION
     assert KERNEL_TAXONOMY_VERSION == PROTOCOL_TAXONOMY_VERSION
     # Verify a few key members' canonical values.
     assert FailureCode.PCCB_REQUIRED.canonical == "PROOF_MISSING"
@@ -187,6 +185,7 @@ def test_gateway_deny_response_has_structured_codes():
 
     # Verify the gateway source actually emits these fields.
     import inspect
+
     from actenon_permit.gateway import Gateway
     src = inspect.getsource(Gateway.call_tool)
     assert "disclosed_code" in src, (
@@ -242,7 +241,6 @@ def test_permit_does_not_import_cloud():
     import ast
     from pathlib import Path
     permit_src = Path(__file__).resolve().parent.parent / "src" / "actenon_permit"
-    forbidden_prefixes = ("actenon_cloud", "app.", "from app", "import app")
     violations = []
     for py_file in permit_src.rglob("*.py"):
         try:
@@ -254,9 +252,8 @@ def test_permit_does_not_import_cloud():
                 for alias in node.names:
                     if alias.name.startswith("actenon_cloud") or alias.name.startswith("app"):
                         violations.append(f"{py_file.name}: import {alias.name}")
-            elif isinstance(node, ast.ImportFrom):
-                if node.module and (node.module.startswith("actenon_cloud") or node.module.startswith("app")):
-                    violations.append(f"{py_file.name}: from {node.module} import ...")
+            elif isinstance(node, ast.ImportFrom) and node.module and (node.module.startswith("actenon_cloud") or node.module.startswith("app")):
+                violations.append(f"{py_file.name}: from {node.module} import ...")
     assert not violations, (
         f"permit source imports cloud modules: {violations}"
     )
@@ -266,11 +263,12 @@ def test_protocol_does_not_import_permit():
     """The protocol package MUST NOT import actenon_permit."""
     import sys
     loaded = set(sys.modules.keys())
-    permit_modules = {m for m in loaded if m.startswith("actenon_permit")}
+    {m for m in loaded if m.startswith("actenon_permit")}
     # The protocol package itself should not import permit. We verify
     # by checking the protocol's __init__ source.
     import actenon_protocol
-    init_code = open(actenon_protocol.__file__).read()
+    with open(actenon_protocol.__file__) as f:
+        init_code = f.read()
     assert "actenon_permit" not in init_code, (
         "actenon_protocol.__init__ imports actenon_permit"
     )
@@ -329,8 +327,8 @@ def test_canonicalisation_byte_equivalence():
 
 def test_unsupported_major_version_is_rejected():
     """A protocol version with major != 1 must be rejected."""
-    from pydantic import TypeAdapter, ValidationError
     from actenon_protocol.types.common import ProtocolVersion
+    from pydantic import TypeAdapter, ValidationError
     adapter = TypeAdapter(ProtocolVersion)
     assert adapter.validate_python("1.0.0") == "1.0.0"
     with pytest.raises(ValidationError):
