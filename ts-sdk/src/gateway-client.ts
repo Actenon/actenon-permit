@@ -7,8 +7,8 @@
  * The agent only ever sees the tool signature and the outcome.
  */
 
-import type { GatewayCallResult } from "./types.ts";
-import { PermitDenied, PermitError } from "./types.ts";
+import type { GatewayCallResult } from "./types";
+import { PermitDenied, PermitError } from "./types";
 
 export interface GatewayClientOptions {
   baseUrl: string; // e.g. "http://127.0.0.1:7780"

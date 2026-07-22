@@ -1,31 +1,46 @@
 /**
- * Actenon-Permit TypeScript SDK — public entry point.
+ * @actenon/sdk — the official Actenon TypeScript SDK.
  *
- * Use this SDK to talk to an Actenon-Permit control plane + gateway from
- * TypeScript / JavaScript agents. For Python agents, use the `actenon_permit`
- * package directly.
+ * Provides protected execution for AI agents with discriminated result
+ * types, receipt verification, and protocol parity with the Python SDK.
  *
  * @example
  * ```ts
- * import { ControlPlaneClient, GatewayClient } from "@actenon/permit-sdk";
+ * import { Actenon } from "@actenon/sdk";
  *
- * const cp = new ControlPlaneClient({ baseUrl: "http://127.0.0.1:7780" });
- * const grant = await cp.issueGrant({
- *   agent: "refund-bot",
- *   ttl: "1h",
- *   budget: { currency: "USD", limit: 50 },
- *   scopes: { allow: ["payment.refund"], deny: ["payment.charge"] },
+ * const client = Actenon.cloud({
+ *   baseUrl: "http://localhost:7780",
+ *   grantToken: "v1.YOUR_TOKEN",
  * });
- * const { token } = await cp.mintToken(grant.id);
  *
- * const gw = new GatewayClient({ baseUrl: "http://127.0.0.1:7780", grantToken: token });
- * const result = await gw.callTool("refund", { amount: 20, reason: "customer" });
+ * const intent = await client.authorisedExecutionIntents.create({
+ *   action: "github.issue.create",
+ *   target: "github",
+ *   parameters: { title: "Hello from TS SDK" },
+ * });
+ *
+ * const result = await intent.execute();
+ * if (result.mode === "brokered" && result.state === "succeeded") {
+ *   console.log("succeeded:", result.evidence);
+ * }
  * ```
+ *
+ * @module
  */
 
-export * from "./types.ts";
-export * from "./token.ts";
-export { ControlPlaneClient } from "./client.ts";
-export type { ControlPlaneClientOptions } from "./client.ts";
-export { GatewayClient } from "./gateway-client.ts";
-export type { GatewayClientOptions } from "./gateway-client.ts";
+// Protocol types (parity with Python actenon_protocol + actenon_permit.sdk)
+export * from "./protocol";
+
+// Crypto helpers (canonicalisation + receipt verification)
+export { canonicalizeJson, computeReceiptSignature, verifyResourceReceipt } from "./crypto";
+
+// Client (Actenon.local / Actenon.cloud)
+export { Actenon, ActenonClient, CloudActenonClient, LocalActenonClient } from "./client";
+
+// Legacy v1 exports (backward compat with the existing TS SDK)
+export * from "./types";
+export * from "./token";
+export { ControlPlaneClient } from "./legacy-client";
+export type { ControlPlaneClientOptions } from "./legacy-client";
+export { GatewayClient } from "./gateway-client";
+export type { GatewayClientOptions } from "./gateway-client";

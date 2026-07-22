@@ -9,8 +9,8 @@
  * it, not verify it. Verification is for tooling (CLI, dashboards).
  */
 
-import type { Grant } from "./types.ts";
-import { TokenError } from "./types.ts";
+import type { Grant } from "./types";
+import { TokenError } from "./types";
 
 const VERSION = "v1";
 const PREFIX = `${VERSION}.`;

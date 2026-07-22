@@ -1,15 +1,31 @@
 {
-  "name": "@actenon/permit-sdk",
-  "version": "1.0.0",
-  "description": "TypeScript SDK for Actenon-Permit — an open-source authority broker for AI agents.",
+  "name": "@actenon/sdk",
+  "version": "1.4.0",
+  "description": "Official TypeScript SDK for Actenon — protected execution for AI agents with discriminated result types, receipt verification, and protocol parity with the Python SDK.",
   "type": "module",
-  "main": "src/index.ts",
-  "module": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js"
+    },
+    "./crypto": {
+      "types": "./dist/crypto.d.ts",
+      "import": "./dist/crypto.js"
+    }
+  },
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "build": "tsc",
+    "prepack": "bun run build",
+    "pack:test": "bun run build && npm pack --dry-run"
   },
   "keywords": [
     "ai",
@@ -20,7 +36,9 @@
     "pep",
     "capabilities",
     "policy",
-    "actenon"
+    "actenon",
+    "broker",
+    "proof"
   ],
   "license": "Apache-2.0",
   "author": "Actenon",
@@ -29,6 +47,13 @@
     "url": "https://github.com/Actenon/actenon-permit",
     "directory": "ts-sdk"
   },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "devDependencies": {
     "@types/bun": "^1.3.14",
     "typescript": "^5.5.0"
