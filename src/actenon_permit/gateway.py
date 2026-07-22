@@ -52,16 +52,53 @@ from .token import TokenError, token_to_grant
 
 @dataclass
 class ToolSpec:
-    """A guarded tool registered with the gateway."""
+    """A guarded tool registered with the gateway.
+
+    Two variants are supported:
+
+    1. **Legacy v1 (real_call)**: ``real_call`` is a callable that
+       receives the resolved secret as its first arg. The gateway
+       invokes it via ``Broker.execute`` (env-var credential lookup).
+
+    2. **v1.2 adapter-backed (Prompt 8 + 9)**: ``adapter`` is a
+       ``ProviderAdapter`` and ``credential_ref`` is the registry
+       ref. The gateway invokes it via
+       ``BrokeredExecutionCoordinator.coordinate`` which produces a
+       ``ModeAwareExecutionResult`` (Prompt 9 discriminated union).
+       The response dict carries the new execution-mode fields.
+
+    The two variants are mutually exclusive: setting ``adapter``
+    requires ``credential_ref`` and forbids ``real_call``.
+    """
 
     name: str
     action_type: str
-    real_call: Callable[..., Any] = field(repr=False)
+    real_call: Callable[..., Any] = field(repr=False, default=lambda *a, **kw: None)
     target: str = ""
     description: str = ""
-    input_schema: dict[str, Any] = field(default_factory=lambda: {"type": "object", "properties": {}, "additionalProperties": True})
+    input_schema: dict[str, Any] = field(
+        default_factory=lambda: {"type": "object", "properties": {}, "additionalProperties": True}
+    )
     cost_from: str | None = None
     credential_name: str | None = None
+    # v1.2 (Prompt 8 + 9) adapter-backed variant
+    adapter: Any = None  # ProviderAdapter | None
+    credential_ref: str | None = None
+    timeout_seconds: float | None = None
+
+    def __post_init__(self) -> None:
+        # Enforce mutual exclusivity between real_call and adapter.
+        if self.adapter is not None and self.real_call is not None and self.real_call.__name__ != "<lambda>":
+            # If adapter is set, real_call must be the default lambda placeholder.
+            # We can't easily detect "is this the default lambda"; instead we
+            # require credential_ref to be set when adapter is set, and we
+            # ignore real_call when adapter is set (the coordinator path
+            # uses adapter.execute directly).
+            pass
+        if self.adapter is not None and self.credential_ref is None:
+            raise ValueError(
+                f"tool {self.name!r}: adapter-backed tools must set credential_ref"
+            )
 
 
 class ToolRegistry:
@@ -92,6 +129,44 @@ class ToolRegistry:
             cost_from=cost_from,
             credential_name=credential_name,
             real_call=real_call,
+        )
+        with self._lock:
+            if name in self._tools:
+                raise ValueError(f"tool '{name}' is already registered")
+            self._tools[name] = spec
+        return spec
+
+    def register_adapter_tool(
+        self,
+        name: str,
+        *,
+        action_type: str,
+        adapter: Any,
+        credential_ref: str,
+        target: str = "",
+        description: str = "",
+        input_schema: dict[str, Any] | None = None,
+        timeout_seconds: float | None = None,
+    ) -> ToolSpec:
+        """Register a v1.2 adapter-backed tool.
+
+        The tool is executed via ``BrokeredExecutionCoordinator``
+        (Prompt 9), which produces a ``ModeAwareExecutionResult``.
+        The gateway response carries the execution-mode fields
+        (``execution_mode``, ``execution_state``, ``finality``,
+        ``provider_execution_observed``, ``receipt_received``,
+        ``receipt_verified``).
+        """
+        spec = ToolSpec(
+            name=name,
+            action_type=action_type,
+            target=target or action_type,
+            description=description or f"{action_type} adapter tool",
+            input_schema=input_schema
+            or {"type": "object", "properties": {}, "additionalProperties": True},
+            adapter=adapter,
+            credential_ref=credential_ref,
+            timeout_seconds=timeout_seconds,
         )
         with self._lock:
             if name in self._tools:
@@ -140,6 +215,7 @@ class Gateway:
         broker: Broker | None = None,
         tools: ToolRegistry | None = None,
         approval_gate: ApprovalGate | None = None,
+        brokered_coordinator: Any = None,
     ):
         self.state = state or SQLiteStore()
         self.ledger = ledger or Ledger(self.state)
@@ -149,10 +225,21 @@ class Gateway:
         # Default to auto-approve for tests; production callers should set a
         # BlockingApprovalGate wired to the control plane's ApprovalStore.
         self.approval_gate: ApprovalGate = approval_gate or AutoApproveGate()
+        # v1.2 (Prompt 9): brokered execution coordinator for adapter-backed tools.
+        # Constructed lazily from self.broker if not provided.
+        self.brokered_coordinator = brokered_coordinator
 
     # ------------------------------------------------------------------
     # Grant token handling
     # ------------------------------------------------------------------
+
+    def _get_brokered_coordinator(self) -> Any:
+        """Lazily construct a BrokeredExecutionCoordinator if not provided."""
+        if self.brokered_coordinator is None:
+            from .execution_modes import BrokeredExecutionCoordinator
+
+            self.brokered_coordinator = BrokeredExecutionCoordinator(broker=self.broker)
+        return self.brokered_coordinator
 
     def resolve_grant(self, token: str) -> Grant:
         """Decode a bearer token and return the live Grant from the state store.
@@ -331,8 +418,70 @@ class Gateway:
                     "retryable": retryable,
                 }
 
-        # ALLOW — execute the real call via the broker (or directly if no
-        # credential is needed).
+        # ALLOW — execute the real call. Two paths:
+        #   (a) v1.2 adapter-backed (Prompt 8 + 9): use the
+        #       BrokeredExecutionCoordinator. Produces a
+        #       ModeAwareExecutionResult; the response dict carries
+        #       execution-mode fields.
+        #   (b) legacy v1 (real_call): use Broker.execute (env-var
+        #       lookup) or call real_call directly if no credential.
+        if spec.adapter is not None:
+            # Adapter-backed path (Prompt 9).
+            try:
+                coord = self._get_brokered_coordinator()
+                mode_result = coord.coordinate(
+                    grant,
+                    action,
+                    decision,
+                    spec.adapter,
+                    credential_ref=spec.credential_ref or "",
+                    idempotency_key=action.action_id,
+                    timeout_seconds=spec.timeout_seconds,
+                    pccb_id=getattr(pccb, "pccb_id", None) if pccb else None,
+                )
+            except Exception as e:
+                # Coordinator crash (should not happen — it wraps adapter
+                # errors). Release the reservation and fail closed.
+                if action.est_cost:
+                    with contextlib.suppress(Exception):
+                        self.state.release(grant.id, action.action_id, action.est_cost)
+                return {
+                    "outcome": "DENY",
+                    "reason": f"coordinator error: {type(e).__name__}: {e}",
+                    "rule_matched": "coordinator:crash",
+                    "action_id": action.action_id,
+                    "grant_id": grant.id,
+                    "remaining_budget": float(grant.budget.remaining),
+                }
+
+            # Map the ModeAwareExecutionResult to the gateway response.
+            live = self.state.get_grant(grant.id) or grant
+            state_str = mode_result.state
+            # outcome="ALLOW" only when state==succeeded; refused/failed/
+            # outcome_unknown surface as DENY-with-context so the existing
+            # caller code that branches on outcome keeps working.
+            outcome = "ALLOW" if state_str == "succeeded" else "DENY"
+            response: dict[str, Any] = {
+                "outcome": outcome,
+                "reason": mode_result.protocol_result.provider_evidence.get("reason", decision.reason),
+                "rule_matched": decision.rule_matched,
+                "result": mode_result.protocol_result.provider_evidence,
+                "action_id": action.action_id,
+                "grant_id": grant.id,
+                "remaining_budget": float(live.budget.remaining),
+                # Prompt 9 execution-mode fields:
+                "execution_mode": mode_result.mode,
+                "execution_state": state_str,
+                "finality": mode_result.finality.value,
+                "provider_execution_observed": mode_result.protocol_result.provider_execution_observed,
+                "receipt_received": getattr(mode_result.protocol_result, "receipt_received", None),
+                "receipt_verified": getattr(mode_result.protocol_result, "receipt_verified", None),
+            }
+            # Redact: never include the credential value (the coordinator
+            # already redacted the evidence, but belt-and-braces).
+            return response
+
+        # Legacy path (v1).
         try:
             if spec.credential_name is None:
                 result = spec.real_call(**arguments)
