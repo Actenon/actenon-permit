@@ -3,10 +3,18 @@ name: Publish to PyPI
 # Build the wheel + sdist and publish to PyPI on tag pushes.
 # Tags must match the pattern v* (e.g. v1.4.0).
 #
-# Trusted publishing (OIDC) is used — no PyPI API token needed in
-# GitHub secrets. The PyPI project must be configured to trust this
-# GitHub Actions workflow. See:
-#   https://docs.pypi.org/trusted-publishers/
+# Two publishing modes are supported:
+#
+# 1. Trusted publishing (OIDC) — preferred. No API token needed.
+#    The PyPI project must be configured to trust this workflow at:
+#    https://pypi.org/manage/project/actenon-permit/settings/publishing/
+#
+# 2. API token — fallback. Set the PYPI_API_TOKEN secret in the
+#    repository's GitHub Actions secrets. The token must have upload
+#    permission for the actenon-permit project.
+#
+# The workflow uses trusted publishing if PYPI_API_TOKEN is NOT set,
+# and falls back to the API token if it is.
 
 on:
   push:
@@ -67,9 +75,17 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Publish to PyPI
+      - name: Publish to PyPI (trusted publishing)
+        if: ${{ !env.PYPI_API_TOKEN }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # Uncomment the next line to publish to TestPyPI first.
-          # repository-url: https://test.pypi.org/legacy/
           print-hash: true
+
+      - name: Publish to PyPI (API token)
+        if: ${{ env.PYPI_API_TOKEN }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          print-hash: true
+    env:
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
