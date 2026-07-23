@@ -254,7 +254,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 ```
 
 **Receipts prove declared enforcement evidence, not the wisdom of the
-authority decision.** See [INSURER_CLARITY.md](https://github.com/Actenon/actenon-cloud/blob/main/INSURER_CLARITY.md)
+authority decision.** See [INSURER_CLARITY.md](https://github.com/Actenon/actenon-cloud/blob/main/docs/INSURER_CLARITY.md)
 for the three separate questions (execution integrity, authority-process
 integrity, business decision correctness).
 
@@ -470,7 +470,7 @@ See `actenon_permit/adapters/github.py` for the reference implementation.
 
 ## 16. Production Deployment
 
-See [PRODUCTION_INTEGRATION.md](https://github.com/Actenon/actenon-cloud/blob/main/PRODUCTION_INTEGRATION.md)
+See [PRODUCTION_INTEGRATION.md](https://github.com/Actenon/actenon-cloud/blob/main/docs/PRODUCTION_INTEGRATION.md)
 for exactly what to wire:
 
 1. **Signing**: KMS/HSM (interface exists, wire AWS KMS / GCP KMS / Azure)
