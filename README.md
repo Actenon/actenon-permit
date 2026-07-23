@@ -53,7 +53,7 @@ The execution gap is not closed by authentication, policy, approval, or audit al
 4. **Brokering the credential** only after verification passes — the agent never sees the raw secret.
 5. Emitting a canonical **Receipt** or **Refusal** that is independently verifiable.
 
-The agent walks away with a Receipt it could not forge; the protected endpoint walks away with proof it actually verified; the auditor walks away with a hash-chained evidence trail. Read the canonical problem statement in [`actenon-kernel/THE_EXECUTION_GAP.md`](https://github.com/Actenon/actenon-kernel/blob/main/THE_EXECUTION_GAP.md).
+The agent walks away with a Receipt it could not forge; the protected endpoint walks away with proof it actually verified; the auditor walks away with a hash-chained evidence trail. Read the canonical problem statement in [`actenon-kernel/docs/THE_EXECUTION_GAP.md`](https://github.com/Actenon/actenon-kernel/blob/main/docs/THE_EXECUTION_GAP.md).
 
 ## Install
 
@@ -283,7 +283,7 @@ In `resource_owned` mode, Permit still issues the Grant and mints the PCCB — b
 - **Exceed budget / scope / rate.** The PDP enforces at decision time; the lifecycle state machine prevents out-of-order execution.
 - **Replay a proof.** Single-use PCCB + lifecycle state machine + durable replay store (atomic claim-once, not check-then-write). Replays are refused with `REPLAY_DETECTED`.
 - **Mutate parameters after approval.** The PCCB binds the action-hash (SHA-256 over `ACTENON-JCS-STRICT-1` canonical JSON of the parameters). Any mutation is detected at the edge as `ACTION_HASH_MISMATCH` / `PARAMETER_DIGEST_MISMATCH`.
-- **Forward proof to a different tool.** The PCCB binds `audience`. A proof minted for tool A is refused by tool B with `AUDIENCE_MISMATCH`. See the Kernel's [Multi-Agent Execution Model](https://github.com/Actenon/actenon-kernel/blob/main/MULTI_AGENT_EXECUTION_MODEL.md).
+- **Forward proof to a different tool.** The PCCB binds `audience`. A proof minted for tool A is refused by tool B with `AUDIENCE_MISMATCH`. See the Kernel's [Multi-Agent Execution Model](https://github.com/Actenon/actenon-kernel/blob/main/docs/MULTI_AGENT_EXECUTION_MODEL.md).
 - **Silently ignore unsupported parameters.** Adapters reject unknown fields with `InvalidParametersError`.
 
 ## Insurer-facing clarity
