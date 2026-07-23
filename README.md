@@ -298,7 +298,7 @@ Every consequential action that runs under Permit produces a cryptographic Recei
 | Was the action replayed or reused? | No. Each proof is single-use with a unique nonce. |
 | Was the agent's authority revoked in time? | The revocation is logged with a timestamp; calls after revocation are refused. |
 
-The Kernel's [Insurer Clarity document](https://github.com/Actenon/actenon-cloud/blob/main/INSURER_CLARITY.md) separates three distinct questions — execution integrity, authority-process integrity, and business decision correctness — and is honest about which two cryptography can prove and which one it cannot.
+The Kernel's [Insurer Clarity document](docs/INSURER_CLARITY.md) separates three distinct questions — execution integrity, authority-process integrity, and business decision correctness — and is honest about which two cryptography can prove and which one it cannot.
 
 ## What's in this repo
 
