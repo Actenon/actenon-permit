@@ -3,7 +3,9 @@
 > The open authority broker. Issues signed grants, enforces at the edge, runs the credential broker. The recommended developer entry point for the Actenon ecosystem.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-[![Python 3.9–3.12](https://img.shields.io/badge/Python-3.9%E2%80%933.12-blue.svg)](https://www.python.org/)
+<!-- PYTHON-BADGE:START -->
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
+<!-- PYTHON-BADGE:END -->
 [![PyPI: actenon-permit](https://img.shields.io/pypi/v/actenon-permit?label=PyPI%20%C2%B7%20Python%20SDK)](https://pypi.org/project/actenon-permit/)
 [![npm: @actenon/sdk](https://img.shields.io/npm/v/@actenon/sdk?label=npm%20%C2%B7%20TypeScript%20SDK)](https://www.npmjs.com/package/@actenon/sdk)
 [![Grant v1.0](https://img.shields.io/badge/Grant%20Spec-v1.0-success.svg)](SPEC.md)
@@ -56,6 +58,8 @@ The execution gap is not closed by authentication, policy, approval, or audit al
 The agent walks away with a Receipt it could not forge; the protected endpoint walks away with proof it actually verified; the auditor walks away with a hash-chained evidence trail. Read the canonical problem statement in [`actenon-kernel/docs/THE_EXECUTION_GAP.md`](https://github.com/Actenon/actenon-kernel/blob/main/docs/THE_EXECUTION_GAP.md).
 
 ## Install
+
+Python 3.10+ for the Kernel alone. The full stack including Permit requires 3.11+.
 
 ```bash
 pip install actenon-permit              # Python SDK + unified CLI + Boundary Kit
