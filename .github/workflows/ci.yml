@@ -41,7 +41,7 @@ jobs:
 
       - name: Check README ecosystem table in sync with ecosystem.yaml
         run: |
-          pip install actenon-protocol --quiet
+          pip install "actenon-protocol[yaml]" --quiet
           python -m actenon_protocol.ecosystem --check README.md --repo actenon-permit
       - name: Lint with ruff
         run: uv run ruff check .
@@ -144,7 +144,7 @@ jobs:
 
       - name: Check README ecosystem table in sync with ecosystem.yaml
         run: |
-          pip install actenon-protocol --quiet
+          pip install "actenon-protocol[yaml]" --quiet
           python -m actenon_protocol.ecosystem --check README.md --repo actenon-permit
 
       - name: Verify protocol version pin
