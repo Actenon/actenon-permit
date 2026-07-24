@@ -47,13 +47,30 @@ class BoundaryMiddleware(BaseHTTPMiddleware):
     is checked against the manifest's boundaries. If a match is found
     and the request lacks a valid proof, the request is refused (or
     logged in observe mode).
+
+    The verifier is a singleton by default (one BoundaryVerifier per
+    process, shared across all middleware instances). This is correct for
+    production: the replay store MUST be process-wide to prevent replay
+    across requests. For testing, pass `verifier=` explicitly to inject a
+    fresh verifier per test, or call `reset_verifier()` in a fixture to
+    reset the singleton's replay state.
     """
 
-    def __init__(self, app, manifest: BoundaryManifest) -> None:
+    def __init__(
+        self,
+        app,
+        manifest: BoundaryManifest,
+        *,
+        verifier: Any = None,
+    ) -> None:
         super().__init__(app)
         self.manifest = manifest
         self._replay_store: set[str] = set()
         self._observe_log: list[dict[str, Any]] = []
+        # If a verifier is explicitly provided, use it directly (no singleton).
+        # This is the test-injection path: tests pass a fresh verifier per
+        # fixture so replay state never bleeds across tests.
+        self._explicit_verifier = verifier
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         method = request.method
@@ -79,7 +96,13 @@ class BoundaryMiddleware(BaseHTTPMiddleware):
         mode = self.manifest.enforcement.mode
 
         # Verify the proof.
-        verification = _verify_proof(proof_token, boundary, action_hash, self.manifest.trusted_issuers)
+        verification = _verify_proof(
+            proof_token,
+            boundary,
+            action_hash,
+            self.manifest.trusted_issuers,
+            verifier=self._explicit_verifier,
+        )
 
         if not verification["valid"]:
             refusal = _build_refusal(boundary, verification, action_hash)
@@ -187,6 +210,8 @@ def _verify_proof(
     boundary: BoundaryEntry,
     action_hash: str,
     trusted_issuers: list,
+    *,
+    verifier: Any = None,
 ) -> dict[str, Any]:
     """Verify a proof token using the Kernel's BoundaryVerifier.
 
@@ -200,6 +225,10 @@ def _verify_proof(
       - reason: str
       - proof_id: str (if valid)
       - refusal_code: str (if invalid)
+
+    If ``verifier`` is provided (the test-injection path), it is used
+    directly instead of the process-wide singleton. This is how tests
+    isolate replay state: each fixture passes a fresh verifier.
     """
     # Lazy-import the Kernel's BoundaryVerifier. If the Kernel is not
     # installed (e.g. in a minimal deployment), fall back to the
@@ -207,7 +236,7 @@ def _verify_proof(
     try:
         from actenon.boundary import BoundaryVerificationRequest
 
-        verifier = _get_or_create_verifier()
+        actual_verifier = verifier if verifier is not None else _get_or_create_verifier()
         request = BoundaryVerificationRequest(
             proof_token=proof_token,
             action_type=boundary.action,
@@ -215,7 +244,7 @@ def _verify_proof(
             audience=boundary.audience,
             boundary_id=boundary.id,
         )
-        result = verifier.verify_boundary(request)
+        result = actual_verifier.verify_boundary(request)
 
         if result.valid:
             return {
