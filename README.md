@@ -11,7 +11,7 @@
 [![Grant v1.0](https://img.shields.io/badge/Grant%20Spec-v1.0-success.svg)](SPEC.md)
 [![Boundary Kit](https://img.shields.io/badge/Boundary%20Kit-auto--discovery-orange.svg)](#boundary-kit--resource-boundary-protection-in-3-commands)
 [![CI](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml/badge.svg)](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml)
-[![Claims: machine-verified](https://img.shields.io/badge/claims-machine--verified-2ea44f.svg)](https://github.com/Actenon/actenon-permit/actions/workflows/verify-claims.yml)
+[![claims: machine-verified](https://img.shields.io/github/actions/workflow/status/Actenon/actenon-permit/verify-claims.yml?branch=main&label=claims%3A%20machine-verified)](https://github.com/Actenon/actenon-permit/actions/workflows/verify-claims.yml)
 [![Code style: ruff](https://img.shields.io/badge/Code%20style-ruff-black.svg)](https://docs.astral.sh/ruff/)
 [![No Cloud required](https://img.shields.io/badge/Cloud-not%20required-2ea44f.svg)](#independence)
 
