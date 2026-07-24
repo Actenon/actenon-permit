@@ -31,18 +31,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Check generated Python badge
-        if: matrix.python-version == '3.12'
-        run: uv run python scripts/sync_badges.py --check
+      # Claim-verification steps moved to verify-claims.yml (one copy of
+      # each check; the README badge links there).
 
-      - name: Check README registry installs
-        if: matrix.python-version == '3.12'
-        run: uv run python scripts/check_readme_installs.py
-
-      - name: Check README ecosystem table in sync with ecosystem.yaml
-        run: |
-          pip install "actenon-protocol[yaml]" --quiet
-          python -m actenon_protocol.ecosystem --check README.md --repo actenon-permit
       - name: Lint with ruff
         run: uv run ruff check .
 
@@ -115,64 +106,5 @@ jobs:
         working-directory: ts-sdk
         run: bun test
 
-  verify-claims:
-    # Machine-enforce every claim the README makes about the package itself.
-    # Fable 5 Part 3A/G: for a trust product, one falsified claim costs more
-    # than ten missing features.
-    name: Verify README claims (machine-enforced)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies
-        run: uv sync --extra dev
-
-      - name: Check generated Python badge
-        run: uv run python scripts/sync_badges.py --check
-
-      - name: Check README registry installs
-        run: uv run python scripts/check_readme_installs.py
-
-      - name: Check README ecosystem table in sync with ecosystem.yaml
-        run: |
-          pip install "actenon-protocol[yaml]" --quiet
-          python -m actenon_protocol.ecosystem --check README.md --repo actenon-permit
-
-      - name: Verify protocol version pin
-        run: |
-          python -c "
-          import tomllib
-          with open('pyproject.toml', 'rb') as f:
-              data = tomllib.load(f)
-          deps = data['project']['dependencies']
-          assert any('actenon-protocol' in d and '1.1.0' in d for d in deps), (
-              f'actenon-protocol >= 1.1.0 not pinned in dependencies: {deps}'
-          )
-          print('OK: actenon-protocol >= 1.1.0 pinned')
-          "
-
-      - name: Verify pytest-asyncio is a runtime dep
-        # Fable 5 Part 3G: four async SDK tests error out without
-        # pytest-asyncio installed in a plain `pip install -e . && pytest`
-        # flow. Make the dep machine-enforced.
-        run: |
-          python -c "
-          import tomllib
-          with open('pyproject.toml', 'rb') as f:
-              data = tomllib.load(f)
-          deps = data['project']['dependencies']
-          assert any('pytest-asyncio' in d for d in deps), (
-              f'pytest-asyncio not in runtime deps (Fable 5 Part 3G): {deps}'
-          )
-          print('OK: pytest-asyncio is a runtime dep')
-          "
-
+  # The verify-claims job moved to verify-claims.yml so the README
+  # badge can link to a dedicated gate.

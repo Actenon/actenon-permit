@@ -11,8 +11,30 @@
 [![Grant v1.0](https://img.shields.io/badge/Grant%20Spec-v1.0-success.svg)](SPEC.md)
 [![Boundary Kit](https://img.shields.io/badge/Boundary%20Kit-auto--discovery-orange.svg)](#boundary-kit--resource-boundary-protection-in-3-commands)
 [![CI](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml/badge.svg)](https://github.com/Actenon/actenon-permit/actions/workflows/ci.yml)
+[![Claims: machine-verified](https://img.shields.io/badge/claims-machine--verified-2ea44f.svg)](https://github.com/Actenon/actenon-permit/actions/workflows/verify-claims.yml)
 [![Code style: ruff](https://img.shields.io/badge/Code%20style-ruff-black.svg)](https://docs.astral.sh/ruff/)
 [![No Cloud required](https://img.shields.io/badge/Cloud-not%20required-2ea44f.svg)](#independence)
+
+### Every claim above is machine-verified
+
+The `claims: machine-verified` badge links to a CI gate
+([`verify-claims.yml`](.github/workflows/verify-claims.yml)) that fails on
+every PR, push to `main`, and once a day if any factual claim this README
+makes about the package stops being true:
+
+- **Install commands** — every `pip install` / `npm install` in this README
+  is resolved against the live registry; the Python version badge is
+  generated, not hand-edited.
+- **The ecosystem table** — rendered from the protocol's `ecosystem.yaml`,
+  never hand-edited.
+- **The protocol pin** — `actenon-protocol>=1.1.0` is asserted from
+  `pyproject.toml`, so the wire-contract compatibility claim cannot silently
+  drift.
+- **The plain-install promise** — a plain install followed by `pytest`
+  works out of the box, because the deps that make that true are
+  machine-checked as runtime deps, not dev-only.
+
+If a claim drifts, the badge goes red before a human notices.
 
 ---
 
