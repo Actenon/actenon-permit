@@ -30,9 +30,9 @@ makes about the package stops being true:
 - **The protocol pin** — `actenon-protocol>=1.1.0` is asserted from
   `pyproject.toml`, so the wire-contract compatibility claim cannot silently
   drift.
-- **The plain-install promise** — `pip install actenon-permit && pytest`
-  works because the deps that make it work are machine-checked as runtime
-  deps, not dev-only.
+- **The plain-install promise** — a plain install followed by `pytest`
+  works out of the box, because the deps that make that true are
+  machine-checked as runtime deps, not dev-only.
 
 If a claim drifts, the badge goes red before a human notices.
 

@@ -31,18 +31,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Check generated Python badge
-        if: matrix.python-version == '3.12'
-        run: uv run python scripts/sync_badges.py --check
+      # Claim-verification steps moved to verify-claims.yml (one copy of
+      # each check; the README badge links there).
 
-      - name: Check README registry installs
-        if: matrix.python-version == '3.12'
-        run: uv run python scripts/check_readme_installs.py
-
-      - name: Check README ecosystem table in sync with ecosystem.yaml
-        run: |
-          pip install "actenon-protocol[yaml]" --quiet
-          python -m actenon_protocol.ecosystem --check README.md --repo actenon-permit
       - name: Lint with ruff
         run: uv run ruff check .
 
