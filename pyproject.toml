@@ -30,6 +30,17 @@ dependencies = [
     "pyyaml>=6.0",
     "actenon-kernel[asymmetric]>=0.1.0",
     "actenon-protocol>=1.1.0,<2",
+    # pytest-asyncio is a runtime dep, not a dev dep, because:
+    #   1. pyproject.toml sets `asyncio_mode = "auto"` under
+    #      `[tool.pytest.ini_options]`, which requires pytest-asyncio to
+    #      be importable whenever pytest runs in this project — including
+    #      in a plain `pip install -e . && pytest` flow.
+    #   2. Fable 5 Part 3G flagged this: four async SDK tests error out
+    #      without pytest-asyncio installed, which is the first thing a
+    #      contributor hits.
+    # Adding ~50KB to the install is preferable to forcing every adopter
+    # to know to install `[dev]` before running tests.
+    "pytest-asyncio>=0.24",
 ]
 
 [project.optional-dependencies]

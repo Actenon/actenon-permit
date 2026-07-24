@@ -73,7 +73,31 @@ def manifest(manifest_dict):
 
 
 @pytest.fixture
-def app_with_middleware(manifest):
+def fresh_verifier():
+    """Return a fresh BoundaryVerifier with an empty replay store.
+
+    This is the test-isolation fix for Fable 5 Part 3G: the middleware
+    uses a module-level singleton verifier by default, whose `_replay_keys`
+    set persists across tests. When `test_middleware_valid_proof_passes`
+    ran before `test_middleware_replay_refused`, the proof_id was already
+    in the singleton's replay set, causing the first request of the
+    replay test to be refused (403 instead of 200).
+
+    Injecting a fresh verifier per test fixture ensures each test starts
+    with an empty replay store, regardless of test order.
+    """
+    try:
+        from actenon.boundary import BoundaryVerifier
+
+        return BoundaryVerifier()
+    except ImportError:
+        # Kernel not installed — middleware falls back to structural check,
+        # no verifier needed.
+        return None
+
+
+@pytest.fixture
+def app_with_middleware(manifest, fresh_verifier):
     app = FastAPI()
 
     @app.post("/refunds")
@@ -88,7 +112,12 @@ def app_with_middleware(manifest):
     async def health():
         return {"status": "ok"}
 
-    app.add_middleware(BoundaryMiddleware, manifest=manifest)
+    # Inject the fresh verifier to ensure replay-state isolation across tests.
+    app.add_middleware(
+        BoundaryMiddleware,
+        manifest=manifest,
+        verifier=fresh_verifier,
+    )
     return app
 
 
@@ -592,3 +621,56 @@ def test_cli_protect_deploy_flags_missing_issuers(manifest_dict, tmp_path):
     # The manifest should still be updated
     updated = json.loads(manifest_path.read_text())
     assert updated["enforcement"]["mode"] == "enforce"
+
+
+# ---------------------------------------------------------------------------
+# Regression test for Fable 5 Part 3G: test isolation bug
+# ---------------------------------------------------------------------------
+
+
+def test_replay_refused_passes_after_valid_proof_passes(app_with_middleware):
+    """Regression test: test_middleware_replay_refused must pass even when
+    test_middleware_valid_proof_passes has already run in the same session.
+
+    Fable 5 Part 3G flagged that this test passed in isolation but failed
+    in the full suite. The root cause: the middleware's BoundaryVerifier
+    singleton had a process-wide `_replay_keys` set that persisted across
+    tests. When test_middleware_valid_proof_passes ran first, it added the
+    proof_id for "valid_proof_token_at_least_16_chars_long" to the
+    singleton's replay set. When test_middleware_replay_refused ran next,
+    its first request was refused (403) because the proof_id was already
+    "replayed" — even though it was a fresh request in a fresh test.
+
+    The fix: the `app_with_middleware` fixture now injects a fresh
+    BoundaryVerifier per test via the `verifier=` kwarg, ensuring each
+    test starts with an empty replay store.
+
+    This regression test explicitly reproduces the order dependency:
+    it uses the same proof token as test_middleware_valid_proof_passes,
+    then immediately tries the replay-refused sequence. If the fixture's
+    fresh-verifier injection is removed, this test will fail.
+    """
+    client = TestClient(app_with_middleware)
+
+    # Use the same proof token that test_middleware_valid_proof_passes uses.
+    # If verifier state bled across tests, this first request would be
+    # refused (403) instead of accepted (200).
+    proof = "valid_proof_token_at_least_16_chars_long"
+    resp1 = client.post(
+        "/refunds",
+        json={"payment_intent_id": "pi_regression", "amount": 999, "reason": "test"},
+        headers={"X-Actenon-Proof": proof},
+    )
+    assert resp1.status_code == 200, (
+        f"First request should pass (fresh verifier) but got {resp1.status_code}: "
+        f"{resp1.json()}"
+    )
+
+    # Second request with same proof must be refused as replay.
+    resp2 = client.post(
+        "/refunds",
+        json={"payment_intent_id": "pi_regression_2", "amount": 888, "reason": "test"},
+        headers={"X-Actenon-Proof": proof},
+    )
+    assert resp2.status_code == 403
+    assert "replay" in resp2.json()["reason"].lower()
