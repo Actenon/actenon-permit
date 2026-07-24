@@ -343,24 +343,22 @@ class StripeAdapter(PaymentsAdapter):
                 checked_at=checked_at,
             )
 
-        if amount is not None and params.get("amount") is not None:
-            if int(amount) != int(params["amount"]):
-                return ReconciliationResult(
-                    reconciled=False,
-                    provider_status=status,
-                    provider_reference=ref,
-                    mismatch=f"amount mismatch: requested {params['amount']}, provider reports {amount}",
-                    checked_at=checked_at,
-                )
+        if amount is not None and params.get("amount") is not None and int(amount) != int(params["amount"]):
+            return ReconciliationResult(
+                reconciled=False,
+                provider_status=status,
+                provider_reference=ref,
+                mismatch=f"amount mismatch: requested {params['amount']}, provider reports {amount}",
+                checked_at=checked_at,
+            )
 
-        if currency is not None and params.get("currency") is not None:
-            if str(currency).upper() != params["currency"].upper():
-                return ReconciliationResult(
-                    reconciled=False,
-                    provider_status=status,
-                    provider_reference=ref,
-                    mismatch=f"currency mismatch: requested {params['currency']!r}, provider reports {currency!r}",
-                    checked_at=checked_at,
+        if currency is not None and params.get("currency") is not None and str(currency).upper() != params["currency"].upper():
+            return ReconciliationResult(
+                reconciled=False,
+                provider_status=status,
+                provider_reference=ref,
+                mismatch=f"currency mismatch: requested {params['currency']!r}, provider reports {currency!r}",
+                checked_at=checked_at,
                 )
 
         return ReconciliationResult(

@@ -68,12 +68,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from . import (
-    InvalidParametersError,
     ProviderAdapter,
     ProviderResponse,
     ValidationResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Payment-specific data structures
@@ -239,9 +237,8 @@ class PaymentsAdapter(ProviderAdapter):
             if key == "amount" and isinstance(value, int) and value < 0:
                 errors.append({"field": "amount", "reason": "must be non-negative (minor units)"})
 
-            if key == "currency" and isinstance(value, str):
-                if len(value) != 3:
-                    errors.append({"field": "currency", "reason": "must be ISO 4217 3-letter code"})
+            if key == "currency" and isinstance(value, str) and len(value) != 3:
+                errors.append({"field": "currency", "reason": "must be ISO 4217 3-letter code"})
 
         return ValidationResult(ok=len(errors) == 0 and len(unknown) == 0, unknown_fields=unknown, errors=errors)
 

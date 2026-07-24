@@ -14,9 +14,6 @@ from actenon_permit.adapters import (
 )
 from actenon_permit.adapters.payments import (
     Money,
-    PAYMENT_ACTION_SCHEMAS,
-    PaymentsAdapter,
-    ReconciliationResult,
 )
 from actenon_permit.adapters.stripe import StripeAdapter
 from actenon_permit.credentials import Credential
