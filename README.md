@@ -57,6 +57,43 @@ Permit is the **on-ramp**. If you are an engineer evaluating Actenon for the fir
 
 ---
 
+## Grants and Proofs — two layers, two trust boundaries
+
+Permit sits between the agent and the Kernel. It uses **two distinct
+cryptographic artefacts** because they serve two distinct trust boundaries.
+Understanding the difference is the key to understanding the ecosystem.
+
+| | **Grant** | **PCCB** (Proof of Constrained Conditional Brokered execution) |
+|---|---|---|
+| **Issued by** | Permit (the authority broker) | The Kernel (the verifier) |
+| **Held by** | The agent (transported as a bearer token) | The protected edge (verified once, then consumed) |
+| **Trust boundary** | Inside the control plane — the agent and the broker share a trust domain | Across trust boundaries — the resource verifies a proof it did not issue |
+| **Signing scheme** | HMAC-SHA256 (v0) or Ed25519 (pilot). Symmetric in v0 because the **verifier is the issuer** — the broker that minted the Grant is the same component that checks it at decision time. | Ed25519 (asymmetric). The resource verifies using the issuer's public key; it does not hold the signing secret. |
+| **Bound to** | A scope, budget, rate, expiry, and revocation status — *who is allowed to ask for what, up to what limit* | A specific action hash, target, audience, tenant, subject, parameters, nonce, and time window — *this exact action, this exact time, once* |
+| **Lifetime** | Long-lived (minutes to hours), reusable across many actions | Single-use, consumed on first verification |
+| **Revocation** | Instant (`status=revoked`); next decision is `DENY` | Not revocable individually (single-use); issuer key revocation is handled by the Kernel's 5-state key lifecycle |
+
+**Why two schemes?** A Grant is an *internal capability token* — the broker
+that issues it is the same broker that verifies it, so a symmetric HMAC is
+sufficient and keeps the token compact for HTTP/MCP transport. A PCCB
+*crosses a trust boundary* — the protected resource must verify it without
+holding the issuer's signing secret, so it requires asymmetric (Ed25519)
+signatures. This is the same reason JWT access tokens are often HMAC-signed
+by the authorization server while cross-service proof tokens are
+asymmetrically signed.
+
+**How they relate:** When the PDP returns `ALLOW`, Permit asks the Kernel to
+mint a PCCB bound to the *exact* Action Intent (same action name, same
+target, same parameters hash, same audience, single-use nonce). The Grant
+authorised the *category* of action; the PCCB authorises *this specific
+execution*. The broker only resolves the real credential after the PCCB is
+verified at the edge — and the PCCB is consumed, so it cannot be replayed.
+
+Read the canonical problem statement in
+[`actenon-kernel/docs/THE_EXECUTION_GAP.md`](https://github.com/Actenon/actenon-kernel/blob/main/docs/THE_EXECUTION_GAP.md).
+
+---
+
 ## What this is
 
 Permit is the **on-ramp** for protected AI-agent execution. It:
