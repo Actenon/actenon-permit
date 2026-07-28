@@ -49,7 +49,9 @@ def _load_persisted_key() -> str | None:
     Returns the key as a hex string, or None if no file exists.
     """
     env_path = os.environ.get("ACTENON_SIGNING_KEY_FILE", "").strip()
-    candidates = [env_path, str(_default_key_file_path())] if env_path else [str(_default_key_file_path())]
+    candidates = (
+        [env_path, str(_default_key_file_path())] if env_path else [str(_default_key_file_path())]
+    )
     for p in candidates:
         if not p:
             continue
@@ -113,26 +115,170 @@ def _get_signing_key() -> bytes:
 
 
 def canonical_json(obj: Any) -> str:
-    """Deterministic JSON for signing/hashing."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=_json_default)
+    """DEPRECATED: use ``actenon_protocol.canonicalize_json`` directly.
+
+    Retained as an alias for backward compatibility. Delegates to
+    ACTENON-JCS-STRICT-1 (RFC 8785 subset, as implemented by
+    ``actenon_protocol.canonicalize_json``) as of actenon-permit 2.0.0.
+
+    Migrating callers should ``from actenon_protocol import canonicalize_json``
+    and pre-coerce ``Decimal`` themselves. This wrapper exists so the public
+    export (see ``actenon_permit/__init__.py``) keeps working for downstream
+    consumers without a major-version bump on their side.
+
+    The wrapper applies ``_coerce_decimals`` first, so ``Decimal`` values are
+    normalised (via ``Decimal.normalize()``) to a canonical string form
+    before canonicalisation. See ``_coerce_decimals`` for details.
+
+    Floats are NOT coerced — they raise ``CanonicalisationError`` from the
+    protocol layer. The error message names ACTENON-JCS-STRICT-1 so callers
+    know which canonicaliser rejected the input. This is intentional: floats
+    in signing payloads are a defect (WO-4 constraint C3); the protocol
+    rejects them, and so does this wrapper.
+
+    Returns the canonical JSON as a ``str`` (the protocol canonicaliser
+    returns ``str``, not ``bytes``; the WO-4 spec's ``.decode("utf-8")``
+    in the example code is therefore a no-op against the actual return
+    type and is omitted here).
+    """
+    from actenon_protocol import canonicalize_json
+
+    return canonicalize_json(_coerce_decimals(obj))
 
 
-def _json_default(obj: Any) -> Any:
-    """Handle Decimal and other non-JSON-native types."""
+def _coerce_decimals(obj: Any) -> Any:
+    """Recursively convert ``Decimal`` to a canonical string for ACTENON-JCS-STRICT-1.
+
+    The protocol canonicaliser (``actenon_protocol.canonicalize_json``)
+    rejects ``Decimal`` and ``float`` outright — both raise
+    ``CanonicalisationError`` with a message naming ACTENON-JCS-STRICT-1.
+
+    Permit's domain model uses ``Decimal`` for monetary amounts (correct —
+    ``Budget.limit`` and ``Budget.remaining`` are ``Decimal``). Before
+    delegating to the protocol, this helper walks the payload and converts
+    every ``Decimal`` via ``Decimal.normalize()`` then ``str()``.
+
+    ``Decimal.normalize()`` strips trailing zeros and adjusts the exponent
+    so numerically equal Decimals produce identical bytes::
+
+        Decimal("50.0").normalize()  == Decimal("5E+1")
+        Decimal("50.00").normalize() == Decimal("5E+1")
+        str(Decimal("5E+1"))         == "5E+1"
+
+    This is the fix for WO-4 defect (b): previously, ``Decimal("50.0")`` and
+    ``Decimal("50.00")`` produced different signing bytes despite being
+    numerically equal. They now canonicalise identically.
+
+    Floats are NOT coerced here — they pass through to the protocol
+    canonicaliser, which raises ``CanonicalisationError`` with a message
+    naming ACTENON-JCS-STRICT-1. This is the fix for WO-4 constraint C3:
+    raw floats in signing payloads are a defect, not something to paper
+    over with ``str()``.
+
+    Any other unsupported type raises ``TypeError``. The previous
+    ``_json_default`` used ``str()`` as a catch-all default, which caused
+    type confusion (defect (b)) — that path is gone.
+    """
     from decimal import Decimal
+
     if isinstance(obj, Decimal):
-        # Use str() for exact representation (e.g. '0.1' not 0.10000000000000001)
-        return str(obj)
-    return str(obj)
+        # normalize() so Decimal("50.0") and Decimal("50.00") produce
+        # identical canonical bytes (both normalize to Decimal("5E+1")).
+        # str() of that is "5E+1" — ugly but unambiguous and stable.
+        return str(obj.normalize())
+    if isinstance(obj, bool):
+        # bool is a subclass of int but must be checked first; the protocol
+        # canonicaliser accepts bool natively (JSON true/false).
+        return obj
+    if isinstance(obj, (int, str)) or obj is None:
+        return obj
+    if isinstance(obj, dict):
+        return {k: _coerce_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_coerce_decimals(item) for item in obj]
+    if isinstance(obj, float):
+        # Defer to the protocol's rejection (its error message names
+        # ACTENON-JCS-STRICT-1, which is more informative than what we'd
+        # produce here).
+        return obj
+    raise TypeError(
+        f"_coerce_decimals: unsupported type {type(obj).__name__!r} for "
+        f"ACTENON-JCS-STRICT-1 canonicalisation. Convert to str/int/Decimal "
+        f"before signing."
+    )
 
 
 def sign(payload: dict[str, Any]) -> str:
     """HMAC-SHA256 hex digest over canonical JSON of ``payload``."""
-    return hmac.new(_get_signing_key(), canonical_json(payload).encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(
+        _get_signing_key(), canonical_json(payload).encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
 
 def verify_signature(payload: dict[str, Any], signature: str) -> bool:
     expected = sign(payload)
+    return hmac.compare_digest(expected, signature)
+
+
+# ---------------------------------------------------------------------------
+# Legacy canonicalisation — kept PRIVATE, for ledger chain verification only
+# ---------------------------------------------------------------------------
+
+# Prior to 2.0.0, Permit used its own canonicaliser (json.dumps with
+# sort_keys=True, separators=(",", ":"), default=str). Ledger entries
+# written by <2.0.0 are verified against this function. New entries use
+# the ACTENON-JCS-STRICT-1 canonicaliser via canonical_json above.
+#
+# DO NOT use this for new code. It exists solely so that ledgers written
+# before the 2.0.0 cut-over can still be verified. See ledger.py for the
+# chain_version discrimination logic.
+
+
+def _legacy_canonical_json(obj: Any) -> str:
+    """Pre-2.0.0 canonical JSON, for verifying legacy ledger entries only.
+
+    Reproduces the exact bytes that ``canonical_json`` produced before the
+    2.0.0 cut-over:
+      - ``json.dumps(obj, sort_keys=True, separators=(",", ":"), default=_legacy_default)``
+      - ``_legacy_default`` coerces Decimal via ``str()`` (the pre-2.0.0 defect (b))
+
+    This is PRIVATE (leading underscore) on purpose. New code must use
+    ``canonical_json`` (which delegates to ACTENON-JCS-STRICT-1). Exporting
+    this would invite callers to keep using the broken canonicaliser.
+    """
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=_legacy_default)
+
+
+def _legacy_default(obj: Any) -> Any:
+    """Pre-2.0.0 fallback for non-JSON-native types. Decimal -> str(obj)."""
+    from decimal import Decimal
+
+    if isinstance(obj, Decimal):
+        return str(obj)
+    return str(obj)
+
+
+def _legacy_sign(payload: dict[str, Any]) -> str:
+    """HMAC-SHA256 over ``_legacy_canonical_json`` — for verifying pre-2.0.0 tokens.
+
+    Grant tokens minted by actenon-permit <2.0.0 carry signatures computed
+    with the old ``canonical_json`` (json.dumps + sort_keys + default=str).
+    ``token_to_grant`` must still verify those tokens during the
+    deprecation window (see ``token.py`` for the window's stated end).
+
+    This function is PRIVATE (leading underscore). New code must use
+    ``sign()``, which delegates to ACTENON-JCS-STRICT-1.
+    """
+    return hmac.new(
+        _get_signing_key(),
+        _legacy_canonical_json(payload).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _legacy_verify_signature(payload: dict[str, Any], signature: str) -> bool:
+    """Verify a pre-2.0.0 signature. Companion to ``_legacy_sign``."""
+    expected = _legacy_sign(payload)
     return hmac.compare_digest(expected, signature)
 
 

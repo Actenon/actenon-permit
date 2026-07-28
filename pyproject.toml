@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "actenon-permit"
-version = "1.4.0"
+version = "2.0.0"
 description = "Actenon-Permit: an open-source authority broker for AI agents. Bounded, revocable capability grants with hard runtime limits."
 readme = "README.md"
 requires-python = ">=3.11"
