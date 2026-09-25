@@ -254,3 +254,30 @@ class TestCostTypeConfusion:
 
         with pytest.raises(PermitDenied):
             refund(amount="40")
+
+
+# ---------------------------------------------------------------------------
+# A threshold approval rule must not be skipped for an unreadable amount
+# ---------------------------------------------------------------------------
+
+
+class TestApprovalThresholdFailClosed:
+    @pytest.mark.parametrize("amount", [float("nan"), "NaN", "abc", [5000]])
+    def test_unreadable_amount_requires_approval(self, stack, amount):
+        """`payment.refund > 20` compared float(amount) > 20; NaN compares
+        False and a parse error returned False, so the rule was skipped and
+        the action ALLOWed without the human."""
+        store, pdp = stack
+        grant = _grant(approval_rules=["payment.refund > 20"])
+        store.put_grant(grant)
+        action = Action(grant_id=grant.id, type="payment.refund", params={"amount": amount})
+        assert pdp.decide(grant, action).outcome == DecisionOutcome.REQUIRE_APPROVAL
+
+    def test_numeric_amounts_still_compare(self, stack):
+        store, pdp = stack
+        grant = _grant(approval_rules=["payment.refund > 20"])
+        store.put_grant(grant)
+        small = Action(grant_id=grant.id, type="payment.refund", params={"amount": 5}, est_cost=5)
+        big = Action(grant_id=grant.id, type="payment.refund", params={"amount": 25}, est_cost=25)
+        assert pdp.decide(grant, small).outcome == DecisionOutcome.ALLOW
+        assert pdp.decide(grant, big).outcome == DecisionOutcome.REQUIRE_APPROVAL

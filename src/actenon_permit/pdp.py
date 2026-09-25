@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import contextlib
 import fnmatch
+import math
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -93,7 +94,9 @@ def _approval_rule_matches(rule: str, action: Action) -> bool:
 
     - Bare type (``"email.send"``): exact match on action.type
     - Threshold (``"payment.refund > 20"``): exact match on type AND
-      (params['amount'] or est_cost) > threshold
+      (params['amount'] or est_cost) > threshold. An amount that is not a
+      finite number (``"abc"``, NaN, a list) cannot be shown to be under
+      the threshold, so the rule matches (fail closed).
     """
     rule = rule.strip()
     m = _THRESHOLD_RE.match(rule)
@@ -106,9 +109,10 @@ def _approval_rule_matches(rule: str, action: Action) -> bool:
         if amount is None:
             amount = action.est_cost or 0.0
         try:
-            return float(amount) > threshold
+            value = float(amount)
         except (TypeError, ValueError):
-            return False
+            return True
+        return not math.isfinite(value) or value > threshold
     # bare type match
     return action.type == rule
 

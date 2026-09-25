@@ -118,6 +118,9 @@ Each entry in `approval_rules` is a string in one of two forms:
 - **Bare type** — `email.send`. Matches if `action.type == "email.send"`.
 - **Type + threshold** — `payment.refund > 20`. Matches if
   `action.type == "payment.refund"` AND `float(action.params['amount'] or action.est_cost) > 20`.
+  If that amount is not a finite number (a non-numeric string, NaN, a list),
+  the rule matches: an amount that cannot be compared is not under the
+  threshold.
 
 If any rule matches, the PDP returns `REQUIRE_APPROVAL` and blocks until the
 control plane returns `approve` or `deny`. On approval, the PDP re-runs the
