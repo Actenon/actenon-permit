@@ -68,7 +68,7 @@ Understanding the difference is the key to understanding the ecosystem.
 | **Issued by** | Permit (the authority broker) | The Kernel (the verifier) |
 | **Held by** | The agent (transported as a bearer token) | The protected edge (verified once, then consumed) |
 | **Trust boundary** | Inside the control plane — the agent and the broker share a trust domain | Across trust boundaries — the resource verifies a proof it did not issue |
-| **Signing scheme** | HMAC-SHA256 (v0) or Ed25519 (pilot). Symmetric in v0 because the **verifier is the issuer** — the broker that minted the Grant is the same component that checks it at decision time. | Ed25519 (asymmetric). The resource verifies using the issuer's public key; it does not hold the signing secret. |
+| **Signing scheme** | HMAC-SHA256. Symmetric because the **verifier is the issuer** — the broker that minted the Grant is the same component that checks it at decision time. | Ed25519 (asymmetric) once a keypair is configured with `permit init-keys` (or `ACTENON_ED25519_KEY_FILE`): the resource verifies using the issuer's public key and does not hold the signing secret. Without a keypair, PCCBs fall back to the kernel's HMAC-SHA256 dev signer (development only). |
 | **Bound to** | A scope, budget, rate, expiry, and revocation status — *who is allowed to ask for what, up to what limit* | A specific action hash, target, audience, tenant, subject, parameters, nonce, and time window — *this exact action, this exact time, once* |
 | **Lifetime** | Long-lived (minutes to hours), reusable across many actions | Single-use, consumed on first verification |
 | **Revocation** | Instant (`status=revoked`); next decision is `DENY` | Not revocable individually (single-use); issuer key revocation is handled by the Kernel's 5-state key lifecycle |
@@ -98,7 +98,7 @@ Read the canonical problem statement in
 
 Permit is the **on-ramp** for protected AI-agent execution. It:
 
-- **Issues signed grants** — capability tokens that are scoped, bounded (currency + spend cap + rate limit), expiring, revocable, and attenuable (UCAN-style sub-grants that can never exceed the parent on any dimension). Signed with HMAC-SHA256 (v0) or Ed25519 (pilot) over canonical JSON.
+- **Issues signed grants** — capability tokens that are scoped, bounded (currency + spend cap + rate limit), expiring, revocable, and attenuable (UCAN-style sub-grants that can never exceed the parent on any dimension). Signed with HMAC-SHA256 over canonical JSON.
 - **Runs the PDP** (Policy Decision Point) — deterministic `ALLOW` / `DENY` / `REQUIRE_APPROVAL` decisions per action, with structured reason codes.
 - **Enforces budget, rate, scope, expiry, and approval rules** at decision time, atomically and race-free.
 - **Runs the credential broker** — resolves credentials server-side, never gives them to the agent, supports 5 pluggable credential providers (static env, file, OIDC, cloud-secret-reference, custom callable).
@@ -133,7 +133,7 @@ npm install @actenon/sdk                # TypeScript SDK v1.4.0 — discriminate
 ```python
 from actenon_permit import Actenon, GitHubAdapter
 
-client = Actenon.local(agent_id="my-agent", scopes=["issue.create"])
+client = Actenon.local(agent_id="my-agent", scopes=["github.issue.create"])
 client.register_credential("GITHUB_TOKEN", "ghp_YOUR_TOKEN")
 client.register_adapter_tool("github_issue",
     action_type="github.issue.create",
@@ -182,7 +182,7 @@ A Grant is the digital analogue of a physical keycard with a budget and an expir
 
 | Property | How it's enforced |
 |---|---|
-| **Signed** | HMAC-SHA256 (v0) or Ed25519 (pilot) over canonical JSON (`ACTENON-JCS-STRICT-1`). Constant-time comparison on verify. |
+| **Signed** | HMAC-SHA256 over canonical JSON (sorted keys, compact separators — see [`SPEC.md`](SPEC.md) §2.1). Constant-time comparison on verify. |
 | **Scoped** | Explicit `allow[]` and `deny[]` action-type lists with glob matching (`payment.*`, `shell.exec`). `deny` wins. Default-deny when `allow` is non-empty. |
 | **Bounded** | A currency, a hard `limit`, and a mutable `remaining` spend cap. Atomic decrement under a transaction; refusal at `REQUIRE_APPROVAL` thresholds. |
 | **Rate-limited** | `{max, per_seconds}` sliding-window enforcement. |
