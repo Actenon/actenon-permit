@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import math
 import os
 import secrets
 import uuid
@@ -396,3 +397,33 @@ def parse_duration(s: str | int | float) -> int:
 
 def parse_duration_to_timedelta(s: str | int | float) -> timedelta:
     return timedelta(seconds=parse_duration(s))
+
+
+class CostError(ValueError):
+    """Raised when an action's cost-bearing argument is not a plain number."""
+
+
+def estimate_cost(arguments: dict[str, Any], cost_from: str | None = None) -> float | None:
+    """Return the cost to reserve for a call, from its arguments.
+
+    The cost field is ``cost_from`` if that argument is present, else
+    ``amount``, else ``cost``. Returns None when none is present.
+
+    Raises ``CostError`` when the cost field holds anything other than a
+    finite int/float/Decimal (a string, None, bool, container, NaN or
+    infinity). Such a value used to reserve nothing while still reaching
+    the provider (``"40"`` refunds $40 in most payment APIs), which let an
+    agent spend past its budget. Fail closed instead.
+    """
+    candidates = ([cost_from] if cost_from else []) + ["amount", "cost"]
+    for key in candidates:
+        if key not in arguments:
+            continue
+        value = arguments[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+            raise CostError(f"cost field {key!r} must be a number, got {type(value).__name__}")
+        cost = float(value)
+        if not math.isfinite(cost):
+            raise CostError(f"cost field {key!r} must be finite")
+        return cost
+    return None

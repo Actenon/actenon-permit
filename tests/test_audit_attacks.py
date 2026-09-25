@@ -6,6 +6,7 @@ A test passes when the attack is blocked (fail closed).
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -158,3 +159,98 @@ class TestRevocationCascade:
 
         result = gw.call_tool("refund", {"amount": 1}, token)
         assert result["outcome"] == "DENY", result
+
+
+# ---------------------------------------------------------------------------
+# A cost field that is not a plain number must not reserve $0
+# ---------------------------------------------------------------------------
+
+
+class TestCostTypeConfusion:
+    @pytest.mark.parametrize("amount", ["40", "4e1", None, [40], {"value": 40}, True])
+    def test_gateway_non_numeric_amount_is_refused(self, tmp_db, amount):
+        from actenon_permit.token import grant_to_token
+
+        store = SQLiteStore()
+        gw, _, _ = _gateway_with_refund_tool(store)
+        grant = _grant()
+        store.put_grant(grant)
+        token = grant_to_token(grant)
+        result = gw.call_tool("refund", {"amount": amount}, token)
+        assert result["outcome"] == "DENY", result
+        assert store.get_grant(grant.id).budget.remaining == 50
+
+    def test_gateway_string_amounts_cannot_exceed_budget(self, tmp_db):
+        """Before the fix: three $40 refunds against a $50 budget, all
+        ALLOWed, budget still $50."""
+        from actenon_permit.token import grant_to_token
+
+        store = SQLiteStore()
+        gw, _, _ = _gateway_with_refund_tool(store)
+        grant = _grant()
+        store.put_grant(grant)
+        token = grant_to_token(grant)
+        outcomes = [gw.call_tool("refund", {"amount": "40"}, token)["outcome"] for _ in range(3)]
+        assert outcomes.count("ALLOW") == 0, outcomes
+
+    @pytest.mark.parametrize("amount", [float("nan"), float("inf")])
+    def test_gateway_non_finite_amount_is_refused(self, tmp_db, amount):
+        from actenon_permit.token import grant_to_token
+
+        store = SQLiteStore()
+        gw, _, _ = _gateway_with_refund_tool(store)
+        grant = _grant()
+        store.put_grant(grant)
+        result = gw.call_tool("refund", {"amount": amount}, grant_to_token(grant))
+        assert result["outcome"] == "DENY", result
+
+    def test_guard_decimal_amount_is_charged_not_ignored(self, tmp_db, monkeypatch):
+        from decimal import Decimal
+
+        from actenon_permit import Broker
+        from actenon_permit.enforce import GuardRegistry, guard
+
+        monkeypatch.setenv("MOCK_STRIPE_KEY", "sk_mock_123")
+        store = SQLiteStore()
+        pdp = PDP(store, Ledger(store))
+        reg = GuardRegistry(store, pdp, Broker(pdp))
+        grant = _grant()
+        store.put_grant(grant)
+        reg.set_grant(grant.id)
+        paid = []
+
+        @guard(
+            "payment.refund", cost_from="amount", credential_name="MOCK_STRIPE_KEY", registry=reg
+        )
+        def refund(secret, amount):
+            paid.append(amount)
+            return {"status": "ok"}
+
+        from actenon_permit.pdp import PermitDenied
+
+        for _ in range(3):
+            with contextlib.suppress(PermitDenied):
+                refund(amount=Decimal("40"))
+        assert sum(paid) <= 50, paid
+
+    def test_guard_string_amount_is_refused(self, tmp_db, monkeypatch):
+        from actenon_permit import Broker
+        from actenon_permit.enforce import GuardRegistry, guard
+        from actenon_permit.pdp import PermitDenied
+
+        monkeypatch.setenv("MOCK_STRIPE_KEY", "sk_mock_123")
+        store = SQLiteStore()
+        pdp = PDP(store, Ledger(store))
+        reg = GuardRegistry(store, pdp, Broker(pdp))
+        grant = _grant()
+        store.put_grant(grant)
+        reg.set_grant(grant.id)
+
+        @guard(
+            "payment.refund", cost_from="amount", credential_name="MOCK_STRIPE_KEY", registry=reg
+        )
+        def refund(secret, amount):
+            return {"status": "ok"}
+
+        with pytest.raises(PermitDenied):
+            refund(amount="40")

@@ -40,7 +40,7 @@ from typing import Any
 from .broker import Broker, CredentialMissing, extract_cost
 from .enforce import ApprovalGate, AutoApproveGate
 from .ledger import Ledger
-from .model import Action, Decision, DecisionOutcome, Grant, GrantStatus
+from .model import Action, CostError, Decision, DecisionOutcome, Grant, GrantStatus, estimate_cost
 from .pdp import PDP
 from .state import SQLiteStore, StateStore
 from .token import TokenError, token_to_grant
@@ -634,13 +634,19 @@ class Gateway:
         # Build the Action from the call args. The cost is extracted from the
         # argument named by ``cost_from`` (or params['amount'] / ['cost']).
         params = {k: v for k, v in arguments.items() if isinstance(v, (str, int, float, bool, type(None)))}
-        est_cost: float | None = None
-        if spec.cost_from and spec.cost_from in arguments and isinstance(arguments[spec.cost_from], (int, float)):
-            est_cost = float(arguments[spec.cost_from])
-        elif "amount" in params and isinstance(params["amount"], (int, float)):
-            est_cost = float(params["amount"])
-        elif "cost" in params and isinstance(params["cost"], (int, float)):
-            est_cost = float(params["cost"])
+        try:
+            est_cost = estimate_cost(arguments, spec.cost_from)
+        except CostError as e:
+            # A cost field the budget cannot price (e.g. "40") would reserve
+            # nothing yet still reach the provider. Fail closed.
+            return {
+                "outcome": "DENY",
+                "reason": str(e),
+                "rule_matched": "cost:invalid",
+                "action_id": None,
+                "grant_id": grant.id,
+                "remaining_budget": float(grant.budget.remaining),
+            }
 
         action = Action(
             action_id=f"act_{uuid.uuid4().hex[:16]}",

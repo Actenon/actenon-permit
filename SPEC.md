@@ -367,7 +367,9 @@ Missing `_meta.actenon_grant` returns a JSON-RPC error:
 1. Decode + verify grant token  →  on failure: DENY("invalid grant token")
 2. Load live grant from state    →  if missing: DENY("grant not found, treating as revoked")
 3. Lookup tool in registry       →  if missing: DENY("unknown tool")
-4. Build Action from args (cost_from rule for est_cost)
+4. Build Action from args (cost_from rule for est_cost: the `cost_from` argument,
+   else `amount`, else `cost`)  →  if that argument is not a finite number
+   (e.g. the string "40"): DENY (`rule_matched: "cost:invalid"`)
 5. PDP.decide(grant, action)
 6. On DENY: return DENY
 7. On REQUIRE_APPROVAL:
