@@ -4,15 +4,16 @@ requires-python = ">=3.11"
 
 [[package]]
 name = "actenon-kernel"
-version = "0.1.0"
+version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "actenon-protocol" },
+    { name = "cryptography" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/b4/42ec85fdbd7d8bae7e10add44d1186a00532f0c26b15c1d09b89b4547671/actenon_kernel-0.1.0.tar.gz", hash = "sha256:e5971576a7ad1dfd0f31bf63099a6d3d8090d7c196a3a4bfd9c1a7571b35ce6e", size = 360734, upload-time = "2026-07-22T18:57:13.665Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/41/1a5618ede9360d641dcbb8ea7601f2b1454b98858bff16a239f329510daf/actenon_kernel-1.2.1.tar.gz", hash = "sha256:851d69eee41279f4d468baf7e5abe1d4b62e5cedf003075a1e3516d9b2a438a3", size = 402679, upload-time = "2026-07-24T23:17:11.632Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/28/9b6c0d76ab73ab0b99d04de6e88d60ce1b4e1df73d8bc8e8babca2647860/actenon_kernel-0.1.0-py3-none-any.whl", hash = "sha256:4e0760f734b2dfa4c471578ec56d30603b1d0e8ebdc8be896dafcf9f82ddf5d2", size = 468631, upload-time = "2026-07-22T18:57:12.29Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/e9/dda034422cfff9123386d69efac6428284306378eff6113d2a44e83f0cd5/actenon_kernel-1.2.1-py3-none-any.whl", hash = "sha256:faeb243e77088f7bd69f9b21dd47c432b3deda0f481b1ec8a80565d573136ef9", size = 494565, upload-time = "2026-07-24T23:17:10.284Z" },
 ]
 
 [package.optional-dependencies]
@@ -28,7 +29,9 @@ dependencies = [
     { name = "actenon-kernel", extra = ["asymmetric"] },
     { name = "actenon-protocol" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "pydantic" },
+    { name = "pytest-asyncio" },
     { name = "pyyaml" },
     { name = "typer" },
     { name = "uvicorn" },
@@ -44,12 +47,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "actenon-kernel", extras = ["asymmetric"], specifier = ">=0.1.0" },
+    { name = "actenon-kernel", extras = ["asymmetric"], specifier = ">=1.0.0" },
     { name = "actenon-protocol", specifier = ">=1.1.0,<2" },
     { name = "fastapi", specifier = ">=0.110" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "pydantic", specifier = ">=2.5,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
