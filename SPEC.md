@@ -131,10 +131,10 @@ strictly weaker on every dimension:
 | Dimension | Parent value | Allowed child value |
 |-----------|--------------|---------------------|
 | `expires_at` | T_parent | T_child <= T_parent |
-| `scopes.allow` | A_parent | A_child ⊆ A_parent |
+| `scopes.allow` | A_parent | A_child ⊆ A_parent, and A_child non-empty if A_parent is (an empty list permits every non-denied action, §4) |
 | `scopes.deny` | D_parent | D_child ⊇ D_parent (deny may only grow) |
 | `budget.limit` | L_parent | L_child <= parent.remaining |
-| `rate.max` | M_parent | M_child <= M_parent |
+| `rate.max` | M_parent | M_child <= M_parent, and M_child > 0 if M_parent > 0 (`max=0` disables rate limiting) |
 | `rate.per_seconds` | P_parent | P_child >= P_parent |
 | `approval_rules` | R_parent | R_child ⊇ R_parent (rules may only grow) |
 
@@ -417,10 +417,10 @@ Returns the freshly-signed child Grant (HTTP 200), or:
 | Dimension | Parent value | Allowed child value |
 |-----------|--------------|---------------------|
 | `expires_at` | T_parent | T_child <= T_parent |
-| `scopes.allow` | A_parent | A_child ⊆ A_parent |
+| `scopes.allow` | A_parent | A_child ⊆ A_parent, and A_child non-empty if A_parent is (an empty list permits every non-denied action, §4) |
 | `scopes.deny` | D_parent | D_child ⊇ D_parent (deny may only grow) |
 | `budget.limit` | L_parent | L_child <= parent.remaining |
-| `rate.max` | M_parent | M_child <= M_parent |
+| `rate.max` | M_parent | M_child <= M_parent, and M_child > 0 if M_parent > 0 (`max=0` disables rate limiting) |
 | `rate.per_seconds` | P_parent | P_child >= P_parent |
 | `approval_rules` | R_parent | R_child ⊇ R_parent (rules may only grow) |
 

@@ -270,10 +270,13 @@ class Grant(BaseModel):
 
         Attenuation rules (any attempt to widen is rejected with ValueError):
         - ``expires_at`` must be <= this grant's expires_at
-        - ``scopes_allow`` must be a subset of this grant's allow list
+        - ``scopes_allow`` must be a subset of this grant's allow list, and
+          must not be empty when this grant's allow list is non-empty (an
+          empty allow list permits every non-denied action)
         - ``scopes_deny`` may only add entries (union), never remove
         - ``budget_limit`` must be <= this grant's remaining budget
-        - ``rate_max`` must be <= this grant's rate.max
+        - ``rate_max`` must be <= this grant's rate.max, and must not be 0
+          (unlimited) when this grant is rate-limited
         - ``rate_per_seconds`` must be >= this grant's rate.per_seconds
         - ``extra_approval_rules`` may only add rules
         """
@@ -286,6 +289,10 @@ class Grant(BaseModel):
         new_allow = list(scopes_allow) if scopes_allow is not None else list(self.scopes.allow)
         if not set(new_allow).issubset(set(self.scopes.allow)):
             raise ValueError("attenuation cannot widen allow scopes")
+        # An empty allow-list is permissive (only deny is enforced, SPEC §4),
+        # so it is a subset in set terms but the widest scope in effect.
+        if not new_allow and self.scopes.allow:
+            raise ValueError("attenuation cannot widen allow scopes (an empty allow list permits every action)")
 
         new_deny = set(self.scopes.deny)
         if scopes_deny is not None:
@@ -298,8 +305,11 @@ class Grant(BaseModel):
         new_remaining = min(new_limit, self.budget.remaining)
 
         new_rate_max = rate_max if rate_max is not None else self.rate.max
-        if self.rate.max > 0 and new_rate_max > self.rate.max:
-            raise ValueError("attenuation cannot raise rate.max")
+        if new_rate_max < 0:
+            raise ValueError("rate.max must be non-negative")
+        # rate.max == 0 disables rate limiting, so it is the widest value.
+        if self.rate.max > 0 and (new_rate_max == 0 or new_rate_max > self.rate.max):
+            raise ValueError("attenuation cannot raise rate.max (0 disables rate limiting)")
 
         new_rate_per = rate_per_seconds if rate_per_seconds is not None else self.rate.per_seconds
         if new_rate_per < self.rate.per_seconds:
