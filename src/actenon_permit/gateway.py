@@ -357,6 +357,19 @@ class Gateway:
                 "rule_matched": "intent:unknown",
             }
 
+        from .intent import IntentLifecycle
+
+        # An intent executes at most once. Refuse a replay (or any intent
+        # already past CREATED) before the PDP runs, so it neither reserves
+        # budget nor writes an ALLOW to the ledger.
+        if intent.lifecycle_state != IntentLifecycle.CREATED:
+            return {
+                "intent": intent.to_dict(),
+                "outcome": "DENY",
+                "reason": f"intent is {intent.lifecycle_state.value}, not created; it cannot be executed again",
+                "rule_matched": "intent:not_executable",
+            }
+
         # Resolve the grant token -> live Grant.
         try:
             grant = self.resolve_grant(grant_token)
@@ -366,8 +379,6 @@ class Gateway:
                 "reason": f"invalid grant token: {e}",
                 "rule_matched": "token:invalid",
             }
-
-        from .intent import IntentLifecycle
 
         def deny(reason: str, rule: str) -> dict[str, Any]:
             # Record the denial on the intent (created -> evaluating -> denied).
