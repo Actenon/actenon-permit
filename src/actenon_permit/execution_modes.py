@@ -27,6 +27,7 @@ re-implement broker semantics; they translate.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import urllib.error
 import urllib.request
@@ -136,6 +137,10 @@ class BrokeredExecutionCoordinator:
             # The broker refused or the adapter failed. Map to a state.
             state = self._map_broker_error_to_state(e)
             if state == BrokeredExecutionState.REFUSED:
+                # Refused means no provider call was made, so nothing was
+                # spent: hand the PDP's reservation back. (FAILED and
+                # OUTCOME_UNKNOWN keep it; the provider was reached.)
+                self._release_reservation(grant, action)
                 return self._refused(
                     action,
                     reason=str(e),
@@ -182,8 +187,11 @@ class BrokeredExecutionCoordinator:
             attempt_id=attempt_id,
             occurred_at=occurred_at,
             provider_execution_observed=True,
-            receipt_received=True,
-            receipt_verified=True,  # the broker signs its own receipts
+            # The coordinator produces no receipt. The gateway attaches a
+            # kernel execution receipt (and sets these) when it has the
+            # verified PCCB to link it to.
+            receipt_received=False,
+            receipt_verified=False,
             provider_evidence=dict(response.provider_evidence),
             reconciliation_status=reconciliation_status,
             pccb_id=pccb_id,
@@ -194,6 +202,12 @@ class BrokeredExecutionCoordinator:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _release_reservation(self, grant: Grant, action: Action) -> None:
+        if not action.est_cost:
+            return
+        with contextlib.suppress(Exception):
+            self.broker.pdp.state.release(grant.id, action.action_id, action.est_cost)
 
     @staticmethod
     def _map_broker_error_to_state(e: BrokerExecutionError) -> BrokeredExecutionState:
@@ -254,8 +268,8 @@ class BrokeredExecutionCoordinator:
             attempt_id=attempt_id or f"exec_{uuid4().hex[:16]}",
             occurred_at=occurred_at or datetime.now(UTC).isoformat(),
             provider_execution_observed=False,  # refused = no provider call
-            receipt_received=True,
-            receipt_verified=True,
+            receipt_received=False,
+            receipt_verified=False,
             provider_evidence={"reason": reason, "action_type": action.type},
             pccb_id=pccb_id,
             action_hash=action_hash,
@@ -279,8 +293,8 @@ class BrokeredExecutionCoordinator:
             attempt_id=attempt_id,
             occurred_at=occurred_at,
             provider_execution_observed=True,  # failed = provider returned a failure
-            receipt_received=True,
-            receipt_verified=True,
+            receipt_received=False,
+            receipt_verified=False,
             provider_evidence={"reason": reason, "action_type": action.type},
             pccb_id=pccb_id,
             action_hash=action_hash,

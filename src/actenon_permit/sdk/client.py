@@ -342,6 +342,8 @@ class LocalActenonClient(ActenonClient):
                 attempt_id=response.get("intent", {}).get("linked_attempt_ids", [None])[0]
                 if response.get("intent", {}).get("linked_attempt_ids")
                 else None,
+                receipt=response.get("receipt"),
+                proof=response.get("proof"),
             )
         else:
             result = ResourceOwnedResult(

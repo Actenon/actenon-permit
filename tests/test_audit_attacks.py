@@ -463,3 +463,155 @@ class TestGitHubPathInjection:
             cred,
         )
         assert sent == ["/repos/Actenon-Org/my_repo.v2/issues"]
+
+
+# ---------------------------------------------------------------------------
+# Intent path (Actenon.local(), POST /intents/{id}/execute)
+# ---------------------------------------------------------------------------
+
+
+class _RefundAdapter:
+    """Minimal brokered refund adapter (test mode, no network)."""
+
+    provider_id = "test-refunds"
+    test_mode = True
+
+    def __init__(self):
+        self.calls = []
+
+    def supported_actions(self):
+        return ["payment.refund"]
+
+    def execute(self, action, params, credential, *, idempotency_key=None, timeout_seconds=None):
+        from actenon_permit.adapters import InvalidParametersError, ProviderResponse
+
+        unknown = [k for k in params if k not in ("amount", "charge_id")]
+        if unknown:
+            raise InvalidParametersError(
+                [{"field": k, "reason": "unsupported parameter"} for k in unknown],
+                provider=self.provider_id,
+            )
+        self.calls.append(dict(params))
+        ref = f"re_{len(self.calls)}"
+        return ProviderResponse(
+            ok=True,
+            action=action,
+            provider_action_id=ref,
+            provider_evidence={"refund_id": ref, "amount": params.get("amount")},
+        )
+
+
+@pytest.fixture
+def local_refunds(tmp_path, monkeypatch):
+    import warnings
+
+    from actenon_permit import Actenon
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("ACTENON_ED25519_KEY_FILE", raising=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        client = Actenon.local(
+            agent_id="audit-agent",
+            scopes=["payment.refund"],
+            budget_limit=10,
+            signing_key="audit-signing-key",
+            intent_store_path=str(tmp_path / "state.db"),
+        )
+        client.register_credential("STRIPE", "sk_test_AUDIT_SECRET")
+    adapter = _RefundAdapter()
+    client.register_adapter_tool(
+        "refund", action_type="payment.refund", adapter=adapter, credential_ref="STRIPE"
+    )
+    return client, adapter
+
+
+def _refund(client, **params):
+    return client.authorised_execution_intents.create(
+        action="payment.refund", target="stripe", parameters=params
+    ).execute()
+
+
+class TestIntentPath:
+    def test_budget_is_enforced(self, local_refunds):
+        from actenon_permit import ExecutionRefusedError
+
+        client, adapter = local_refunds
+        # Before the fix est_cost was hard-coded to 0 on this path: a $1000
+        # refund against a $10 grant succeeded.
+        with pytest.raises(ExecutionRefusedError):
+            _refund(client, amount=1000, charge_id="ch_1")
+        assert _refund(client, amount=4, charge_id="ch_2").state == "succeeded"
+        assert _refund(client, amount=4, charge_id="ch_3").state == "succeeded"
+        with pytest.raises(ExecutionRefusedError):
+            _refund(client, amount=4, charge_id="ch_4")
+        assert [c["charge_id"] for c in adapter.calls] == ["ch_2", "ch_3"]
+
+    def test_non_numeric_amount_is_refused(self, local_refunds):
+        from actenon_permit import ExecutionRefusedError
+
+        client, adapter = local_refunds
+        with pytest.raises(ExecutionRefusedError):
+            _refund(client, amount="1000", charge_id="ch_1")
+        assert adapter.calls == []
+
+    def test_edge_verification_gates_the_broker(self, local_refunds, monkeypatch):
+        """The minted PCCB must be verified before the credential is used."""
+        from actenon.core.errors import ProofVerificationError
+
+        from actenon_permit import ExecutionRefusedError, kernel_bridge
+
+        def refuse(*args, **kwargs):
+            raise ProofVerificationError("audit: forced", refusal_code="SIGNATURE_INVALID")
+
+        monkeypatch.setattr(kernel_bridge, "verify_pccb_at_edge", refuse)
+        client, adapter = local_refunds
+        with pytest.raises(ExecutionRefusedError):
+            _refund(client, amount=1, charge_id="ch_1")
+        assert adapter.calls == []
+
+    def test_refused_execution_does_not_burn_budget(self, local_refunds):
+        from actenon_permit import ExecutionRefusedError
+
+        client, adapter = local_refunds
+        for _ in range(3):
+            with pytest.raises(ExecutionRefusedError):
+                _refund(client, amount=4, charge_id="ch_x", bogus="field")
+        assert _refund(client, amount=9, charge_id="ch_ok").state == "succeeded"
+
+    def test_success_carries_a_kernel_receipt(self, local_refunds, tmp_path):
+        import json
+        import subprocess
+        import sys
+
+        client, _ = local_refunds
+        result = _refund(client, amount=3, charge_id="ch_r")
+        assert result.state == "succeeded"
+        assert result.receipt_received is True and result.receipt_verified is True
+        assert result.receipt is not None and result.proof is not None
+        assert result.receipt["correlation"]["pccb_id"] == result.proof["pccb"]["pccb_id"]
+        assert "sk_test_AUDIT_SECRET" not in json.dumps([result.receipt, result.proof])
+        for name, payload in (
+            ("receipt", result.receipt),
+            ("intent", result.proof["intent"]),
+            ("pccb", result.proof["pccb"]),
+        ):
+            (tmp_path / f"{name}.json").write_text(json.dumps(payload))
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "actenon.cli",
+                "verify-receipt",
+                "--receipt",
+                str(tmp_path / "receipt.json"),
+                "--intent",
+                str(tmp_path / "intent.json"),
+                "--pccb",
+                str(tmp_path / "pccb.json"),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=tmp_path,
+        )
+        assert proc.returncode == 0, proc.stdout + proc.stderr

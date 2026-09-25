@@ -276,6 +276,37 @@ def verify_pccb_at_edge(
     verifier.verify(actual_intent, pccb, context)
 
 
+def build_execution_receipt(
+    intent: ActionIntent,
+    pccb: Any,
+    grant: Grant,
+    action: Action,
+    evidence: dict[str, Any],
+    *,
+    audience_id: str = "actenon-permit-gateway",
+) -> Any:
+    """Build the kernel execution Receipt for a brokered action that ran.
+
+    The receipt is linked to ``intent`` and ``pccb`` (intent id, tenant,
+    subject, action, target, ``correlation.pccb_id`` and action hash), so
+    ``actenon-kernel verify-receipt --receipt ... --intent ... --pccb ...``
+    can check it offline. ``evidence`` must already be redacted.
+    """
+    from actenon.receipts import ReceiptFactory
+
+    receipt = ReceiptFactory().create_execution_receipt(
+        intent,
+        _build_context(grant, action, audience_id=audience_id),
+        pccb_id=pccb.pccb_id,
+        escrow_id=None,
+        payload=dict(evidence),
+        action_hash=pccb.action_hash,
+    )
+    if receipt.intent_id != intent.intent_id or receipt.correlation.pccb_id != pccb.pccb_id:
+        raise KernelBridgeError("execution receipt is not linked to the verified proof")
+    return receipt
+
+
 def pccb_to_token_payload(pccb: Any) -> dict[str, Any]:
     """Serialize a kernel PCCB into the v1 token payload.
 
@@ -297,6 +328,7 @@ __all__ = [
     "KernelBridgeError",
     "mint_pccb_for_action",
     "verify_pccb_at_edge",
+    "build_execution_receipt",
     "pccb_to_token_payload",
     "token_payload_to_pccb",
     "build_action_hash_input",

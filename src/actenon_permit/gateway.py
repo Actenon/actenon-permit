@@ -367,21 +367,10 @@ class Gateway:
                 "rule_matched": "token:invalid",
             }
 
-        # Build the Action + decision via the PDP.
-        action = Action(
-            action_id=f"act_{uuid.uuid4().hex[:16]}",
-            grant_id=grant.id,
-            ts=datetime.now(UTC),
-            type=intent.action_type,
-            target=intent.target_id,
-            params=dict(intent.action_params),
-            est_cost=0.0,
-        )
-        decision, _intent_obj, _pccb = self.pdp.decide_and_mint_pccb(grant, action, ctx={})
-        if decision.outcome == DecisionOutcome.DENY:
-            # Record the denial on the intent.
-            from .intent import IntentLifecycle
+        from .intent import IntentLifecycle
 
+        def deny(reason: str, rule: str) -> dict[str, Any]:
+            # Record the denial on the intent (created -> evaluating -> denied).
             mgr.transition(intent.intent_id, IntentLifecycle.EVALUATING)
             mgr.transition(intent.intent_id, IntentLifecycle.DENIED)
             updated = mgr.store.get(intent.intent_id)
@@ -389,11 +378,12 @@ class Gateway:
             return {
                 "intent": updated.to_dict(),
                 "outcome": "DENY",
-                "reason": decision.reason,
-                "rule_matched": decision.rule_matched,
+                "reason": reason,
+                "rule_matched": rule,
             }
 
-        # Locate a registered adapter tool whose action_type matches.
+        # Locate a registered adapter tool whose action_type matches, before
+        # anything is reserved.
         tool = None
         for t in self.tools.list():
             if t.action_type == intent.action_type and t.adapter is not None:
@@ -407,8 +397,50 @@ class Gateway:
                 "rule_matched": "intent:no_adapter",
             }
 
+        # Price the action the same way call_tool() does. This path used to
+        # hard-code est_cost=0.0, so no budget was ever enforced here.
+        try:
+            est_cost = estimate_cost(intent.action_params)
+        except CostError as e:
+            return deny(str(e), "cost:invalid")
+
+        # Build the Action + decision via the PDP.
+        action = Action(
+            action_id=f"act_{uuid.uuid4().hex[:16]}",
+            grant_id=grant.id,
+            ts=datetime.now(UTC),
+            type=intent.action_type,
+            target=intent.target_id,
+            params=dict(intent.action_params),
+            est_cost=est_cost,
+        )
+        decision, kernel_intent, pccb = self.pdp.decide_and_mint_pccb(grant, action, ctx={})
+        if decision.outcome == DecisionOutcome.DENY:
+            return deny(decision.reason, decision.rule_matched or "pdp:deny")
+
+        # EDGE VERIFICATION: the kernel verifies the PCCB is bound to this
+        # exact action before the broker may resolve the credential.
+        # (Previously the PCCB was minted here and discarded unverified.)
+        if decision.outcome == DecisionOutcome.ALLOW:
+            try:
+                from . import kernel_bridge
+
+                if kernel_intent is None or pccb is None:
+                    raise kernel_bridge.KernelBridgeError("no PCCB was minted for an ALLOW")
+                kernel_bridge.verify_pccb_at_edge(kernel_intent, pccb, grant, action)
+            except Exception as e:
+                if action.est_cost:
+                    with contextlib.suppress(Exception):
+                        self.state.release(grant.id, action.action_id, action.est_cost)
+                return deny(
+                    f"proof verification failed at edge: {e}",
+                    "kernel:proof_verification_failed",
+                )
+
         # Execute via the manager. The manager advances the lifecycle
-        # and returns the ModeAwareExecutionResult.
+        # and returns the ModeAwareExecutionResult. It executes the exact
+        # Action decided on above, so budget is reconciled against its
+        # reservation.
         try:
             updated, mode_result = mgr.execute(
                 intent,
@@ -417,8 +449,13 @@ class Gateway:
                 broker=self.broker,
                 adapter=tool.adapter,
                 credential_ref=tool.credential_ref or "",
+                action=action,
+                pccb_id=getattr(pccb, "pccb_id", None),
             )
         except Exception as e:
+            if decision.outcome == DecisionOutcome.ALLOW and action.est_cost:
+                with contextlib.suppress(Exception):
+                    self.state.release(grant.id, action.action_id, action.est_cost)
             return {
                 "intent": intent.to_dict(),
                 "outcome": "DENY",
@@ -440,7 +477,48 @@ class Gateway:
         if mode_result.mode == "brokered":
             response["receipt_received"] = mode_result.protocol_result.receipt_received
             response["receipt_verified"] = mode_result.protocol_result.receipt_verified
+            if mode_result.state != "succeeded":
+                response["reason"] = mode_result.protocol_result.provider_evidence.get(
+                    "reason", decision.reason
+                )
+            self._attach_receipt(response, mode_result, kernel_intent, pccb, grant, action)
         return response
+
+    @staticmethod
+    def _attach_receipt(
+        response: dict[str, Any],
+        mode_result: Any,
+        kernel_intent: Any,
+        pccb: Any,
+        grant: Grant,
+        action: Action,
+    ) -> None:
+        """Attach the kernel execution receipt for a succeeded brokered call.
+
+        Adds ``receipt`` plus the ``proof`` it links to (``intent`` and
+        ``pccb``), so the caller can check it offline with
+        ``actenon-kernel verify-receipt --receipt --intent --pccb``.
+        ``receipt_received``/``receipt_verified`` are True only when a
+        receipt linked to the verified PCCB was actually produced.
+        """
+        if mode_result.state != "succeeded" or kernel_intent is None or pccb is None:
+            return
+        from .kernel_bridge import build_execution_receipt
+
+        try:
+            receipt = build_execution_receipt(
+                kernel_intent,
+                pccb,
+                grant,
+                action,
+                mode_result.protocol_result.provider_evidence,
+            )
+        except Exception:
+            return
+        response["receipt"] = receipt.to_dict()
+        response["proof"] = {"intent": kernel_intent.to_dict(), "pccb": pccb.to_dict()}
+        response["receipt_received"] = True
+        response["receipt_verified"] = True
 
     def register_resource_client(self, resource_id: str, client: Any) -> None:
         """Register a ``ResourceOwnedSubmissionClient`` for a resource_id.
@@ -805,6 +883,7 @@ class Gateway:
                 "receipt_received": getattr(mode_result.protocol_result, "receipt_received", None),
                 "receipt_verified": getattr(mode_result.protocol_result, "receipt_verified", None),
             }
+            self._attach_receipt(response, mode_result, intent, pccb, grant, action)
             # Redact: never include the credential value (the coordinator
             # already redacted the evidence, but belt-and-braces).
             return response
