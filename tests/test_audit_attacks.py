@@ -281,3 +281,80 @@ class TestApprovalThresholdFailClosed:
         big = Action(grant_id=grant.id, type="payment.refund", params={"amount": 25}, est_cost=25)
         assert pdp.decide(grant, small).outcome == DecisionOutcome.ALLOW
         assert pdp.decide(grant, big).outcome == DecisionOutcome.REQUIRE_APPROVAL
+
+
+# ---------------------------------------------------------------------------
+# The broker's own redaction pass must actually run
+# ---------------------------------------------------------------------------
+
+
+class _LeakyAdapter:
+    """An adapter whose redact() misses the credential (the case the
+    broker's defensive pass exists for)."""
+
+    provider_id = "leaky"
+    test_mode = True
+
+    def supported_actions(self):
+        return ["leaky.echo"]
+
+    def execute(self, action, params, credential, *, idempotency_key=None, timeout_seconds=None):
+        from actenon_permit.adapters import ProviderResponse
+
+        return ProviderResponse(
+            ok=True,
+            action=action,
+            provider_action_id="x1",
+            provider_evidence={
+                "debug": f"Authorization: Bearer {credential.value}",
+                "nested": {"token": credential.value},
+            },
+            raw={"request_headers": {"Authorization": credential.value}},
+        )
+
+
+class TestBrokerRedaction:
+    def test_broker_scrubs_credential_the_adapter_leaked(self, stack):
+        from actenon_permit import Broker, CredentialProviderRegistry, LocalDevSecretProvider
+
+        store, pdp = stack
+        secret = "ghp_AUDIT_SECRET_0123456789"
+        registry = CredentialProviderRegistry()
+        registry.register("TOKEN", LocalDevSecretProvider({"TOKEN": secret}))
+        broker = Broker(pdp, credential_providers=registry)
+        grant = _grant(scopes=Scopes(allow=["leaky.echo"], deny=[]))
+        store.put_grant(grant)
+        action = Action(grant_id=grant.id, type="leaky.echo", params={})
+        decision = pdp.decide(grant, action)
+        assert decision.outcome == DecisionOutcome.ALLOW
+
+        response, _ = broker.execute_via_adapter(
+            grant, action, decision, _LeakyAdapter(), credential_ref="TOKEN"
+        )
+
+        assert secret not in repr(response.provider_evidence)
+        assert response.raw is None
+
+    def test_broker_scrubs_credential_from_adapter_error_text(self, stack):
+        from actenon_permit import Broker, CredentialProviderRegistry, LocalDevSecretProvider
+        from actenon_permit.adapters import AdapterError
+        from actenon_permit.broker import BrokerExecutionError
+
+        class _LeakyErrorAdapter(_LeakyAdapter):
+            def execute(self, action, params, credential, **kwargs):
+                raise AdapterError(f"401 for token {credential.value}", provider="leaky")
+
+        store, pdp = stack
+        secret = "ghp_AUDIT_SECRET_0123456789"
+        registry = CredentialProviderRegistry()
+        registry.register("TOKEN", LocalDevSecretProvider({"TOKEN": secret}))
+        broker = Broker(pdp, credential_providers=registry)
+        grant = _grant(scopes=Scopes(allow=["leaky.echo"], deny=[]))
+        store.put_grant(grant)
+        action = Action(grant_id=grant.id, type="leaky.echo", params={})
+        decision = pdp.decide(grant, action)
+        with pytest.raises(BrokerExecutionError) as exc:
+            broker.execute_via_adapter(
+                grant, action, decision, _LeakyErrorAdapter(), credential_ref="TOKEN"
+            )
+        assert secret not in str(exc.value)
