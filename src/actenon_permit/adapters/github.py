@@ -41,6 +41,7 @@ Design choices
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.request
 from typing import Any
@@ -58,6 +59,13 @@ from . import (
 )
 
 GITHUB_API = "https://api.github.com"
+
+# ``owner`` and ``repo`` are interpolated into the request path, so they must
+# be plain GitHub names. Anything else ("/", "?", "#", "..") can re-target the
+# request: repo="example/issues/7/comments#" turned an authorised
+# issue.create into POST /repos/<owner>/example/issues/7/comments.
+_OWNER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}")
+_REPO_RE = re.compile(r"[A-Za-z0-9._-]{1,100}")
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +179,12 @@ class GitHubAdapter(ProviderAdapter):
                     errors.append({"field": k, "reason": f"expected string, got {type(v).__name__}"})
                 if k == "issue_number" and (not isinstance(v, int) or v < 1):
                     errors.append({"field": k, "reason": "expected positive integer"})
+        owner = params.get("owner")
+        if isinstance(owner, str) and not _OWNER_RE.fullmatch(owner):
+            errors.append({"field": "owner", "reason": "not a valid GitHub owner name"})
+        repo = params.get("repo")
+        if isinstance(repo, str) and (not _REPO_RE.fullmatch(repo) or repo in (".", "..")):
+            errors.append({"field": "repo", "reason": "not a valid GitHub repository name"})
         if "labels" in params and not isinstance(params["labels"], list):
             errors.append({"field": "labels", "reason": "expected list of strings"})
         if "draft" in params and not isinstance(params["draft"], bool):

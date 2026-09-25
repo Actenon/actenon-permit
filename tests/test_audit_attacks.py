@@ -404,3 +404,62 @@ class TestSignerDowngrade:
         monkeypatch.delenv("ACTENON_ED25519_KEY_FILE", raising=False)
         monkeypatch.setenv("HOME", str(tmp_path))
         assert resolve_signer(hmac_secret="k").algorithm == "HS256"
+
+
+# ---------------------------------------------------------------------------
+# GitHub adapter: owner/repo are path segments, not URL fragments
+# ---------------------------------------------------------------------------
+
+
+class TestGitHubPathInjection:
+    @pytest.mark.parametrize(
+        ("owner", "repo"),
+        [
+            ("Actenon", "example/issues/7/comments#"),  # issue.create -> comment
+            ("Actenon", "example/issues/7/comments?x="),
+            ("Actenon/example/issues/7/comments#", "x"),
+            ("Actenon", ".."),
+            ("..", "example"),
+            ("Actenon", "exa mple"),
+            ("Actenon", ""),
+        ],
+    )
+    def test_path_breaking_owner_or_repo_is_rejected(self, owner, repo):
+        from actenon_permit.adapters import InvalidParametersError
+        from actenon_permit.adapters.github import GitHubAdapter
+        from actenon_permit.credentials import Credential
+
+        adapter = GitHubAdapter(test_mode=False, api_base="https://github.invalid")
+        sent = []
+        adapter._http_send = lambda req, timeout: sent.append(req.selector) or {}
+        cred = Credential(ref="GH", value="ghp_x", source="local")
+        with pytest.raises(InvalidParametersError):
+            adapter.execute(
+                "github.issue.create",
+                {"owner": owner, "repo": repo, "title": "t", "body": "b"},
+                cred,
+            )
+        assert sent == [], f"request was sent to {sent}"
+
+    def test_valid_names_still_accepted(self):
+        from actenon_permit.adapters.github import GitHubAdapter
+        from actenon_permit.credentials import Credential
+
+        adapter = GitHubAdapter(test_mode=False, api_base="https://github.invalid")
+        sent = []
+        adapter._http_send = lambda req, timeout: (
+            sent.append(req.selector)
+            or {
+                "number": 1,
+                "html_url": "https://github.com/a/b/issues/1",
+                "node_id": "n",
+            }
+        )
+        adapter.reconcile = lambda action, params, response: response
+        cred = Credential(ref="GH", value="ghp_x", source="local")
+        adapter.execute(
+            "github.issue.create",
+            {"owner": "Actenon-Org", "repo": "my_repo.v2", "title": "t"},
+            cred,
+        )
+        assert sent == ["/repos/Actenon-Org/my_repo.v2/issues"]
