@@ -334,7 +334,9 @@ class PDP:
             # Map the reserve_reason onto a structured FailureCode so callers
             # and the ledger get a stable taxonomy, not free-text prose.
             r = (reserve_reason or "").lower()
-            if "rate limit" in r:
+            if "revoked" in r:
+                fc = FailureCode.REVOKED
+            elif "rate limit" in r:
                 fc = FailureCode.RATE_LIMITED
             elif "budget" in r or "exceed" in r:
                 fc = FailureCode.BUDGET_EXCEEDED

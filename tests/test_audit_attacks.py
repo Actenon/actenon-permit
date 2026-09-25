@@ -76,3 +76,85 @@ class TestAttenuationCannotWiden:
         parent = _grant(rate=Rate(max=0, per_seconds=60))
         child = parent.attenuate(rate_max=3)
         assert child.rate.max == 3
+
+
+# ---------------------------------------------------------------------------
+# Revocation must reach every descendant of a revoked grant
+# ---------------------------------------------------------------------------
+
+
+def _gateway_with_refund_tool(store):
+    from actenon_permit import AutoApproveGate, Broker, Gateway, ToolRegistry
+    from actenon_permit._mock_providers import mock_stripe_refund
+
+    ledger = Ledger(store)
+    pdp = PDP(store, ledger)
+    tools = ToolRegistry()
+    tools.register(
+        "refund",
+        action_type="payment.refund",
+        target="stripe",
+        cost_from="amount",
+        credential_name="MOCK_STRIPE_KEY",
+        real_call=lambda secret, amount, reason="r": mock_stripe_refund(secret, amount, reason),
+    )
+    gw = Gateway(
+        state=store,
+        ledger=ledger,
+        pdp=pdp,
+        broker=Broker(pdp),
+        tools=tools,
+        approval_gate=AutoApproveGate(),
+    )
+    return gw, ledger, pdp
+
+
+class TestRevocationCascade:
+    def test_http_revoke_reaches_grandchildren(self, tmp_db):
+        from fastapi.testclient import TestClient
+
+        from actenon_permit.control import create_app
+        from actenon_permit.token import grant_to_token
+
+        store = SQLiteStore()
+        gw, ledger, pdp = _gateway_with_refund_tool(store)
+        client = TestClient(
+            create_app(
+                state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False
+            )
+        )
+        root = _grant(budget=Budget(currency="USD", limit=100, remaining=100))
+        store.put_grant(root)
+        child = client.post(f"/grants/{root.id}/attenuate", json={"budget_limit": 50}).json()
+        grandchild = client.post(
+            f"/grants/{child['id']}/attenuate", json={"budget_limit": 20}
+        ).json()
+        gc_token = grant_to_token(store.get_grant(grandchild["id"]))
+        assert gw.call_tool("refund", {"amount": 1}, gc_token)["outcome"] == "ALLOW"
+
+        assert client.post(f"/grants/{root.id}/revoke").status_code == 200
+
+        result = gw.call_tool("refund", {"amount": 1}, gc_token)
+        assert result["outcome"] == "DENY", result
+        assert store.get_grant(grandchild["id"]).status.value == "revoked"
+
+    def test_kill_switch_by_agent_reaches_delegated_children(self, tmp_db):
+        """`permit revoke <agent>` only flips the agent's own grants; a child
+        attenuated to another agent id must still stop working."""
+        from actenon_permit.token import grant_to_token
+
+        store = SQLiteStore()
+        gw, _, _ = _gateway_with_refund_tool(store)
+        root = _grant()
+        store.put_grant(root)
+        child = root.attenuate(agent_id="sub-agent", budget_limit=10)
+        store.put_grant(child)
+        token = grant_to_token(child)
+        assert gw.call_tool("refund", {"amount": 1}, token)["outcome"] == "ALLOW"
+
+        from actenon_permit.model import GrantStatus
+
+        store.set_status(root.id, GrantStatus.REVOKED)  # what `permit revoke` does
+
+        result = gw.call_tool("refund", {"amount": 1}, token)
+        assert result["outcome"] == "DENY", result

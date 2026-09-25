@@ -230,21 +230,24 @@ def create_app(
             raise HTTPException(status_code=404, detail="grant not found")
         state.set_status(grant_id, GrantStatus.REVOKED)
         # ── Phase 7: revocation cascade ──────────────────────────────
-        # Revoke all child grants that were attenuated from this grant.
-        # A child grant records its parent_grant_id; when the parent is
-        # revoked, all children are also revoked. (Audit finding P-05.)
-        cascaded_count = 0
-        for grant in state.list_grants():
-            if (
-                hasattr(grant, "parent_grant_id")
-                and grant.parent_grant_id == grant_id
-                and grant.status == GrantStatus.ACTIVE
-            ):
-                state.set_status(grant.id, GrantStatus.REVOKED)
-                cascaded_count += 1
-        # Deny any in-flight approval waiters for this grant.
+        # Revoke every grant attenuated from this one, transitively (a
+        # grandchild must not outlive its revoked root). (Audit finding
+        # P-05.) The state store also refuses to reserve against any grant
+        # with a revoked ancestor, so this pass is for status visibility.
+        all_grants = state.list_grants()
+        revoked_ids = {grant_id}
+        frontier = [grant_id]
+        while frontier:
+            parent_id = frontier.pop()
+            for grant in all_grants:
+                if grant.parent_grant_id == parent_id and grant.id not in revoked_ids:
+                    revoked_ids.add(grant.id)
+                    frontier.append(grant.id)
+                    if grant.status == GrantStatus.ACTIVE:
+                        state.set_status(grant.id, GrantStatus.REVOKED)
+        # Deny any in-flight approval waiters for the revoked grants.
         for p in approvals.list_pending():
-            if p["grant_id"] == grant_id:
+            if p["grant_id"] in revoked_ids:
                 approvals.resolve(p["action_id"], "denied")
         return RevokeResponse(grant_id=grant_id, status="revoked")
 
