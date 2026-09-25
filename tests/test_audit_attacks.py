@@ -358,3 +358,49 @@ class TestBrokerRedaction:
                 grant, action, decision, _LeakyErrorAdapter(), credential_ref="TOKEN"
             )
         assert secret not in str(exc.value)
+
+
+# ---------------------------------------------------------------------------
+# A configured Ed25519 key that cannot be loaded must not silently become HMAC
+# ---------------------------------------------------------------------------
+
+
+class TestSignerDowngrade:
+    def test_corrupt_configured_key_file_fails_closed(self, tmp_path, monkeypatch):
+        from actenon_permit.ed25519_signer import Ed25519KeyError, resolve_signer
+
+        bad = tmp_path / "ed25519.json"
+        bad.write_text("{not json")
+        monkeypatch.setenv("ACTENON_ED25519_KEY_FILE", str(bad))
+        monkeypatch.delenv("ACTENON_SIGNING_KEY", raising=False)
+        # Before the fix: an HmacSha256Signer keyed with the kernel's
+        # *public* default local secret.
+        with pytest.raises(Ed25519KeyError):
+            resolve_signer()
+
+    def test_missing_configured_key_file_fails_closed(self, tmp_path, monkeypatch):
+        from actenon_permit.ed25519_signer import Ed25519KeyError, resolve_signer
+
+        monkeypatch.setenv("ACTENON_ED25519_KEY_FILE", str(tmp_path / "nope.json"))
+        with pytest.raises(Ed25519KeyError):
+            resolve_signer()
+
+    def test_corrupt_key_file_denies_at_the_gateway(self, tmp_db, tmp_path, monkeypatch):
+        from actenon_permit.token import grant_to_token
+
+        bad = tmp_path / "ed25519.json"
+        bad.write_text('{"algorithm": "EdDSA", "private_key": "AAAA"}')
+        monkeypatch.setenv("ACTENON_ED25519_KEY_FILE", str(bad))
+        store = SQLiteStore()
+        gw, _, _ = _gateway_with_refund_tool(store)
+        grant = _grant()
+        store.put_grant(grant)
+        result = gw.call_tool("refund", {"amount": 1}, grant_to_token(grant))
+        assert result["outcome"] == "DENY", result
+
+    def test_no_key_configured_still_uses_hmac(self, tmp_path, monkeypatch):
+        from actenon_permit.ed25519_signer import resolve_signer
+
+        monkeypatch.delenv("ACTENON_ED25519_KEY_FILE", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        assert resolve_signer(hmac_secret="k").algorithm == "HS256"

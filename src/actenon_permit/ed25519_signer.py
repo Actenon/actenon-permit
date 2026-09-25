@@ -250,7 +250,12 @@ def resolve_signer(
          ``~/.actenon-permit/ed25519-key.json``)
       2. HMAC secret (from ``hmac_secret`` or ``ACTENON_SIGNING_KEY``)
 
-    Ed25519 is the production-preferred path. HMAC is the dev fallback.
+    Ed25519 is the production-preferred path. HMAC is the dev fallback,
+    used only when no Ed25519 key is configured. A configured key (an
+    explicit path, ``ACTENON_ED25519_KEY_FILE``, or an existing default
+    file) that cannot be loaded raises ``Ed25519KeyError``: silently
+    signing with HMAC instead (possibly the kernel's public default
+    secret) would be an algorithm downgrade.
     """
     from actenon.proof.signers.local import build_local_proof_signer
 
@@ -266,13 +271,18 @@ def resolve_signer(
                 key_path = default_path
 
     if key_path is not None:
+        path = Path(key_path)
+        if not path.is_file():
+            raise Ed25519KeyError(f"configured Ed25519 key file not found: {path}")
         try:
-            path = Path(key_path)
-            if path.is_file():
-                keypair = load_ed25519_keypair(path)
-                return build_ed25519_signer(keypair)
-        except Exception:
-            pass  # fall through to HMAC
+            keypair = load_ed25519_keypair(path)
+            return build_ed25519_signer(keypair)
+        except Ed25519KeyError:
+            raise
+        except Exception as e:
+            raise Ed25519KeyError(
+                f"configured Ed25519 key file could not be loaded ({type(e).__name__}): {path}"
+            ) from e
 
     # Fall back to HMAC
     secret = hmac_secret
