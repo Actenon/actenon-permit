@@ -34,7 +34,13 @@ Public API:
 
 from __future__ import annotations
 
-__version__ = "1.1.0"
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _dist_version
+
+try:
+    __version__ = _dist_version("actenon-permit")
+except _PackageNotFoundError:  # running from a source tree without install
+    __version__ = "0.0.0+unknown"
 
 from .adapters import (
     AdapterError,

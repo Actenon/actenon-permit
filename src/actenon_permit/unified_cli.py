@@ -574,18 +574,19 @@ def version() -> None:
     """Print version information."""
     typer.echo(f"  actenon {__version__}")
     typer.echo(f"  python  {sys.version.split()[0]}")
-    try:
-        import actenon_protocol
+    typer.echo(f"  protocol {_installed_version('actenon-protocol')}")
+    typer.echo(f"  kernel  {_installed_version('actenon-kernel')}")
 
-        typer.echo(f"  protocol {actenon_protocol.__version__}")
-    except ImportError:
-        pass
-    try:
-        import actenon
 
-        typer.echo(f"  kernel  {getattr(actenon, '__version__', 'unknown')}")
-    except ImportError:
-        pass
+def _installed_version(dist: str) -> str:
+    """The installed distribution's version (module __version__ constants drift)."""
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as dist_version
+
+    try:
+        return dist_version(dist)
+    except PackageNotFoundError:
+        return "not installed"
 
 
 # ---------------------------------------------------------------------------
@@ -624,17 +625,16 @@ def doctor() -> None:
         typer.echo(f"    local db:    not found ({db_path})")
     # Check protocol
     try:
-        import actenon_protocol
+        import actenon_protocol  # noqa: F401 - availability check
 
-        typer.echo(f"    protocol:    OK (v{actenon_protocol.__version__})")
+        typer.echo(f"    protocol:    OK (v{_installed_version('actenon-protocol')})")
     except ImportError:
         typer.echo("    protocol:    NOT INSTALLED")
     # Check kernel
     try:
-        import actenon
+        import actenon  # noqa: F401 - availability check
 
-        kver = getattr(actenon, "__version__", "unknown")
-        typer.echo(f"    kernel:      OK (v{kver})")
+        typer.echo(f"    kernel:      OK (v{_installed_version('actenon-kernel')})")
     except ImportError:
         typer.echo("    kernel:      NOT INSTALLED")
     # Check scan

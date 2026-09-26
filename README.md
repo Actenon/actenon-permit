@@ -124,9 +124,11 @@ The agent walks away with a Receipt it could not forge; the protected endpoint w
 Python 3.10+ for the Kernel alone. The full stack including Permit requires 3.11+.
 
 ```bash
-pip install actenon-permit              # Python SDK + unified CLI + Boundary Kit
+pip install actenon-permit              # Python SDK + unified CLI + Boundary Kit (see note below)
 npm install @actenon/sdk                # TypeScript SDK v1.4.0 — discriminated result types, receipt verification, protocol parity with Python
 ```
+
+> **Release note:** this README tracks `main`. The Boundary Kit proof binding, the kernel execution Receipts returned by brokered calls, and other fixes on `main` are newer than the latest PyPI/npm release; install from a checkout (`pip install .`) to get them until the next release.
 
 ## Hero quickstart (6 lines)
 
@@ -347,8 +349,8 @@ In `resource_owned` mode, Permit still issues the Grant and mints the PCCB — b
 - **See the raw credential.** The broker resolves it internally and passes it only to the adapter.
 - **Bypass proof verification.** The Kernel verifies at the edge; the broker will not resolve the credential until verification passes.
 - **Exceed budget / scope / rate.** The PDP enforces at decision time; the lifecycle state machine prevents out-of-order execution.
-- **Replay a proof.** Single-use PCCB + lifecycle state machine + durable replay store (atomic claim-once, not check-then-write). Replays are refused with `REPLAY_DETECTED`.
-- **Mutate parameters after approval.** The PCCB binds the action-hash (SHA-256 over `ACTENON-JCS-STRICT-1` canonical JSON of the parameters). Any mutation is detected at the edge as `ACTION_HASH_MISMATCH` / `PARAMETER_DIGEST_MISMATCH`.
+- **Replay a proof.** Single-use PCCB + lifecycle state machine + durable replay store (atomic claim-once, not check-then-write). Replays are refused (a re-executed intent with `intent:not_executable`; a PCCB presented for another action with `INTENT_MISMATCH`; a reused boundary proof with `REPLAY_DETECTED`).
+- **Mutate parameters after approval.** The PCCB binds the action-hash (SHA-256 over `ACTENON-JCS-STRICT-1` canonical JSON of the parameters). Any mutation is refused at the edge by the Kernel (`ACTION_MISMATCH`), and at a Boundary Kit route as `PARAMETER_MISMATCH`.
 - **Forward proof to a different tool.** The PCCB binds `audience`. A proof minted for tool A is refused by tool B with `AUDIENCE_MISMATCH`. See the Kernel's [Multi-Agent Execution Model](https://github.com/Actenon/actenon-kernel/blob/main/docs/MULTI_AGENT_EXECUTION_MODEL.md).
 - **Silently ignore unsupported parameters.** Adapters reject unknown fields with `InvalidParametersError`.
 
