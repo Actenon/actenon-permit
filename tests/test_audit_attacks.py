@@ -7,6 +7,7 @@ A test passes when the attack is blocked (fail closed).
 from __future__ import annotations
 
 import contextlib
+import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -613,6 +614,9 @@ class TestIntentPath:
             capture_output=True,
             text=True,
             cwd=tmp_path,
+            # The PCCB is HS256 under the dev signing key; kernels that also
+            # verify the linked PCCB's signature read it from here.
+            env={**os.environ, "ACTENON_LOCAL_HMAC_SECRET": "audit-signing-key"},
         )
         assert proc.returncode == 0, proc.stdout + proc.stderr
 
