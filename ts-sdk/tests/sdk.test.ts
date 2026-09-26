@@ -10,6 +10,8 @@ import {
 } from "../src/index.ts";
 
 const SIGNING_KEY = "test-signing-key-not-secret";
+// The operator's control-plane credential. Agents never hold it.
+const ADMIN_TOKEN = "test-admin-token-not-secret";
 const BASE_URL = "http://127.0.0.1:7781";
 
 const REFUND_POLICY = {
@@ -64,7 +66,7 @@ tools.register("send_email", action_type="email.send", target="smtp",
                credential_name="MOCK_STRIPE_KEY",
                real_call=lambda secret, to, subject, body="": mock_send_email(secret, to, subject, body))
 gw = Gateway(state=state, ledger=ledger, pdp=pdp, broker=broker, tools=tools, approval_gate=AutoApproveGate())
-app = create_app(state=state, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
+app = create_app(state=state, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False, admin_token="${ADMIN_TOKEN}")
 uvicorn.run(app, host="127.0.0.1", port=7781, log_level="warning")
 `,
     ],
@@ -191,7 +193,7 @@ describe("control plane + gateway end-to-end", () => {
     "issues a grant, mints a token, calls refund (ALLOW), then over-budget (DENY)",
     async () => {
       await withServer(async () => {
-        const cp = new ControlPlaneClient({ baseUrl: BASE_URL });
+        const cp = new ControlPlaneClient({ baseUrl: BASE_URL, adminToken: ADMIN_TOKEN });
         const grant = await cp.issueGrant(REFUND_POLICY);
         expect(grant.status).toBe("active");
         expect(grant.budget.limit).toBe(50);
@@ -240,7 +242,7 @@ describe("control plane + gateway end-to-end", () => {
     "attenuates a parent grant to a weaker child",
     async () => {
       await withServer(async () => {
-        const cp = new ControlPlaneClient({ baseUrl: BASE_URL });
+        const cp = new ControlPlaneClient({ baseUrl: BASE_URL, adminToken: ADMIN_TOKEN });
         const parent = await cp.issueGrant(REFUND_POLICY);
         const child = await cp.attenuateGrant(parent.id, {
           budget_limit: 10,
@@ -262,7 +264,7 @@ describe("control plane + gateway end-to-end", () => {
     "ledger verifies as intact after a series of calls",
     async () => {
       await withServer(async () => {
-        const cp = new ControlPlaneClient({ baseUrl: BASE_URL });
+        const cp = new ControlPlaneClient({ baseUrl: BASE_URL, adminToken: ADMIN_TOKEN });
         const grant = await cp.issueGrant(REFUND_POLICY);
         const { token } = await cp.mintToken(grant.id);
         const gw = new GatewayClient({ baseUrl: BASE_URL, grantToken: token });
@@ -274,4 +276,19 @@ describe("control plane + gateway end-to-end", () => {
     },
     { timeout: 30_000 },
   );
+});
+
+describe("control plane requires the admin token", () => {
+  it("refuses a client without it (an agent) and accepts the operator", async () => {
+    await withServer(async () => {
+      const agent = new ControlPlaneClient({ baseUrl: BASE_URL });
+      await expect(agent.issueGrant(REFUND_POLICY)).rejects.toThrow(/401/);
+      await expect(agent.listGrants()).rejects.toThrow(/401/);
+      const wrong = new ControlPlaneClient({ baseUrl: BASE_URL, adminToken: "nope" });
+      await expect(wrong.listGrants()).rejects.toThrow(/403/);
+      const operator = new ControlPlaneClient({ baseUrl: BASE_URL, adminToken: ADMIN_TOKEN });
+      const grant = await operator.issueGrant(REFUND_POLICY);
+      expect(grant.agent_id).toBe(REFUND_POLICY.agent);
+    });
+  });
 });

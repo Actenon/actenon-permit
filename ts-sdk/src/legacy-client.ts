@@ -13,6 +13,13 @@ import { PermitError } from "./types.js";
 
 export interface ControlPlaneClientOptions {
   baseUrl: string; // e.g. "http://127.0.0.1:7780"
+  /**
+   * The operator's control-plane admin token, sent as
+   * `Authorization: Bearer <token>`. Every route except /health requires
+   * it (`permit serve` prints the path of the file that holds it). Agents
+   * never need it: they use the gateway with their grant token.
+   */
+  adminToken?: string;
   fetch?: typeof fetch;
   timeoutMs?: number;
 }
@@ -47,8 +54,10 @@ export class ControlPlaneClient {
   private baseUrl: string;
   private fetchFn: typeof fetch;
   private timeoutMs: number;
+  private adminToken?: string;
 
   constructor(opts: ControlPlaneClientOptions) {
+    this.adminToken = opts.adminToken;
     this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
     this.fetchFn = opts.fetch ?? globalThis.fetch;
     if (!this.fetchFn) {
@@ -124,7 +133,10 @@ export class ControlPlaneClient {
     const url = `${this.baseUrl}${path}`;
     const init: RequestInit = {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(this.adminToken ? { Authorization: `Bearer ${this.adminToken}` } : {}),
+      },
       signal: AbortSignal.timeout(this.timeoutMs),
     };
     if (body !== undefined) init.body = JSON.stringify(body);
