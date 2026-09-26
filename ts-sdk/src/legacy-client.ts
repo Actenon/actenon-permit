@@ -8,8 +8,8 @@ import type {
   Grant,
   LedgerEntry,
   Policy,
-} from "./types";
-import { PermitError } from "./types";
+} from "./types.js";
+import { PermitError } from "./types.js";
 
 export interface ControlPlaneClientOptions {
   baseUrl: string; // e.g. "http://127.0.0.1:7780"

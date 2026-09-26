@@ -29,18 +29,23 @@
  */
 
 // Protocol types (parity with Python actenon_protocol + actenon_permit.sdk)
-export * from "./protocol";
+export * from "./protocol.js";
 
 // Crypto helpers (canonicalisation + receipt verification)
-export { canonicalizeJson, computeReceiptSignature, verifyResourceReceipt } from "./crypto";
+export {
+  CanonicalizationError,
+  canonicalizeJson,
+  computeReceiptSignature,
+  verifyResourceReceipt,
+} from "./crypto.js";
 
 // Client (Actenon.local / Actenon.cloud)
-export { Actenon, ActenonClient, CloudActenonClient, LocalActenonClient } from "./client";
+export { Actenon, ActenonClient, CloudActenonClient, LocalActenonClient } from "./client.js";
 
 // Legacy v1 exports (backward compat with the existing TS SDK)
-export * from "./types";
-export * from "./token";
-export { ControlPlaneClient } from "./legacy-client";
-export type { ControlPlaneClientOptions } from "./legacy-client";
-export { GatewayClient } from "./gateway-client";
-export type { GatewayClientOptions } from "./gateway-client";
+export * from "./types.js";
+export * from "./token.js";
+export { ControlPlaneClient } from "./legacy-client.js";
+export type { ControlPlaneClientOptions } from "./legacy-client.js";
+export { GatewayClient } from "./gateway-client.js";
+export type { GatewayClientOptions } from "./gateway-client.js";

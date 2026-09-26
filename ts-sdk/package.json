@@ -25,7 +25,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "prepack": "bun run build",
-    "pack:test": "bun run build && npm pack --dry-run"
+    "pack:test": "bun run build && npm pack --dry-run",
+    "smoke:node": "bun run build && node scripts/node-smoke.mjs"
   },
   "keywords": [
     "ai",

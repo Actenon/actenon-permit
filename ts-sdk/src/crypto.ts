@@ -10,35 +10,91 @@
  * `actenon-jcs-sha256-v1` profile and by the `ResourceReceiptVerifier`.
  */
 
+import { createHmac } from "node:crypto";
+
 // ---------------------------------------------------------------------------
 // Canonical JSON (parity: actenon_protocol.canonicalisation.canonicalize_json)
 // ---------------------------------------------------------------------------
 
-/**
- * Canonicalise a JSON-serialisable value using JCS-compatible rules:
- *   - sorted object keys (lexicographic byte order)
- *   - no insignificant whitespace
- *   - UTF-8 encoded
- *
- * This matches Python's `json.dumps(obj, sort_keys=True, separators=(",", ":"))`.
- */
-export function canonicalizeJson(value: unknown): string {
-  return JSON.stringify(sortKeys(value));
+/** Thrown when a value has no single canonical encoding shared with Python. */
+export class CanonicalizationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CanonicalizationError";
+  }
 }
 
-function sortKeys(value: unknown): unknown {
-  if (value === null || typeof value !== "object") {
-    return value;
+/**
+ * Canonicalise a JSON value exactly as the Python reference does
+ * (`json.dumps(obj, sort_keys=True, separators=(",", ":"))`, used by the
+ * kernel's ResourceReceiptVerifier):
+ *   - object keys sorted by Unicode code point (not UTF-16 code unit)
+ *   - no insignificant whitespace
+ *   - every non-ASCII character escaped as lowercase `\uXXXX`
+ *     (surrogate pairs as two escapes), control characters as Python does
+ *
+ * Fails closed (throws `CanonicalizationError`) on values whose encoding
+ * would differ between languages or silently lose information: numbers
+ * that are not safe integers (floats, -0, NaN, Infinity, |n| > 2^53-1),
+ * unpaired surrogates, and anything that is not a plain JSON value
+ * (undefined, functions, symbols, bigint, Date, Map, Set, class instances).
+ */
+export function canonicalizeJson(value: unknown): string {
+  return canon(value, "$");
+}
+
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+function quote(s: string, path: string): string {
+  if (LONE_SURROGATE.test(s)) {
+    throw new CanonicalizationError(`${path}: unpaired surrogate has no UTF-8 encoding`);
   }
-  if (Array.isArray(value)) {
-    return value.map(sortKeys);
+  return JSON.stringify(s).replace(
+    /[\u0080-\uffff]/g,
+    (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"),
+  );
+}
+
+function compareCodePoints(a: string, b: string): number {
+  const ca = Array.from(a, (c) => c.codePointAt(0) as number);
+  const cb = Array.from(b, (c) => c.codePointAt(0) as number);
+  for (let i = 0; i < Math.min(ca.length, cb.length); i++) {
+    if (ca[i] !== cb[i]) return ca[i] - cb[i];
   }
-  const obj = value as Record<string, unknown>;
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(obj).sort()) {
-    sorted[key] = sortKeys(obj[key]);
+  return ca.length - cb.length;
+}
+
+function canon(value: unknown, path: string): string {
+  if (value === null) return "null";
+  switch (typeof value) {
+    case "boolean":
+      return value ? "true" : "false";
+    case "number":
+      if (!Number.isSafeInteger(value) || Object.is(value, -0)) {
+        throw new CanonicalizationError(`${path}: ${value} is not a safe integer`);
+      }
+      return String(value);
+    case "string":
+      return quote(value, path);
+    case "object": {
+      if (Array.isArray(value)) {
+        return "[" + value.map((v, i) => canon(v, `${path}[${i}]`)).join(",") + "]";
+      }
+      const proto = Object.getPrototypeOf(value);
+      if (proto !== Object.prototype && proto !== null) {
+        throw new CanonicalizationError(`${path}: not a plain JSON object`);
+      }
+      const obj = value as Record<string, unknown>;
+      const keys = Object.keys(obj).sort(compareCodePoints);
+      return (
+        "{" +
+        keys.map((k) => quote(k, path) + ":" + canon(obj[k], `${path}.${k}`)).join(",") +
+        "}"
+      );
+    }
+    default:
+      throw new CanonicalizationError(`${path}: ${typeof value} is not a JSON value`);
   }
-  return sorted;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,9 +175,8 @@ function verifyHmacSha256Sync(
 }
 
 function hmacSha256HexSync(message: string, secret: Uint8Array): string {
-  // Use Node's crypto module (available in Node 18+).
-  // In a browser, this would need a polyfill or Web Crypto (async).
-  const { createHmac } = require("node:crypto") as typeof import("node:crypto");
+  // Node's crypto module (Node 18+), imported statically: `require` does
+  // not exist in an ES module under Node.
   const hmac = createHmac("sha256", Buffer.from(secret));
   hmac.update(message, "utf-8");
   return hmac.digest("hex");

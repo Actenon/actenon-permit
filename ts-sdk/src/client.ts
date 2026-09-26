@@ -38,13 +38,13 @@ import type {
   IntentLifecycle,
   LocalRuntimeConfig,
   ResourceClientConfig,
-} from "./protocol";
+} from "./protocol.js";
 import {
   ActenonError,
   ExecutionFailedError,
   ExecutionRefusedError,
   OutcomeUnknownError,
-} from "./protocol";
+} from "./protocol.js";
 
 // ---------------------------------------------------------------------------
 // AuthorisedExecutionIntents API

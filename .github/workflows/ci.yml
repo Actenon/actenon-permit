@@ -106,5 +106,9 @@ jobs:
         working-directory: ts-sdk
         run: bun test
 
+      - name: Built package imports in plain Node (ESM)
+        working-directory: ts-sdk
+        run: bun run smoke:node
+
   # The verify-claims job moved to verify-claims.yml so the README
   # badge can link to a dedicated gate.
