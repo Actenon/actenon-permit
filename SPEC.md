@@ -365,7 +365,12 @@ On DENY (or REQUIRE_APPROVAL that resolves to DENY):
 }}
 ```
 
-Missing `_meta.actenon_grant` returns a JSON-RPC error:
+The grant can instead be fixed at launch (`permit mcp-serve --grant-token`
+or `ACTENON_GRANT_TOKEN`), so standard MCP clients need no `_meta`; a
+per-call `_meta.actenon_grant` overrides it. Notifications (no `id`, e.g.
+`notifications/initialized`) never receive a response.
+
+With neither a launch grant nor `_meta.actenon_grant`, `tools/call` returns a JSON-RPC error:
 ```json
 {"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"missing _meta.actenon_grant"}}
 ```

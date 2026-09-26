@@ -499,17 +499,25 @@ def serve(
 
 
 @app.command()
-def mcp_serve() -> None:
+def mcp_serve(
+    grant_token: str | None = typer.Option(
+        None,
+        "--grant-token",
+        envvar="ACTENON_GRANT_TOKEN",
+        help="Grant token used for tools/call when the client sends no _meta.actenon_grant.",
+    ),
+) -> None:
     """Run the v1 MCP stdio server (JSON-RPC 2.0 over stdin/stdout).
 
     The agent host (Claude Desktop, Cursor, etc.) connects to this process
-    via stdio and calls tools/list + tools/call. The grant token is passed
-    in params._meta.actenon_grant on each tools/call.
+    via stdio and calls tools/list + tools/call. The grant token comes from
+    --grant-token / ACTENON_GRANT_TOKEN, or per call from
+    params._meta.actenon_grant (which takes precedence).
     """
     from .gateway import mcp_serve as _mcp_serve
 
     gateway = _build_demo_gateway()
-    _mcp_serve(gateway)
+    _mcp_serve(gateway, grant_token=grant_token)
 
 
 @app.command()
