@@ -247,6 +247,10 @@ class Broker:
         # Track the live credential so we can destroy it on any exit path.
         cred_id = id(credential)
         self._live_credentials[cred_id] = credential
+        # Held only for the redaction pass in step 6: _destroy_credential()
+        # blanks credential.value in the finally block below, so reading it
+        # there afterwards would redact nothing.
+        secret_value = credential.value
 
         # 5. Execute via the adapter. The credential value is passed
         # ONLY to the adapter.execute() call - never returned, never
@@ -261,12 +265,18 @@ class Broker:
                 timeout_seconds=timeout_seconds,
             )
         except UnsupportedActionError as e:
-            raise BrokerExecutionError(str(e), rule="broker:unsupported_action") from e
+            raise BrokerExecutionError(
+                _scrub_text(str(e), secret_value), rule="broker:unsupported_action"
+            ) from e
         except InvalidParametersError as e:
-            raise BrokerExecutionError(str(e), rule="broker:invalid_parameters") from e
+            raise BrokerExecutionError(
+                _scrub_text(str(e), secret_value), rule="broker:invalid_parameters"
+            ) from e
         except AdapterError as e:
             raise BrokerExecutionError(
-                str(e), retryable=e.retryable, rule=f"adapter:{adapter.provider_id}"
+                _scrub_text(str(e), secret_value),
+                retryable=e.retryable,
+                rule=f"adapter:{adapter.provider_id}",
             ) from e
         except Exception as e:
             # Unexpected adapter crash. Sanitise the message - never
@@ -284,9 +294,10 @@ class Broker:
 
         # 6. Belt-and-braces redaction: strip any field whose value
         # matches the credential value, even if the adapter's redact()
-        # missed it. The credential has already been destroyed, but
-        # we kept a local reference for this exact check.
-        response = self._final_redact(response, credential)
+        # missed it. The credential has already been destroyed; the value
+        # captured before the call is used for this check, then dropped.
+        response = self._final_redact(response, secret_value)
+        del secret_value
 
         # 7. Reconcile cost. Adapters may report a cost (e.g. usage-
         # based billing). If they don't, fall back to the reservation.
@@ -317,18 +328,24 @@ class Broker:
             object.__setattr__(credential, "value", "")
 
     @staticmethod
-    def _final_redact(response: ProviderResponse, credential: Credential) -> ProviderResponse:
+    def _final_redact(response: ProviderResponse, secret: str) -> ProviderResponse:
         """Belt-and-braces redaction. The adapter's ``redact()`` has
         already run; this is the broker's defensive pass to ensure the
         credential value does not appear anywhere in the evidence.
 
         We compare the credential value against every string field in
         ``provider_evidence`` and replace any match with ``<redacted>``.
-        We never log the credential value here.
+        ``raw`` is always dropped. We never log the credential value here.
         """
-        secret = credential.value
         if not secret:
-            return response
+            return ProviderResponse(
+                ok=response.ok,
+                action=response.action,
+                provider_action_id=response.provider_action_id,
+                provider_evidence=response.provider_evidence,
+                cost=response.cost,
+                raw=None,
+            )
 
         def _scrub(v: Any) -> Any:
             if isinstance(v, str):
@@ -387,6 +404,11 @@ def extract_cost(result: Any, action: Action) -> float:
                 return float(result[k])
     # Fall back to the reservation. The broker does NOT inflate cost.
     return float(action.est_cost or 0.0)
+
+
+def _scrub_text(text: str, secret: str) -> str:
+    """Replace every occurrence of ``secret`` in ``text``."""
+    return text.replace(secret, "<redacted>") if secret else text
 
 
 def _adapter_supports_action(

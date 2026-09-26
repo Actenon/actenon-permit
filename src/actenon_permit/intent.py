@@ -618,6 +618,8 @@ class IntentManager:
         credential_ref: str | None = None,
         resource_client: ResourceOwnedSubmissionClient | None = None,
         proof: dict[str, Any] | None = None,
+        action: Action | None = None,
+        pccb_id: str | None = None,
     ) -> tuple[AuthorisedExecutionIntent, Any]:
         """Execute an intent. Dispatches based on ``requested_execution_mode``.
 
@@ -643,6 +645,7 @@ class IntentManager:
             return self.execute_brokered(
                 intent, grant=grant, decision=decision, broker=broker,
                 adapter=adapter, credential_ref=credential_ref,
+                action=action, pccb_id=pccb_id,
             )
         if intent.requested_execution_mode == "resource_owned":
             if resource_client is None or proof is None:
@@ -663,6 +666,8 @@ class IntentManager:
         broker: Broker,
         adapter: ProviderAdapter,
         credential_ref: str,
+        action: Action | None = None,
+        pccb_id: str | None = None,
     ) -> tuple[AuthorisedExecutionIntent, Any]:
         """Execute a brokered intent.
 
@@ -671,6 +676,12 @@ class IntentManager:
 
         The proof_issued state is entered optimistically (Permit mints
         a PCCB at decision time; the AEI records the link).
+
+        ``action`` should be the exact Action the PDP decided on (and the
+        PCCB was minted and verified for), so the broker executes and
+        reconciles budget against that reservation. ``pccb_id`` is
+        recorded as the intent's linked proof. Without them an Action is
+        derived from the intent with no cost (legacy behaviour).
         """
         # Transition through the lifecycle.
         intent = self.transition(intent.intent_id, IntentLifecycle.EVALUATING)
@@ -687,14 +698,15 @@ class IntentManager:
 
         # Record proof link (PCCB is minted by the PDP; the AEI just
         # records that one was issued).
-        proof_id = f"proof_{uuid.uuid4().hex[:16]}"
+        proof_id = pccb_id or f"proof_{uuid.uuid4().hex[:16]}"
         self.link_proof(intent.intent_id, proof_id)
         intent = self.transition(intent.intent_id, IntentLifecycle.PROOF_ISSUED)
         intent = self.transition(intent.intent_id, IntentLifecycle.EXECUTING)
 
         # Run the coordinator.
         coord = BrokeredExecutionCoordinator(broker=broker)
-        action = self._to_action(intent, grant)
+        if action is None:
+            action = self._to_action(intent, grant)
         result = coord.coordinate(
             grant, action, decision, adapter,
             credential_ref=credential_ref,

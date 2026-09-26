@@ -92,10 +92,15 @@ class BrokeredResult:
         finality: ``"final"`` or ``"non_final"``.
         provider_execution_observed: Whether the broker observed the
             provider's response.
-        receipt_received: Whether a receipt was issued.
-        receipt_verified: Whether the receipt was cryptographically verified.
+        receipt_received: Whether a kernel execution receipt was issued.
+        receipt_verified: Whether that receipt is linked to the PCCB the
+            kernel verified at the edge before the credential was used.
         evidence: Redacted provider evidence (safe to log/persist).
         attempt_id: The execution attempt id.
+        receipt: The kernel execution Receipt (``Receipt.to_dict()``), or
+            None. Check it offline with ``actenon-kernel verify-receipt``.
+        proof: ``{"intent": ..., "pccb": ...}`` the receipt is linked to,
+            or None.
     """
 
     intent_id: str
@@ -106,6 +111,8 @@ class BrokeredResult:
     receipt_verified: bool
     evidence: dict[str, Any] = field(default_factory=dict)
     attempt_id: str | None = None
+    receipt: dict[str, Any] | None = None
+    proof: dict[str, Any] | None = None
 
     @property
     def mode(self) -> Literal["brokered"]:

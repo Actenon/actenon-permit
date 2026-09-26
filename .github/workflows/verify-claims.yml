@@ -75,3 +75,13 @@ jobs:
           print('OK: pytest-asyncio is a runtime dep')
           "
 
+      - name: Verify the plain-install promise (pip install . && pytest)
+        # The README promises "a plain install followed by pytest works out
+        # of the box". `uv sync --extra dev` above installs the dev extras,
+        # which masks any test dependency declared only under [dev] (httpx
+        # for fastapi.testclient was one). Run the promise literally in a
+        # clean venv with runtime deps only.
+        run: |
+          python -m venv /tmp/plain-install
+          /tmp/plain-install/bin/pip install --quiet .
+          /tmp/plain-install/bin/python -m pytest -q -p no:cacheprovider

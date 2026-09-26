@@ -362,7 +362,7 @@ the only entry point.
 
 | Protocol | Kernel | Permit | Cloud | Scan | SDK |
 |---|---|---|---|---|---|
-| 1.1.0 | 0.1.0 | 1.4.0 | 0.1.0 | 0.1.3 | 1.4.0 |
+| 1.1.0 | ≥ 1.0.0 | 1.4.0 | 0.1.0 | 0.1.3 | 1.4.0 |
 
 Protocol 1.1.0 is backward-compatible with 1.0.0 (purely additive).
 

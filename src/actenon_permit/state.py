@@ -211,6 +211,26 @@ class SQLiteStore(StateStore):
                 cur.execute("ROLLBACK")
                 raise
 
+    @staticmethod
+    def _revoked_ancestor(cur: sqlite3.Cursor, parent_id: str | None, grant_id: str) -> str | None:
+        """Return the id of the nearest revoked ancestor, else None.
+
+        Walks ``parent_grant_id`` links with the caller's cursor (inside its
+        transaction). An ancestor that is not in this store cannot be
+        checked here and ends the walk.
+        """
+        seen = {grant_id}
+        while parent_id and parent_id not in seen:
+            seen.add(parent_id)
+            cur.execute("SELECT status, body FROM grants WHERE id = ?", (parent_id,))
+            row = cur.fetchone()
+            if row is None:
+                return None
+            if row[0] == GrantStatus.REVOKED.value:
+                return parent_id
+            parent_id = Grant.model_validate_json(row[1]).parent_grant_id
+        return None
+
     # ------------------------------------------------------------------
     # Atomic reserve / commit / release
     # ------------------------------------------------------------------
@@ -244,6 +264,15 @@ class SQLiteStore(StateStore):
                 if grant.status != GrantStatus.ACTIVE:
                     cur.execute("ROLLBACK")
                     return False, f"grant status is {grant.status.value}", {}
+
+                # Revocation cascades to every attenuated descendant. Checked
+                # here, in the reserve transaction every ALLOW passes through,
+                # so it holds however the ancestor was revoked (HTTP, CLI
+                # kill switch by agent id, direct set_status).
+                revoked_ancestor = self._revoked_ancestor(cur, grant.parent_grant_id, grant.id)
+                if revoked_ancestor is not None:
+                    cur.execute("ROLLBACK")
+                    return False, f"ancestor grant {revoked_ancestor} is revoked", {}
 
                 # Rate check (within this same transaction so it's atomic).
                 if rate_max > 0:

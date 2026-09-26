@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from .broker import Broker, CredentialMissing, extract_cost
-from .model import Action, Decision, DecisionOutcome, Grant
+from .model import Action, CostError, Decision, DecisionOutcome, Grant, estimate_cost
 from .pdp import PDP, PermitDenied
 from .state import StateStore
 
@@ -164,24 +164,13 @@ class GuardRegistry:
 def _extract_amount_from_args(
     bound_args: dict[str, Any], cost_from: str | None, params: dict[str, Any]
 ) -> float | None:
-    """Find a numeric cost from the call args.
+    """Find the cost to reserve from the call args (see ``estimate_cost``).
 
-    Priority:
-    1. ``cost_from`` names a kwarg or positional arg name; if present and
-       numeric, use it.
-    2. ``params['amount']`` if present and numeric.
-    3. ``params['cost']`` if present and numeric.
-    4. None (no estimated cost).
+    Priority: ``cost_from``, then ``amount``, then ``cost``; None if absent.
+    Raises ``CostError`` if that argument is not a finite number, so a
+    string or Decimal amount cannot reserve $0 and still reach the tool.
     """
-    if cost_from and cost_from in bound_args:
-        v = bound_args[cost_from]
-        if isinstance(v, (int, float)):
-            return float(v)
-    if "amount" in params and isinstance(params["amount"], (int, float)):
-        return float(params["amount"])
-    if "cost" in params and isinstance(params["cost"], (int, float)):
-        return float(params["cost"])
-    return None
+    return estimate_cost(params, cost_from)
 
 
 def guard(
@@ -239,7 +228,10 @@ def guard(
             secret_param_name = next(iter(sig.parameters), None)
             params = {k: v for k, v in bound_args.items() if k != secret_param_name}
 
-            est_cost = _extract_amount_from_args(bound_args, cost_from, params)
+            try:
+                est_cost = _extract_amount_from_args(bound_args, cost_from, params)
+            except CostError as e:
+                raise PermitDenied(str(e), "cost:invalid") from None
 
             action = Action(
                 action_id=f"act_{uuid.uuid4().hex[:16]}",

@@ -50,6 +50,10 @@ class TrustedIssuer:
     issuer: str
     jwks_uri: str = ""
     audiences: list[str] = field(default_factory=list)
+    # Ed25519 public keys as JWKs ({"kty": "OKP", "crv": "Ed25519", "kid",
+    # "x"}). BoundaryMiddleware builds its trust root from these; jwks_uri
+    # is informational and never fetched.
+    public_keys: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,7 @@ class BoundaryManifest:
                 issuer=i["issuer"],
                 jwks_uri=i.get("jwks_uri", ""),
                 audiences=i.get("audiences", []),
+                public_keys=list(i.get("public_keys", [])),
             )
             for i in raw.get("trusted_issuers", [])
         ]
@@ -162,6 +167,7 @@ class BoundaryManifest:
             },
             "trusted_issuers": [
                 {"issuer": i.issuer, "jwks_uri": i.jwks_uri, "audiences": i.audiences}
+                | ({"public_keys": i.public_keys} if i.public_keys else {})
                 for i in self.trusted_issuers
             ],
             "enforcement": {

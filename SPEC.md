@@ -118,6 +118,9 @@ Each entry in `approval_rules` is a string in one of two forms:
 - **Bare type** — `email.send`. Matches if `action.type == "email.send"`.
 - **Type + threshold** — `payment.refund > 20`. Matches if
   `action.type == "payment.refund"` AND `float(action.params['amount'] or action.est_cost) > 20`.
+  If that amount is not a finite number (a non-numeric string, NaN, a list),
+  the rule matches: an amount that cannot be compared is not under the
+  threshold.
 
 If any rule matches, the PDP returns `REQUIRE_APPROVAL` and blocks until the
 control plane returns `approve` or `deny`. On approval, the PDP re-runs the
@@ -131,10 +134,10 @@ strictly weaker on every dimension:
 | Dimension | Parent value | Allowed child value |
 |-----------|--------------|---------------------|
 | `expires_at` | T_parent | T_child <= T_parent |
-| `scopes.allow` | A_parent | A_child ⊆ A_parent |
+| `scopes.allow` | A_parent | A_child ⊆ A_parent, and A_child non-empty if A_parent is (an empty list permits every non-denied action, §4) |
 | `scopes.deny` | D_parent | D_child ⊇ D_parent (deny may only grow) |
 | `budget.limit` | L_parent | L_child <= parent.remaining |
-| `rate.max` | M_parent | M_child <= M_parent |
+| `rate.max` | M_parent | M_child <= M_parent, and M_child > 0 if M_parent > 0 (`max=0` disables rate limiting) |
 | `rate.per_seconds` | P_parent | P_child >= P_parent |
 | `approval_rules` | R_parent | R_child ⊇ R_parent (rules may only grow) |
 
@@ -212,6 +215,12 @@ a `version` field.
 - Grants are bearer tokens. Anyone holding a grant id and the agent_id can
   present it. The v0 control plane is localhost-only; v1 must add transport
   authentication before grants traverse a network.
+- Revocation stops new decisions immediately, but cannot recall a PCCB
+  already minted. PCCBs therefore live at most `PCCB_TTL_SECONDS` (120 s,
+  `actenon_permit.kernel_bridge`) from the action's timestamp, bounded by
+  the grant's expiry: that is the residual window in which a revoked
+  grant's last proof can still verify at an edge that does not also check
+  grant status.
 - The grant object travels in the agent's context, but the real credential
   never does. The broker is the only component that sees the secret, and only
   for the duration of a single guarded call.
@@ -367,7 +376,9 @@ Missing `_meta.actenon_grant` returns a JSON-RPC error:
 1. Decode + verify grant token  →  on failure: DENY("invalid grant token")
 2. Load live grant from state    →  if missing: DENY("grant not found, treating as revoked")
 3. Lookup tool in registry       →  if missing: DENY("unknown tool")
-4. Build Action from args (cost_from rule for est_cost)
+4. Build Action from args (cost_from rule for est_cost: the `cost_from` argument,
+   else `amount`, else `cost`)  →  if that argument is not a finite number
+   (e.g. the string "40"): DENY (`rule_matched: "cost:invalid"`)
 5. PDP.decide(grant, action)
 6. On DENY: return DENY
 7. On REQUIRE_APPROVAL:
@@ -417,10 +428,10 @@ Returns the freshly-signed child Grant (HTTP 200), or:
 | Dimension | Parent value | Allowed child value |
 |-----------|--------------|---------------------|
 | `expires_at` | T_parent | T_child <= T_parent |
-| `scopes.allow` | A_parent | A_child ⊆ A_parent |
+| `scopes.allow` | A_parent | A_child ⊆ A_parent, and A_child non-empty if A_parent is (an empty list permits every non-denied action, §4) |
 | `scopes.deny` | D_parent | D_child ⊇ D_parent (deny may only grow) |
 | `budget.limit` | L_parent | L_child <= parent.remaining |
-| `rate.max` | M_parent | M_child <= M_parent |
+| `rate.max` | M_parent | M_child <= M_parent, and M_child > 0 if M_parent > 0 (`max=0` disables rate limiting) |
 | `rate.per_seconds` | P_parent | P_child >= P_parent |
 | `approval_rules` | R_parent | R_child ⊇ R_parent (rules may only grow) |
 

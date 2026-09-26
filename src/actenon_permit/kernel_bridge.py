@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -43,6 +43,12 @@ from .model import Action, Decision, DecisionOutcome, Grant
 
 class KernelBridgeError(RuntimeError):
     """Raised when the bridge cannot translate or verify."""
+
+
+# A PCCB authorises one execution, so it lives seconds-to-minutes, never as
+# long as the grant: revoking a grant cannot recall a proof already minted,
+# so this is the window in which a revoked grant's last proof is usable.
+PCCB_TTL_SECONDS = 120
 
 
 def _canonicalize_value(v: Any) -> Any:
@@ -94,18 +100,21 @@ def _permit_action_to_kernel_intent(
         are used in the brokered execution path.
     """
     now = datetime.now(UTC)
-    # Permit's grant.expires_at is the outer bound; the intent's expires_at
-    # is the same — the PCCB cannot outlive the grant.
-    expires_at = grant.expires_at
+    if grant.expires_at < now:
+        raise KernelBridgeError(f"grant expired at {grant.expires_at}, cannot build intent")
+    # The proof window starts at the action's timestamp (so the intent built
+    # at mint time and the one rebuilt at the edge are identical) and is
+    # PCCB_TTL_SECONDS long, bounded by the grant: never the grant's lifetime.
+    expires_at = min(grant.expires_at, action.ts + timedelta(seconds=PCCB_TTL_SECONDS))
     if expires_at < now:
-        raise KernelBridgeError(f"grant expired at {expires_at}, cannot build intent")
+        raise KernelBridgeError(f"proof window for action {action.action_id} closed at {expires_at}")
 
     # The action parameters are what make this "exact": the amount, the
     # reason, the target account. The kernel hashes these and the edge
     # refuses any action whose parameters don't match.
+    # Exactly the action's parameters: nothing synthetic (a derived "amount"
+    # would bind a value the caller never sent).
     parameters: dict[str, Any] = _canonicalize_params(dict(action.params))
-    if action.est_cost is not None:
-        parameters.setdefault("amount", _canonicalize_value(action.est_cost))
 
     # ── Phase 7: authority_ref digest ──────────────────────────────
     # A stable digest of (grant_id, grant_signature, action_id) that the
@@ -183,7 +192,9 @@ def _build_context(
         audience=AudienceRef(type="service", id=audience_id),
         scope_capabilities=tuple(grant.scopes.allow) or (action.type,),
         now=datetime.now(UTC),
-        max_ttl_seconds=int((grant.expires_at - datetime.now(UTC)).total_seconds()) or 900,
+        max_ttl_seconds=max(
+            1, min(PCCB_TTL_SECONDS, int((grant.expires_at - datetime.now(UTC)).total_seconds()))
+        ),
     )
 
 
@@ -276,6 +287,37 @@ def verify_pccb_at_edge(
     verifier.verify(actual_intent, pccb, context)
 
 
+def build_execution_receipt(
+    intent: ActionIntent,
+    pccb: Any,
+    grant: Grant,
+    action: Action,
+    evidence: dict[str, Any],
+    *,
+    audience_id: str = "actenon-permit-gateway",
+) -> Any:
+    """Build the kernel execution Receipt for a brokered action that ran.
+
+    The receipt is linked to ``intent`` and ``pccb`` (intent id, tenant,
+    subject, action, target, ``correlation.pccb_id`` and action hash), so
+    ``actenon-kernel verify-receipt --receipt ... --intent ... --pccb ...``
+    can check it offline. ``evidence`` must already be redacted.
+    """
+    from actenon.receipts import ReceiptFactory
+
+    receipt = ReceiptFactory().create_execution_receipt(
+        intent,
+        _build_context(grant, action, audience_id=audience_id),
+        pccb_id=pccb.pccb_id,
+        escrow_id=None,
+        payload=dict(evidence),
+        action_hash=pccb.action_hash,
+    )
+    if receipt.intent_id != intent.intent_id or receipt.correlation.pccb_id != pccb.pccb_id:
+        raise KernelBridgeError("execution receipt is not linked to the verified proof")
+    return receipt
+
+
 def pccb_to_token_payload(pccb: Any) -> dict[str, Any]:
     """Serialize a kernel PCCB into the v1 token payload.
 
@@ -294,9 +336,11 @@ def token_payload_to_pccb(payload: dict[str, Any]) -> Any:
 
 
 __all__ = [
+    "PCCB_TTL_SECONDS",
     "KernelBridgeError",
     "mint_pccb_for_action",
     "verify_pccb_at_edge",
+    "build_execution_receipt",
     "pccb_to_token_payload",
     "token_payload_to_pccb",
     "build_action_hash_input",
