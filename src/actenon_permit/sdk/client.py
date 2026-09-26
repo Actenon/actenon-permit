@@ -213,14 +213,20 @@ class LocalActenonClient(ActenonClient):
         adapter: Any,
         credential_ref: str,
         target: str = "",
+        cost_from: str | None = None,
     ) -> None:
-        """Register an adapter-backed tool for brokered execution."""
+        """Register an adapter-backed tool for brokered execution.
+
+        ``cost_from`` names the parameter priced against the budget
+        (default: ``amount``, then ``cost``).
+        """
         self._tools.register_adapter_tool(
             name,
             action_type=action_type,
             adapter=adapter,
             credential_ref=credential_ref,
             target=target or action_type,
+            cost_from=cost_from,
         )
 
     def register_resource_client(self, resource_id: str, client: Any) -> None:

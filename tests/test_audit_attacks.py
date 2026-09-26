@@ -781,3 +781,41 @@ class TestBoundaryKit:
         api = FastAPI()
         module.protect(api)
         assert any(m.cls.__name__ == "BoundaryMiddleware" for m in api.user_middleware)
+
+
+class TestProofBoundParameters:
+    def test_bridge_binds_exactly_the_action_params(self):
+        """No synthetic "amount" may be added to what the PCCB binds."""
+        from actenon_permit.kernel_bridge import _permit_action_to_kernel_intent
+
+        grant = _grant()
+        action = Action(grant_id=grant.id, type="payment.refund", params={"cost": 3}, est_cost=3.0)
+        intent = _permit_action_to_kernel_intent(grant, action)
+        assert dict(intent.action.parameters) == {"cost": 3}
+
+    def test_adapter_tool_cost_from_is_priced(self, tmp_path, monkeypatch):
+        import warnings
+
+        from actenon_permit import Actenon, ExecutionRefusedError
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            client = Actenon.local(scopes=["payment.refund"], budget_limit=100, signing_key="k")
+            client.register_credential("STRIPE", "sk_x")
+
+        class MinorUnits(_RefundAdapter):
+            def execute(self, action, params, credential, **kwargs):
+                return super().execute(action, {"amount": params["amount_minor"]}, credential)
+
+        client.register_adapter_tool(
+            "refund",
+            action_type="payment.refund",
+            adapter=MinorUnits(),
+            credential_ref="STRIPE",
+            cost_from="amount_minor",
+        )
+        with pytest.raises(ExecutionRefusedError):
+            client.authorised_execution_intents.create(
+                action="payment.refund", target="stripe", parameters={"amount_minor": 99_999_999}
+            ).execute()

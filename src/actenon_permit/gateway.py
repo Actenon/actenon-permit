@@ -147,8 +147,12 @@ class ToolRegistry:
         description: str = "",
         input_schema: dict[str, Any] | None = None,
         timeout_seconds: float | None = None,
+        cost_from: str | None = None,
     ) -> ToolSpec:
         """Register a v1.2 adapter-backed tool.
+
+        ``cost_from`` names the parameter that carries the cost reserved
+        against the grant's budget (default: ``amount``, then ``cost``).
 
         The tool is executed via ``BrokeredExecutionCoordinator``
         (Prompt 9), which produces a ``ModeAwareExecutionResult``.
@@ -167,6 +171,7 @@ class ToolRegistry:
             adapter=adapter,
             credential_ref=credential_ref,
             timeout_seconds=timeout_seconds,
+            cost_from=cost_from,
         )
         with self._lock:
             if name in self._tools:
@@ -411,7 +416,7 @@ class Gateway:
         # Price the action the same way call_tool() does. This path used to
         # hard-code est_cost=0.0, so no budget was ever enforced here.
         try:
-            est_cost = estimate_cost(intent.action_params)
+            est_cost = estimate_cost(intent.action_params, tool.cost_from)
         except CostError as e:
             return deny(str(e), "cost:invalid")
 

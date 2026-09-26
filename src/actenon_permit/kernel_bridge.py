@@ -103,9 +103,9 @@ def _permit_action_to_kernel_intent(
     # The action parameters are what make this "exact": the amount, the
     # reason, the target account. The kernel hashes these and the edge
     # refuses any action whose parameters don't match.
+    # Exactly the action's parameters: nothing synthetic (a derived "amount"
+    # would bind a value the caller never sent).
     parameters: dict[str, Any] = _canonicalize_params(dict(action.params))
-    if action.est_cost is not None:
-        parameters.setdefault("amount", _canonicalize_value(action.est_cost))
 
     # ── Phase 7: authority_ref digest ──────────────────────────────
     # A stable digest of (grant_id, grant_signature, action_id) that the
