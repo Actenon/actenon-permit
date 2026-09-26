@@ -615,3 +615,169 @@ class TestIntentPath:
             cwd=tmp_path,
         )
         assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# ---------------------------------------------------------------------------
+# Boundary Kit: fail closed, and never report checks that did not run
+# ---------------------------------------------------------------------------
+
+_BOUNDARY_MANIFEST = {
+    "version": "1.0.0",
+    "metadata": {"service_name": "audit"},
+    "trusted_issuers": [],
+    "enforcement": {"mode": "enforce", "proof_header": "X-Actenon-Proof"},
+    "boundaries": [
+        {
+            "id": "refund-api",
+            "route": "POST /refunds",
+            "action": "payment.refund",
+            "target": {"type": "charge", "from": "body.charge_id"},
+            "parameters": {"amount": {"from": "body.amount", "type": "integer"}},
+            "execution_mode": "resource_owned",
+            "audience": "service:payments",
+            "proof": {"source": "header", "name": "X-Actenon-Proof"},
+        }
+    ],
+}
+
+
+class TestBoundaryKit:
+    def test_middleware_without_kernel_boundary_verifier_fails_closed(self, monkeypatch):
+        """With no actenon.boundary module (kernel 0.1.0, which CI was locked
+        to), any token >= 16 chars was accepted as 'verified (structural)'."""
+        import sys
+
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from actenon_permit.boundary import BoundaryManifest, BoundaryMiddleware
+
+        monkeypatch.setitem(sys.modules, "actenon.boundary", None)
+        calls = []
+        app = FastAPI()
+
+        @app.post("/refunds")
+        def refund():
+            calls.append(1)
+            return {"ok": True}
+
+        app.add_middleware(
+            BoundaryMiddleware, manifest=BoundaryManifest.from_dict(_BOUNDARY_MANIFEST)
+        )
+        resp = TestClient(app).post(
+            "/refunds", json={"amount": 5}, headers={"X-Actenon-Proof": "A" * 16}
+        )
+        assert resp.status_code == 403
+        assert calls == []
+
+    def test_protect_test_reports_what_actually_ran(self, tmp_path, monkeypatch):
+        """`actenon protect test` printed ten hard-coded ✓ per boundary and
+        wrote assurance PASS without sending a single request. Its verdict
+        must now follow what the middleware actually does: a middleware
+        that lets everything through must FAIL."""
+        import json
+
+        from starlette.middleware.base import BaseHTTPMiddleware
+        from typer.testing import CliRunner
+
+        from actenon_permit.boundary import middleware as mw
+        from actenon_permit.unified_cli import app as cli
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "m.json").write_text(json.dumps(_BOUNDARY_MANIFEST))
+
+        result = CliRunner().invoke(cli, ["protect", "test", "--manifest", "m.json"])
+        report = json.loads((tmp_path / "actenon_boundary_report.json").read_text())
+        assert result.exit_code == 0, result.output
+        assert report["assurance"] == "PASS"
+        assert {r["status"] for r in report["results"]} <= {"pass", "not_run"}
+        assert report["tests_passed"] == sum(r["status"] == "pass" for r in report["results"])
+        assert report["production_ready"] is False  # no issuer public_keys configured
+
+        class FailOpen(BaseHTTPMiddleware):
+            def __init__(self, app, **kwargs):
+                super().__init__(app)
+
+            async def dispatch(self, request, call_next):
+                return await call_next(request)
+
+        monkeypatch.setattr(mw, "BoundaryMiddleware", FailOpen)
+        result = CliRunner().invoke(cli, ["protect", "test", "--manifest", "m.json"])
+        report = json.loads((tmp_path / "actenon_boundary_report.json").read_text())
+        assert result.exit_code == 1
+        assert report["assurance"] == "FAIL"
+        by_name = {r["name"]: r["status"] for r in report["results"]}
+        assert by_name["forged proof refuses"] == "fail"
+        assert by_name["no proof refuses"] == "fail"
+
+    def test_middleware_binds_the_proof_to_the_request(self):
+        """A genuine proof for amount=5 must not authorise amount=5000, and a
+        proof from a key the manifest does not trust must not verify."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from actenon_permit.boundary import (
+            BoundaryManifest,
+            BoundaryMiddleware,
+            mint_boundary_proof,
+            proof_headers,
+        )
+        from actenon_permit.ed25519_signer import build_ed25519_signer, generate_ed25519_keypair
+
+        issuer = generate_ed25519_keypair(key_id="issuer-1")
+        manifest = dict(_BOUNDARY_MANIFEST)
+        manifest["trusted_issuers"] = [{"issuer": "permit", "public_keys": [issuer.public_key_jwk]}]
+        calls = []
+        app = FastAPI()
+
+        @app.post("/refunds")
+        def refund():
+            calls.append(1)
+            return {"ok": True}
+
+        app.add_middleware(BoundaryMiddleware, manifest=BoundaryManifest.from_dict(manifest))
+        client = TestClient(app)
+
+        def proof(signer, amount=5):
+            return proof_headers(
+                *mint_boundary_proof(
+                    signer,
+                    action="payment.refund",
+                    target="ch_1",
+                    parameters={"amount": amount},
+                    audience="service:payments",
+                )
+            )
+
+        signer = build_ed25519_signer(issuer)
+        body = {"charge_id": "ch_1", "amount": 5000}
+        assert client.post("/refunds", json=body, headers=proof(signer)).status_code == 403
+        rogue = build_ed25519_signer(generate_ed25519_keypair(key_id="issuer-1"))
+        assert (
+            client.post("/refunds", json={**body, "amount": 5}, headers=proof(rogue)).status_code
+            == 403
+        )
+        assert calls == []
+        ok = client.post("/refunds", json={**body, "amount": 5}, headers=proof(signer))
+        assert ok.status_code == 200 and calls == [1]
+
+    def test_generated_integration_module_imports(self, tmp_path, monkeypatch):
+        import importlib.util
+        import json
+
+        from fastapi import FastAPI
+        from typer.testing import CliRunner
+
+        from actenon_permit.unified_cli import app as cli
+
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "m.json").write_text(json.dumps(_BOUNDARY_MANIFEST))
+        assert CliRunner().invoke(cli, ["protect", "apply", "--manifest", "m.json"]).exit_code == 0
+        spec = importlib.util.spec_from_file_location(
+            "actenon_boundary", tmp_path / "actenon_boundary.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # NameError: name 'app' is not defined, before the fix
+        api = FastAPI()
+        module.protect(api)
+        assert any(m.cls.__name__ == "BoundaryMiddleware" for m in api.user_middleware)

@@ -73,31 +73,41 @@ def manifest(manifest_dict):
 
 
 @pytest.fixture
-def fresh_verifier():
-    """Return a fresh BoundaryVerifier with an empty replay store.
+def issuer_keypair():
+    """The proof issuer's Ed25519 keypair (the manifest trusts its public key)."""
+    from actenon_permit.ed25519_signer import generate_ed25519_keypair
 
-    This is the test-isolation fix for Fable 5 Part 3G: the middleware
-    uses a module-level singleton verifier by default, whose `_replay_keys`
-    set persists across tests. When `test_middleware_valid_proof_passes`
-    ran before `test_middleware_replay_refused`, the proof_id was already
-    in the singleton's replay set, causing the first request of the
-    replay test to be refused (403 instead of 200).
-
-    Injecting a fresh verifier per test fixture ensures each test starts
-    with an empty replay store, regardless of test order.
-    """
-    try:
-        from actenon.boundary import BoundaryVerifier
-
-        return BoundaryVerifier()
-    except ImportError:
-        # Kernel not installed — middleware falls back to structural check,
-        # no verifier needed.
-        return None
+    return generate_ed25519_keypair(key_id="test-issuer-1")
 
 
 @pytest.fixture
-def app_with_middleware(manifest, fresh_verifier):
+def issue_proof(issuer_keypair):
+    """Mint genuine proof headers for one exact /refunds request."""
+    from actenon_permit.boundary import mint_boundary_proof, proof_headers
+    from actenon_permit.ed25519_signer import build_ed25519_signer
+
+    signer = build_ed25519_signer(issuer_keypair)
+
+    def _issue(payment_intent_id: str, amount: int, reason: str) -> dict[str, str]:
+        return proof_headers(
+            *mint_boundary_proof(
+                signer,
+                action="payment.refund",
+                target=payment_intent_id,
+                parameters={"amount": amount, "reason": reason},
+                audience="service:payments",
+            )
+        )
+
+    return _issue
+
+
+@pytest.fixture
+def app_with_middleware(manifest_dict, issuer_keypair):
+    # Each app gets its own middleware instance, so replay state never
+    # bleeds across tests (the Fable 5 Part 3G isolation bug).
+    manifest_dict["trusted_issuers"][0]["public_keys"] = [issuer_keypair.public_key_jwk]
+    manifest = BoundaryManifest.from_dict(manifest_dict)
     app = FastAPI()
 
     @app.post("/refunds")
@@ -112,12 +122,7 @@ def app_with_middleware(manifest, fresh_verifier):
     async def health():
         return {"status": "ok"}
 
-    # Inject the fresh verifier to ensure replay-state isolation across tests.
-    app.add_middleware(
-        BoundaryMiddleware,
-        manifest=manifest,
-        verifier=fresh_verifier,
-    )
+    app.add_middleware(BoundaryMiddleware, manifest=manifest)
     return app
 
 
@@ -237,13 +242,13 @@ def test_middleware_no_proof_refused(app_with_middleware):
     assert body["boundary_id"] == "refund-api"
 
 
-def test_middleware_valid_proof_passes(app_with_middleware):
+def test_middleware_valid_proof_passes(app_with_middleware, issue_proof):
     """A request with a valid proof passes through to the handler."""
     client = TestClient(app_with_middleware)
     resp = client.post(
         "/refunds",
         json={"payment_intent_id": "pi_123", "amount": 100, "reason": "customer"},
-        headers={"X-Actenon-Proof": "valid_proof_token_at_least_16_chars_long"},
+        headers=issue_proof("pi_123", 100, "customer"),
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "refunded"
@@ -259,23 +264,27 @@ def test_middleware_unprotected_route_passes(app_with_middleware):
     assert resp.json()["status"] == "ok"
 
 
-def test_middleware_replay_refused(app_with_middleware):
-    """The same proof token cannot be used twice."""
+def test_middleware_forged_proof_refused(app_with_middleware):
+    """An arbitrary string is not a proof (it used to pass if >= 16 chars)."""
     client = TestClient(app_with_middleware)
-    proof = "valid_proof_token_at_least_16_chars_long"
-    # First request succeeds.
-    resp1 = client.post(
+    resp = client.post(
         "/refunds",
         json={"payment_intent_id": "pi_123", "amount": 100, "reason": "customer"},
-        headers={"X-Actenon-Proof": proof},
+        headers={"X-Actenon-Proof": "valid_proof_token_at_least_16_chars_long"},
     )
+    assert resp.status_code == 403
+
+
+def test_middleware_replay_refused(app_with_middleware, issue_proof):
+    """The same proof cannot be used twice."""
+    client = TestClient(app_with_middleware)
+    request = {"payment_intent_id": "pi_123", "amount": 100, "reason": "customer"}
+    proof = issue_proof("pi_123", 100, "customer")
+    # First request succeeds.
+    resp1 = client.post("/refunds", json=request, headers=proof)
     assert resp1.status_code == 200
-    # Second request with same proof is refused (replay).
-    resp2 = client.post(
-        "/refunds",
-        json={"payment_intent_id": "pi_456", "amount": 200, "reason": "other"},
-        headers={"X-Actenon-Proof": proof},
-    )
+    # The identical request with the same proof is refused (replay).
+    resp2 = client.post("/refunds", json=request, headers=proof)
     assert resp2.status_code == 403
     assert "replay" in resp2.json()["reason"].lower()
 
@@ -628,7 +637,7 @@ def test_cli_protect_deploy_flags_missing_issuers(manifest_dict, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_replay_refused_passes_after_valid_proof_passes(app_with_middleware):
+def test_replay_refused_passes_after_valid_proof_passes(app_with_middleware, issue_proof):
     """Regression test: test_middleware_replay_refused must pass even when
     test_middleware_valid_proof_passes has already run in the same session.
 
@@ -655,22 +664,15 @@ def test_replay_refused_passes_after_valid_proof_passes(app_with_middleware):
     # Use the same proof token that test_middleware_valid_proof_passes uses.
     # If verifier state bled across tests, this first request would be
     # refused (403) instead of accepted (200).
-    proof = "valid_proof_token_at_least_16_chars_long"
-    resp1 = client.post(
-        "/refunds",
-        json={"payment_intent_id": "pi_regression", "amount": 999, "reason": "test"},
-        headers={"X-Actenon-Proof": proof},
-    )
+    request = {"payment_intent_id": "pi_regression", "amount": 999, "reason": "test"}
+    proof = issue_proof("pi_regression", 999, "test")
+    resp1 = client.post("/refunds", json=request, headers=proof)
     assert resp1.status_code == 200, (
         f"First request should pass (fresh verifier) but got {resp1.status_code}: "
         f"{resp1.json()}"
     )
 
     # Second request with same proof must be refused as replay.
-    resp2 = client.post(
-        "/refunds",
-        json={"payment_intent_id": "pi_regression_2", "amount": 888, "reason": "test"},
-        headers={"X-Actenon-Proof": proof},
-    )
+    resp2 = client.post("/refunds", json=request, headers=proof)
     assert resp2.status_code == 403
     assert "replay" in resp2.json()["reason"].lower()

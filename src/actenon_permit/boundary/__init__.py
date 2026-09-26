@@ -24,15 +24,27 @@ from .manifest import (
     extract_value,
 )
 from .middleware import BoundaryMiddleware
+from .proofs import (
+    INTENT_HEADER,
+    Ed25519PublicKeyVerifier,
+    mint_boundary_proof,
+    proof_headers,
+    trust_root_from_issuers,
+)
 
 __all__ = [
     "BoundaryEntry",
     "BoundaryManifest",
     "BoundaryMiddleware",
+    "Ed25519PublicKeyVerifier",
     "EnforcementConfig",
+    "INTENT_HEADER",
     "ParameterMapping",
     "ProofConfig",
     "TargetMapping",
     "TrustedIssuer",
     "extract_value",
+    "mint_boundary_proof",
+    "proof_headers",
+    "trust_root_from_issuers",
 ]

@@ -274,8 +274,8 @@ The manifest is **~95% auto-generated**. Parameter types, target mappings, and a
 What the Boundary Kit generates:
 
 - `actenon.boundary.yaml` — a `BoundaryManifest` (per the Protocol) mapping HTTP routes to canonical Actenon actions, with parameter extraction rules, audience, target, and trusted-issuer config.
-- `BoundaryMiddleware` — ASGI / WSGI middleware that intercepts protected routes, extracts parameters, builds a `BoundaryVerificationRequest`, calls the Kernel's `BoundaryVerifier`, and refuses on `valid=False` before the route handler runs.
-- Auto-generated tests proving enforcement works for each protected route.
+- `BoundaryMiddleware` — ASGI middleware that intercepts protected routes. Each request must carry the kernel PCCB (`X-Actenon-Proof`) and the exact Action Intent it was minted for (`X-Actenon-Intent`). The middleware requires the intent's action, target and every mapped parameter to equal what the request carries, has the Kernel verify the PCCB against that intent and the boundary's `audience` (signature, time window, action hash), and refuses replays — all before the route handler runs. The trust root is the issuer's Ed25519 public keys under `trusted_issuers[].public_keys` in the manifest (or `pccb_verifier=` in code). **With no trust root, no audience, or no intent, every protected request is refused.** Issuers mint proofs with `actenon_permit.boundary.mint_boundary_proof()` / `proof_headers()`.
+- `actenon protect test` — sends real requests through the middleware for each route (valid proof, no proof, altered params/target, replay, wrong audience, expired, malformed, forged-key proofs, alternate route spellings) using a throwaway issuer key, and reports what actually happened plus any trust-configuration gaps.
 
 The Boundary Kit is the **resource-owned mode** implementation. Use it when the resource is the protected endpoint (Placement B in the Kernel README).
 
