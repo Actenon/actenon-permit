@@ -122,8 +122,14 @@ class TestRevocationCascade:
         gw, ledger, pdp = _gateway_with_refund_tool(store)
         client = TestClient(
             create_app(
-                state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False
-            )
+                state=store,
+                ledger=ledger,
+                pdp=pdp,
+                gateway=gw,
+                wire_gateway_approvals=False,
+                admin_token="operator-token",
+            ),
+            headers={"Authorization": "Bearer operator-token"},
         )
         root = _grant(budget=Budget(currency="USD", limit=100, remaining=100))
         store.put_grant(root)

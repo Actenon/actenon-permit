@@ -212,9 +212,18 @@ a `version` field.
 
 - The signing key is the root of trust. Compromise of `ACTENON_SIGNING_KEY`
   permits forging arbitrary grants. Protect it accordingly.
-- Grants are bearer tokens. Anyone holding a grant id and the agent_id can
-  present it. The v0 control plane is localhost-only; v1 must add transport
-  authentication before grants traverse a network.
+- Grants are bearer tokens: anyone holding one can present it at the
+  gateway. The control plane (`/grants`, `/approvals`, `/ledger`: issuing,
+  listing, revoking, attenuating, minting tokens, approving) requires
+  `Authorization: Bearer <admin token>` (constant-time compare; 401 without
+  it, 403 when wrong or when none is configured). `permit serve` takes the
+  token from `--admin-token-file` / `ACTENON_ADMIN_TOKEN_FILE`, then
+  `ACTENON_ADMIN_TOKEN`, else writes a fresh one to
+  `~/.actenon-permit/admin-token` (0600) and prints only that path. Agents
+  never hold it. The control plane still shares the gateway's port and
+  binds 127.0.0.1 by default; serving it on a separate interface/port is a
+  recommended hardening step not yet built in. Use TLS before any of it
+  leaves the host.
 - Revocation stops new decisions immediately, but cannot recall a PCCB
   already minted. PCCBs therefore live at most `PCCB_TTL_SECONDS` (120 s,
   `actenon_permit.kernel_bridge`) from the action's timestamp, bounded by
@@ -409,6 +418,7 @@ hold more power than its parent.
 
 ```
 POST /grants/{grant_id}/attenuate
+Authorization: Bearer <admin token>
 Content-Type: application/json
 
 {
@@ -423,7 +433,12 @@ Content-Type: application/json
 }
 ```
 
+The endpoint is operator-only (admin token): a child's spend does not
+debit its parent (§13.3), so letting a holder mint children at will would
+let it multiply its budget. Holders delegate by asking the operator.
+
 Returns the freshly-signed child Grant (HTTP 200), or:
+- 401 / 403 without a valid admin token
 - 404 if the parent grant doesn't exist
 - 409 if the parent grant is not active
 - 400 if any attenuation rule is violated (e.g. widening budget)

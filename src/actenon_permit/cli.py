@@ -337,6 +337,13 @@ def watch(
         "--once",
         help="Print pending approvals once and exit (non-interactive, for scripts/CI).",
     ),
+    admin_token_file: str | None = typer.Option(
+        None,
+        "--admin-token-file",
+        envvar="ACTENON_ADMIN_TOKEN_FILE",
+        help="File holding the control-plane admin token (default: ACTENON_ADMIN_TOKEN, "
+        "then ~/.actenon-permit/admin-token).",
+    ),
 ) -> None:
     """Live TUI for pending approvals. Polls the control plane's /approvals
     endpoint. Press a=approve, d=deny on the most recent pending request,
@@ -350,8 +357,20 @@ def watch(
     import urllib.error
     import urllib.request
 
+    from .control import read_admin_token
+
+    token = read_admin_token(admin_token_file)
+    if not token:
+        typer.echo(
+            "no admin token: pass --admin-token-file, set ACTENON_ADMIN_TOKEN, or run "
+            "`permit serve` first (it writes ~/.actenon-permit/admin-token)",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    auth = {"Authorization": f"Bearer {token}"}
+
     def _get(path: str):
-        req = urllib.request.Request(f"{url}{path}", method="GET")
+        req = urllib.request.Request(f"{url}{path}", method="GET", headers=auth)
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 return _json.loads(resp.read().decode("utf-8"))
@@ -360,7 +379,7 @@ def watch(
             raise typer.Exit(code=1) from e
 
     def _post(path: str):
-        req = urllib.request.Request(f"{url}{path}", method="POST", data=b"")
+        req = urllib.request.Request(f"{url}{path}", method="POST", data=b"", headers=auth)
         try:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 return resp.status == 200
@@ -391,7 +410,8 @@ def watch(
         typer.echo(
             "watch: no TTY available. Use `permit watch --once` to print pending "
             "approvals non-interactively, or approve directly via the API:\n"
-            "  curl -X POST http://127.0.0.1:7780/approvals/<action_id>/approve",
+            "  curl -X POST -H \"Authorization: Bearer $(cat ~/.actenon-permit/admin-token)\" \\\n"
+            "    http://127.0.0.1:7780/approvals/<action_id>/approve",
             err=True,
         )
         raise typer.Exit(code=1) from None
@@ -442,6 +462,12 @@ def watch(
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
 
+def _run_uvicorn(application, host: str, port: int) -> None:
+    import uvicorn
+
+    uvicorn.run(application, host=host, port=port, log_level="info")
+
+
 @app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", "--host", help="Bind host (localhost only in v0)."),
@@ -451,8 +477,20 @@ def serve(
         "--with-gateway",
         help="Also mount the v1 out-of-process PEP proxy (/proxy/*) on the same port.",
     ),
+    admin_token_file: str | None = typer.Option(
+        None,
+        "--admin-token-file",
+        envvar="ACTENON_ADMIN_TOKEN_FILE",
+        help="File holding the control-plane admin token. Default: ACTENON_ADMIN_TOKEN, "
+        "else a fresh token written 0600 to ~/.actenon-permit/admin-token.",
+    ),
 ) -> None:
     """Run the localhost control plane (FastAPI + uvicorn).
+
+    Control-plane routes (/grants, /approvals, /ledger) require
+    `Authorization: Bearer <admin token>`; agents only use /proxy and
+    /intents with their grant token. The token is never printed — only
+    the path of the file that holds it.
 
     With --with-gateway, also mounts the v1 HTTP proxy endpoints so a single
     `permit serve --with-gateway` can host both the control plane and the
@@ -462,9 +500,7 @@ def serve(
     """
     import socket
 
-    import uvicorn
-
-    from .control import create_app
+    from .control import create_app, load_or_create_admin_token
 
     # Pre-check: fail fast and loud if the port is taken. Uvicorn logs the
     # error but exits 0, which means a stranger would think the server is
@@ -482,15 +518,26 @@ def serve(
         )
         raise typer.Exit(code=1) from e
 
+    try:
+        admin_token, token_path = load_or_create_admin_token(admin_token_file)
+    except (OSError, ValueError) as e:
+        typer.echo(f"ERROR: cannot load the admin token: {e}", err=True)
+        raise typer.Exit(code=1) from e
+
     gateway = None
     if with_gateway:
         gateway = _build_demo_gateway()
-    application = create_app(gateway=gateway)
+    application = create_app(gateway=gateway, admin_token=admin_token)
+    del admin_token
     typer.echo(f"Actenon-Permit control plane starting on http://{host}:{port}", err=True)
+    if token_path is not None:
+        typer.echo(f"  admin token (for /grants, /approvals, /ledger): {token_path}", err=True)
+    else:
+        typer.echo("  admin token: from ACTENON_ADMIN_TOKEN", err=True)
     if with_gateway:
         typer.echo(f"  gateway proxy: POST http://{host}:{port}/proxy/<tool>", err=True)
     try:
-        uvicorn.run(application, host=host, port=port, log_level="info")
+        _run_uvicorn(application, host, port)
     except OSError as e:
         # Race: the port was free during pre-check but taken before uvicorn
         # bound it. Still fail loud.

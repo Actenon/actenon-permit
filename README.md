@@ -254,6 +254,8 @@ actenon scan                          # run the execution-gap scanner
 actenon doctor                        # diagnose configuration
 ```
 
+`permit serve` hosts the control plane (`/grants`, `/approvals`, `/ledger`) and, with `--with-gateway`, the agent-facing gateway (`/proxy/*`, `/intents/*`) on one localhost port. Control-plane routes require `Authorization: Bearer <admin token>`; the server writes the token to `~/.actenon-permit/admin-token` (0600) and prints only that path (or use `--admin-token-file` / `ACTENON_ADMIN_TOKEN`). Agents only ever hold their grant token, so an agent on the same host cannot issue itself grants, mint tokens, approve its own requests or read other grants. `permit watch` and the TS `ControlPlaneClient({ adminToken })` send the token.
+
 The CLI is the single entry point for the whole ecosystem — including Scan (which lives in a separate repo). It is intentionally a thin orchestrator: every subcommand maps to a function you can also call from the SDK.
 
 ## Boundary Kit — resource-boundary protection in 3 commands
