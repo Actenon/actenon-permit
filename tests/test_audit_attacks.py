@@ -819,3 +819,27 @@ class TestProofBoundParameters:
             client.authorised_execution_intents.create(
                 action="payment.refund", target="stripe", parameters={"amount_minor": 99_999_999}
             ).execute()
+
+
+class TestShortLivedProofs:
+    def test_pccb_lifetime_is_short_not_the_grants(self, stack):
+        """A PCCB minted from a 24h grant was valid for 24h, so a proof minted
+        before revocation stayed usable at any edge for the rest of the day."""
+        from actenon_permit.kernel_bridge import PCCB_TTL_SECONDS
+
+        store, pdp = stack
+        grant = _grant(expires_at=datetime.now(UTC) + timedelta(hours=24))
+        store.put_grant(grant)
+        action = Action(grant_id=grant.id, type="payment.refund", params={"amount": 1}, est_cost=1)
+        decision, _, pccb = pdp.decide_and_mint_pccb(grant, action)
+        assert decision.outcome == DecisionOutcome.ALLOW
+        assert pccb.expires_at - pccb.issued_at <= timedelta(seconds=PCCB_TTL_SECONDS)
+        assert PCCB_TTL_SECONDS <= 300
+
+    def test_pccb_never_outlives_the_grant(self, stack):
+        store, pdp = stack
+        grant = _grant(expires_at=datetime.now(UTC) + timedelta(seconds=30))
+        store.put_grant(grant)
+        action = Action(grant_id=grant.id, type="payment.refund", params={"amount": 1}, est_cost=1)
+        _, _, pccb = pdp.decide_and_mint_pccb(grant, action)
+        assert pccb.expires_at <= grant.expires_at

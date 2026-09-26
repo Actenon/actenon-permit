@@ -773,6 +773,9 @@ class Gateway:
                     "remaining_budget": float(grant.budget.remaining),
                 }
             # Re-run decision + PCCB mint after approval — state and clock moved.
+            # The proof window starts at action.ts, so restart it: a slow
+            # human must not leave the proof born expired.
+            action = action.model_copy(update={"ts": datetime.now(UTC)})
             grant = self.state.get_grant(grant.id) or grant
             decision, intent, pccb = self.pdp.decide_and_mint_pccb(
                 grant, action, ctx={"approved_action_id": action.action_id}

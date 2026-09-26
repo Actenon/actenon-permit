@@ -215,6 +215,12 @@ a `version` field.
 - Grants are bearer tokens. Anyone holding a grant id and the agent_id can
   present it. The v0 control plane is localhost-only; v1 must add transport
   authentication before grants traverse a network.
+- Revocation stops new decisions immediately, but cannot recall a PCCB
+  already minted. PCCBs therefore live at most `PCCB_TTL_SECONDS` (120 s,
+  `actenon_permit.kernel_bridge`) from the action's timestamp, bounded by
+  the grant's expiry: that is the residual window in which a revoked
+  grant's last proof can still verify at an edge that does not also check
+  grant status.
 - The grant object travels in the agent's context, but the real credential
   never does. The broker is the only component that sees the secret, and only
   for the duration of a single guarded call.
