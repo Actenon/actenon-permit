@@ -32,7 +32,7 @@ dependencies = [
     # (shadowing this package's unified CLI, install-order dependent) and
     # shipped no `actenon.boundary` module, which the Boundary Kit
     # middleware requires.
-    "actenon-kernel[asymmetric]>=1.0.0",
+    "actenon-kernel[asymmetric]>=1.3.0rc1,<2",
     "actenon-protocol>=1.1.0,<2",
     # pytest-asyncio is a runtime dep, not a dev dep, because:
     #   1. pyproject.toml sets `asyncio_mode = "auto"` under

@@ -136,8 +136,10 @@ def test_ed25519_pccb_verifies_with_correct_key(ed25519_keyfile, tmp_db, monkeyp
     from actenon_permit.ed25519_signer import build_ed25519_signer
     from actenon_permit.kernel_bridge import _build_context
 
+    from actenon_permit.revocation import StoreRevocationChecker
+
     signer = build_ed25519_signer(kp)
-    verifier = PCCBVerifier(signer=signer)
+    verifier = PCCBVerifier(signer=signer, revocation_checker=StoreRevocationChecker(store))
     context = _build_context(grant, action)
     verifier.verify(intent, pccb, context)  # raises on failure
 
@@ -243,7 +245,9 @@ def test_ed25519_pccb_survives_process_restart(ed25519_keyfile, tmp_db, monkeypa
     assert loaded_kp.key_id == kp.key_id  # same key
 
     signer2 = build_ed25519_signer(loaded_kp)
-    verifier2 = PCCBVerifier(signer=signer2)
+    from actenon_permit.revocation import StoreRevocationChecker
+
+    verifier2 = PCCBVerifier(signer=signer2, revocation_checker=StoreRevocationChecker(store))
     pccb2 = PCCB.from_dict(pccb_dict)
     context2 = _build_context(grant, action)
     verifier2.verify(intent, pccb2, context2)  # raises on failure

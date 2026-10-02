@@ -175,6 +175,8 @@ class TestLocalSigning:
 class TestExternalSigning:
     def test_external_signing_secret(self):
         grant = _make_grant()
+        store, _, _ = _make_store_and_pdp()
+        store.put_grant(grant)  # the revocation source the verifier consults
         action = _make_action(grant)
         decision = _make_allow_decision()
         intent, pccb = mint_pccb_for_action(
@@ -183,8 +185,10 @@ class TestExternalSigning:
         )
         assert pccb is not None
         from actenon.proof import PCCBVerifier, build_local_proof_signer
+        from actenon_permit.revocation import StoreRevocationChecker
         verifier = PCCBVerifier(
             signer=build_local_proof_signer(secret="external-supplied-secret-key"),
+            revocation_checker=StoreRevocationChecker(store),
         )
         from actenon.models.contracts import AudienceRef
         from actenon.models.runtime import DynamicContextInput

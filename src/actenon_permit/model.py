@@ -98,6 +98,17 @@ def _get_signing_key() -> bytes:
     persisted = _load_persisted_key()
     if persisted:
         return persisted.encode("utf-8")
+    # Nothing configured. An ephemeral key is development behaviour; outside
+    # explicit development intent, refuse instead of silently signing grants
+    # nobody else can verify.
+    from actenon.security_posture import development_intent
+
+    if not development_intent():
+        raise RuntimeError(
+            "no grant signing key is configured: set ACTENON_SIGNING_KEY (or "
+            "ACTENON_SIGNING_KEY_FILE, or run `permit init-key`). For local "
+            "development, demos or tests set ACTENON_ENV=development."
+        )
     if _DEV_KEY is None:
         _DEV_KEY = secrets.token_hex(32)
     if not _WARNED_ABOUT_DEV_KEY and not _SUPPRESS_DEV_KEY_WARNING:

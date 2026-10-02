@@ -443,7 +443,7 @@ class Gateway:
 
                 if kernel_intent is None or pccb is None:
                     raise kernel_bridge.KernelBridgeError("no PCCB was minted for an ALLOW")
-                kernel_bridge.verify_pccb_at_edge(kernel_intent, pccb, grant, action)
+                kernel_bridge.verify_pccb_at_edge(kernel_intent, pccb, grant, action, store=self.state)
             except Exception as e:
                 if action.est_cost:
                     with contextlib.suppress(Exception):
@@ -792,7 +792,7 @@ class Gateway:
             try:
                 from .kernel_bridge import verify_pccb_at_edge
 
-                verify_pccb_at_edge(intent, pccb, grant, action)
+                verify_pccb_at_edge(intent, pccb, grant, action, store=self.state)
             except Exception as e:
                 # Kernel verification failed — release the reservation and
                 # fail closed. The credential is NOT released.
