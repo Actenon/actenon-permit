@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+# The suite exercises development-only behaviour (local demo signers,
+# per-process replay state) on purpose, so it declares explicit test intent
+# itself instead of depending on the caller's shell. Tests of production
+# behaviour set ACTENON_ENV with monkeypatch.
+os.environ["ACTENON_ENV"] = "test"
 
 import pytest
 
