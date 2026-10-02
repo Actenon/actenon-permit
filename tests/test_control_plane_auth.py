@@ -166,7 +166,7 @@ def test_operator_with_admin_token_can_do_everything(stack):
     issued = admin.post("/grants", json={"policy": POLICY})
     assert issued.status_code == 200
     assert admin.get("/grants").status_code == 200
-    assert admin.post(f"/grants/{grant.id}/token").json()["token"].startswith("v1.")
+    assert admin.post(f"/grants/{grant.id}/token").json()["token"].startswith("v2.")
     child = admin.post(f"/grants/{grant.id}/attenuate", json={"budget_limit": 5})
     assert child.status_code == 200
     assert admin.post(f"/grants/{grant.id}/revoke").status_code == 200

@@ -46,7 +46,7 @@ def test_mint_token_quiet_suppresses_warning(tmp_db, monkeypatch, capsys):
     mint_token(g.id, quiet=True)
     captured = capsys.readouterr()
     assert "WARNING" not in captured.err
-    assert "v1." in captured.out
+    assert "v2." in captured.out  # 2.0.0 mints v2 (ACTENON-JCS-STRICT-1) tokens
 
 
 def test_mint_token_without_quiet_shows_warning(tmp_db, monkeypatch, capsys):

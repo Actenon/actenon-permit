@@ -8,6 +8,26 @@ Tampering with any row — its decision, its params, or its hash — breaks the
 chain. ``verify()`` recomputes the chain from row 0 and returns False on any
 mismatch. The contract test in ``tests/test_ledger.py`` mutates a row in-place
 and asserts that ``verify()`` fails.
+
+Chain versioning
+----------------
+As of actenon-permit 2.0.0, the canonicaliser used to compute entry hashes
+changed from Permit's home-grown ``json.dumps(sort_keys=True, default=str)``
+to ACTENON-JCS-STRICT-1 (delegated via ``actenon_protocol.canonicalize_json``).
+This changes every entry hash, so existing ledgers would fail their integrity
+check under the new canonicaliser alone.
+
+To support ledgers that contain entries written by both pre-2.0.0 and
+post-2.0.0 code, each entry carries a ``chain_version`` field:
+
+  - ``chain_version`` absent  -> entry written by <2.0.0; verify with
+    ``_legacy_canonical_json`` (kept private in ``model.py``)
+  - ``chain_version = 2``     -> entry written by >=2.0.0; verify with
+    ``canonical_json`` (delegates to ACTENON-JCS-STRICT-1)
+
+A mixed-version ledger (some legacy, some new) verifies intact as long as
+each entry's hash matches the canonicaliser its ``chain_version`` selects.
+``verify()`` dispatches per-entry.
 """
 
 from __future__ import annotations
@@ -17,34 +37,162 @@ import hashlib
 import json
 import threading
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol
 
-from .model import canonical_json
+from .model import _legacy_canonical_json, canonical_json
 
 GENESIS_PREV_HASH = "0" * 64
 
+# The chain version this code writes. Entries written by <2.0.0 have no
+# chain_version column (NULL in SQLite); entries written by >=2.0.0 have
+# chain_version=2. Bump this if the canonicaliser changes again.
+CURRENT_CHAIN_VERSION = 2
 
-def _json_normalize(obj: Any) -> Any:
-    """Recursively normalize to JSON-safe types with consistent numeric representation.
 
-    Decimal -> float, int -> float (so 20 and 20.0 hash identically),
-    because SQLite REAL columns convert int to float on storage.
+class _Canonicaliser(Protocol):
+    def __call__(self, obj: Any) -> str: ...
+
+
+def _json_normalize_legacy(obj: Any) -> Any:
+    """Legacy normalisation for legacy (chain_version absent) entries.
+
+    Reproduces the pre-2.0.0 behaviour: Decimal and int are converted to
+    float (so 20 and 20.0 hash identically), because SQLite REAL columns
+    convert int to float on storage. This is the function the pre-2.0.0
+    verifier used to reconstruct the entry body before hashing.
+
+    DO NOT use for new entries. New entries use ``_coerce_decimals`` (in
+    model.py) which converts Decimal to str via ``Decimal.normalize()``
+    and rejects floats outright.
     """
     from decimal import Decimal
+
     if isinstance(obj, (Decimal, int)) and not isinstance(obj, bool):
         return float(obj)
     if isinstance(obj, dict):
-        return {k: _json_normalize(v) for k, v in obj.items()}
+        return {k: _json_normalize_legacy(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
-        return [_json_normalize(item) for item in obj]
+        return [_json_normalize_legacy(item) for item in obj]
     return obj
 
 
-def _hash_entry(prev_hash: str, entry_body: dict[str, Any]) -> str:
-    """``sha256(prev_hash + canonical_json(entry_without_hash))``."""
-    normalized = _json_normalize(entry_body)
-    payload = (prev_hash + canonical_json(normalized)).encode("utf-8")
+def _coerce_decimals_for_new_chain(obj: Any) -> Any:
+    """Normalisation for chain_version=2 entries.
+
+    The protocol canonicaliser (ACTENON-JCS-STRICT-1) rejects ``Decimal``
+    and ``float`` outright. Permit's domain model uses ``Decimal`` for
+    ``Budget`` (correct), but several legacy code paths still produce
+    floats — in particular, ``enforce._extract_amount_from_args`` returns
+    ``float``, and ``Action.est_cost`` accepts ``float | int | Decimal | None``.
+    Those floats flow into the ledger payload as ``est_cost`` and (when
+    callers pass them) inside ``params``.
+
+    The WO-4 brief says floats should raise at the ``canonical_json``
+    boundary (constraint C3). That is correct for the PUBLIC API — callers
+    who construct signing payloads by hand must not be allowed to slip a
+    float through. But the LEDGER is not a hand-constructed payload: it's
+    a machine-generated record of decisions the PDP already made, and the
+    pre-2.0.0 code path that produces floats in ``est_cost`` is not in
+    this work order's scope (it lives in ``enforce.py``, ``broker.py``,
+    and ``model.Action`` — none of which are in "Files in scope").
+
+    The pragmatic, scope-respecting fix is to normalise floats to a
+    canonical string form HERE, before the protocol canonicaliser sees
+    them. This:
+
+      - keeps the public ``canonical_json`` strict (floats raise there)
+      - keeps the demo working (``permit demo --auto-approve`` produces
+        floats in ``est_cost`` and would otherwise crash)
+      - is local to ``ledger.py`` (in scope)
+      - produces stable bytes across the SQLite round-trip
+
+    SQLite REAL columns convert ``int`` to ``float`` on storage (so
+    ``est_cost=10`` written by ``append`` becomes ``10.0`` when read back
+    by ``verify``). If we coerced ``int`` -> ``int`` and ``float`` ->
+    ``str`` separately, the same field would canonicalise to different
+    bytes at append-time vs verify-time, breaking the hash chain. We
+    therefore coerce BOTH ``int`` and ``float`` to a canonical Decimal
+    string via ``Decimal(str(x)).normalize()``::
+
+        int(10)      -> str(Decimal("10").normalize())   = "1E+1"
+        float(10.0)  -> str(Decimal("10.0").normalize()) = "1E+1"
+        Decimal("10.0").normalize()                      = "1E+1"
+
+    All three produce identical bytes. This is the same normalisation
+    ``_coerce_decimals`` (in model.py) applies to ``Decimal``.
+
+    A future work order should fix ``enforce._extract_amount_from_args``
+    to return ``Decimal`` (or integer cents) instead of ``float``, at
+    which point this int/float-coercion branch can be removed.
+    """
+    from decimal import Decimal
+
+    def _float_safe_coerce(o: Any) -> Any:
+        if isinstance(o, bool):
+            # bool is a subclass of int; the protocol canonicaliser
+            # accepts bool natively (JSON true/false). Must check before
+            # the int/float branch below.
+            return o
+        if isinstance(o, (int, float)):
+            # Coerce BOTH int and float to a canonical Decimal string so
+            # the SQLite REAL round-trip (int -> float) doesn't change
+            # the canonical bytes. See function docstring for details.
+            return str(Decimal(str(o)).normalize())
+        if isinstance(o, Decimal):
+            return str(o.normalize())
+        if isinstance(o, str) or o is None:
+            return o
+        if isinstance(o, dict):
+            return {k: _float_safe_coerce(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [_float_safe_coerce(item) for item in o]
+        # Genuinely unsupported type. Reaching here means the payload
+        # contains something neither the protocol canonicaliser nor this
+        # coercer can handle. Raise TypeError with the type name.
+        raise TypeError(
+            f"_coerce_decimals_for_new_chain: unsupported type "
+            f"{type(o).__name__!r} for ACTENON-JCS-STRICT-1 canonicalisation."
+        )
+
+    return _float_safe_coerce(obj)
+
+
+def _hash_entry(
+    prev_hash: str,
+    entry_body: dict[str, Any],
+    *,
+    canonicaliser: _Canonicaliser,
+    normaliser: Any = None,
+) -> str:
+    """``sha256(prev_hash + canonicaliser(normaliser(entry_without_hash)))``.
+
+    The ``canonicaliser`` and ``normaliser`` are passed in explicitly so the
+    same function can hash entries with either the legacy or the new
+    canonicaliser (chain-version discrimination lives in the caller).
+    """
+    normalized = normaliser(entry_body) if normaliser is not None else entry_body
+    payload = (prev_hash + canonicaliser(normalized)).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _hash_entry_v2(prev_hash: str, entry_body: dict[str, Any]) -> str:
+    """Hash a chain_version=2 entry (ACTENON-JCS-STRICT-1 canonicaliser)."""
+    return _hash_entry(
+        prev_hash,
+        entry_body,
+        canonicaliser=canonical_json,
+        normaliser=_coerce_decimals_for_new_chain,
+    )
+
+
+def _hash_entry_legacy(prev_hash: str, entry_body: dict[str, Any]) -> str:
+    """Hash a legacy (chain_version absent) entry (pre-2.0.0 canonicaliser)."""
+    return _hash_entry(
+        prev_hash,
+        entry_body,
+        canonicaliser=_legacy_canonical_json,
+        normaliser=_json_normalize_legacy,
+    )
 
 
 class Ledger:
@@ -83,9 +231,7 @@ class Ledger:
         else:
             db_path = str(conn_or_store)
 
-        self._conn = sqlite3.connect(
-            db_path, check_same_thread=False, isolation_level=None
-        )
+        self._conn = sqlite3.connect(db_path, check_same_thread=False, isolation_level=None)
         self._owns_conn = True
         self._lock = threading.RLock()
         self._init_schema()
@@ -127,6 +273,11 @@ class Ledger:
                 cur.execute("ALTER TABLE ledger ADD COLUMN failure_code TEXT")
             if "authority_boundary" not in columns:
                 cur.execute("ALTER TABLE ledger ADD COLUMN authority_boundary TEXT")
+            # WO-4: chain_version discriminator. NULL (absent) = legacy
+            # (<2.0.0) entry, verify with _legacy_canonical_json. 2 = entry
+            # written by >=2.0.0, verify with canonical_json (ACTENON-JCS-STRICT-1).
+            if "chain_version" not in columns:
+                cur.execute("ALTER TABLE ledger ADD COLUMN chain_version INTEGER")
 
     # ------------------------------------------------------------------
     # Append
@@ -149,7 +300,13 @@ class Ledger:
         failure_code: str | None = None,
         authority_boundary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Append a single entry. Computes and stores the hash. Returns the entry."""
+        """Append a single entry. Computes and stores the hash. Returns the entry.
+
+        All new entries are written with ``chain_version = CURRENT_CHAIN_VERSION``
+        (2 as of actenon-permit 2.0.0) and hashed via the ACTENON-JCS-STRICT-1
+        canonicaliser. Legacy entries (written by <2.0.0) have ``chain_version``
+        NULL and are verified with ``_legacy_canonical_json`` — see ``verify()``.
+        """
         ts_str = ts.astimezone(UTC).isoformat() if isinstance(ts, datetime) else ts
 
         with self._lock:
@@ -162,6 +319,7 @@ class Ledger:
 
                 entry_body: dict[str, Any] = {
                     "entry_format": "v2",
+                    "chain_version": CURRENT_CHAIN_VERSION,
                     "action_id": action_id,
                     "grant_id": grant_id,
                     "ts": ts_str,
@@ -177,15 +335,16 @@ class Ledger:
                     "authority_boundary": authority_boundary,
                     "prev_hash": prev_hash,
                 }
-                h = _hash_entry(prev_hash, entry_body)
+                h = _hash_entry_v2(prev_hash, entry_body)
 
                 cur.execute(
                     """
                     INSERT INTO ledger (
                         action_id, grant_id, ts, action_type, target, params,
                         est_cost, outcome, reason, rule_matched, state_delta,
-                        failure_code, authority_boundary, prev_hash, hash
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        failure_code, authority_boundary, prev_hash, hash,
+                        chain_version
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         action_id,
@@ -205,6 +364,7 @@ class Ledger:
                         else None,
                         prev_hash,
                         h,
+                        CURRENT_CHAIN_VERSION,
                     ),
                 )
                 cur.execute("COMMIT")
@@ -218,16 +378,14 @@ class Ledger:
     # Read
     # ------------------------------------------------------------------
 
-    def list_entries(
-        self, grant_id: str | None = None, limit: int = 1000
-    ) -> list[dict[str, Any]]:
+    def list_entries(self, grant_id: str | None = None, limit: int = 1000) -> list[dict[str, Any]]:
         with self._lock:
             cur = self._conn.cursor()
             if grant_id:
                 cur.execute(
                     "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
                     "est_cost, outcome, reason, rule_matched, state_delta, "
-                    "failure_code, authority_boundary, prev_hash, hash "
+                    "failure_code, authority_boundary, prev_hash, hash, chain_version "
                     "FROM ledger WHERE grant_id = ? ORDER BY seq ASC LIMIT ?",
                     (grant_id, limit),
                 )
@@ -235,7 +393,7 @@ class Ledger:
                 cur.execute(
                     "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
                     "est_cost, outcome, reason, rule_matched, state_delta, "
-                    "failure_code, authority_boundary, prev_hash, hash "
+                    "failure_code, authority_boundary, prev_hash, hash, chain_version "
                     "FROM ledger ORDER BY seq ASC LIMIT ?",
                     (limit,),
                 )
@@ -261,6 +419,7 @@ class Ledger:
                     "authority_boundary": json.loads(r[13]) if r[13] else None,
                     "prev_hash": r[14],
                     "hash": r[15],
+                    "chain_version": r[16],
                 }
             )
         return entries
@@ -277,13 +436,25 @@ class Ledger:
     # ------------------------------------------------------------------
 
     def verify(self) -> bool:
-        """Recompute the chain from row 0 and return True iff it is intact."""
+        """Recompute the chain from row 0 and return True iff it is intact.
+
+        Per-entry chain-version discrimination:
+
+          - ``chain_version`` NULL  -> legacy entry; verify with
+            ``_legacy_canonical_json`` (pre-2.0.0 canonicaliser).
+          - ``chain_version = 2``   -> new entry; verify with
+            ``canonical_json`` (ACTENON-JCS-STRICT-1).
+
+        A mixed-version ledger (some legacy, some new) verifies intact as
+        long as each entry's hash matches its own canonicaliser and the
+        ``prev_hash`` chain is unbroken.
+        """
         with self._lock:
             cur = self._conn.cursor()
             cur.execute(
                 "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
                 "est_cost, outcome, reason, rule_matched, state_delta, "
-                "failure_code, authority_boundary, prev_hash, hash "
+                "failure_code, authority_boundary, prev_hash, hash, chain_version "
                 "FROM ledger ORDER BY seq ASC"
             )
             rows = cur.fetchall()
@@ -291,26 +462,42 @@ class Ledger:
         prev_hash = GENESIS_PREV_HASH
         for r in rows:
             # Use dict to avoid column-order fragility (ALTER TABLE adds cols at end)
-            cols = ['seq', 'action_id', 'grant_id', 'ts', 'action_type', 'target',
-                    'params', 'est_cost', 'outcome', 'reason', 'rule_matched',
-                    'state_delta', 'failure_code', 'authority_boundary',
-                    'prev_hash', 'hash']
+            cols = [
+                "seq",
+                "action_id",
+                "grant_id",
+                "ts",
+                "action_type",
+                "target",
+                "params",
+                "est_cost",
+                "outcome",
+                "reason",
+                "rule_matched",
+                "state_delta",
+                "failure_code",
+                "authority_boundary",
+                "prev_hash",
+                "hash",
+                "chain_version",
+            ]
             row_dict = dict(zip(cols, r, strict=True))
-            action_id = row_dict['action_id']
-            grant_id = row_dict['grant_id']
-            ts = row_dict['ts']
-            action_type = row_dict['action_type']
-            target = row_dict['target']
-            params_json = row_dict['params']
-            est_cost = row_dict['est_cost']
-            outcome = row_dict['outcome']
-            reason = row_dict['reason']
-            rule_matched = row_dict['rule_matched']
-            state_delta_json = row_dict['state_delta']
-            failure_code = row_dict['failure_code']
-            authority_boundary_json = row_dict['authority_boundary']
-            stored_prev_hash = row_dict['prev_hash']
-            stored_hash = row_dict['hash']
+            action_id = row_dict["action_id"]
+            grant_id = row_dict["grant_id"]
+            ts = row_dict["ts"]
+            action_type = row_dict["action_type"]
+            target = row_dict["target"]
+            params_json = row_dict["params"]
+            est_cost = row_dict["est_cost"]
+            outcome = row_dict["outcome"]
+            reason = row_dict["reason"]
+            rule_matched = row_dict["rule_matched"]
+            state_delta_json = row_dict["state_delta"]
+            failure_code = row_dict["failure_code"]
+            authority_boundary_json = row_dict["authority_boundary"]
+            stored_prev_hash = row_dict["prev_hash"]
+            stored_hash = row_dict["hash"]
+            chain_version = row_dict["chain_version"]
 
             # Check the prev_hash field matches what we expect.
             if stored_prev_hash != prev_hash:
@@ -320,24 +507,53 @@ class Ledger:
                 json.loads(authority_boundary_json) if authority_boundary_json else None
             )
 
-            entry_body = {
-                "entry_format": "v2",
-                "action_id": action_id,
-                "grant_id": grant_id,
-                "ts": ts,
-                "action_type": action_type,
-                "target": target,
-                "params": json.loads(params_json) if params_json else {},
-                "est_cost": est_cost,
-                "outcome": outcome,
-                "reason": reason,
-                "rule_matched": rule_matched,
-                "state_delta": json.loads(state_delta_json) if state_delta_json else {},
-                "failure_code": failure_code,
-                "authority_boundary": authority_boundary,
-                "prev_hash": prev_hash,
-            }
-            expected_hash = _hash_entry(prev_hash, entry_body)
+            # Dispatch on chain_version. Legacy entries (NULL/absent) get the
+            # legacy canonicaliser + legacy normaliser; new entries (==2) get
+            # ACTENON-JCS-STRICT-1 + the float-safe Decimal coercer.
+            if chain_version is None:
+                # Pre-2.0.0 entry. Reconstruct the entry_body exactly as the
+                # pre-2.0.0 code did (no chain_version field in the body).
+                entry_body = {
+                    "entry_format": "v2",
+                    "action_id": action_id,
+                    "grant_id": grant_id,
+                    "ts": ts,
+                    "action_type": action_type,
+                    "target": target,
+                    "params": json.loads(params_json) if params_json else {},
+                    "est_cost": est_cost,
+                    "outcome": outcome,
+                    "reason": reason,
+                    "rule_matched": rule_matched,
+                    "state_delta": json.loads(state_delta_json) if state_delta_json else {},
+                    "failure_code": failure_code,
+                    "authority_boundary": authority_boundary,
+                    "prev_hash": prev_hash,
+                }
+                expected_hash = _hash_entry_legacy(prev_hash, entry_body)
+            else:
+                # chain_version == 2 (or future versions, when added).
+                # New entries include chain_version in the hashed body.
+                entry_body = {
+                    "entry_format": "v2",
+                    "chain_version": chain_version,
+                    "action_id": action_id,
+                    "grant_id": grant_id,
+                    "ts": ts,
+                    "action_type": action_type,
+                    "target": target,
+                    "params": json.loads(params_json) if params_json else {},
+                    "est_cost": est_cost,
+                    "outcome": outcome,
+                    "reason": reason,
+                    "rule_matched": rule_matched,
+                    "state_delta": json.loads(state_delta_json) if state_delta_json else {},
+                    "failure_code": failure_code,
+                    "authority_boundary": authority_boundary,
+                    "prev_hash": prev_hash,
+                }
+                expected_hash = _hash_entry_v2(prev_hash, entry_body)
+
             if expected_hash != stored_hash:
                 return False
 
