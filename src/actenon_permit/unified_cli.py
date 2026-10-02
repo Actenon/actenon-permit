@@ -464,6 +464,9 @@ def demo(
       - replay refusal
       - mutation refusal
     """
+    from actenon.security_posture import declare_process_development_intent
+
+    declare_process_development_intent("actenon demo")
     _run_demo(auto_approve)
 
 
@@ -936,6 +939,10 @@ def protect_test(
     bypass it. Uses a throwaway issuer key (see boundary/selftest.py);
     trust configuration problems are reported separately.
     """
+    from actenon.security_posture import declare_process_development_intent
+
+    # A self-test with throwaway keys and per-process replay state.
+    declare_process_development_intent("actenon protect test")
     from .boundary import BoundaryManifest
     from .boundary.selftest import print_report, run_boundary_checks
 

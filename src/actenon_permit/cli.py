@@ -660,6 +660,11 @@ def demo(
     ),
 ) -> None:
     """Run the built-in 7-step scripted demo. No LLM, no network, no real money."""
+    from actenon.security_posture import declare_process_development_intent
+
+    # A scripted local demo: explicit development intent for this process
+    # (refused when ACTENON_ENV declares a non-development environment).
+    declare_process_development_intent("permit demo")
     if mode == "in-process":
         from ._demo import run_demo
 
