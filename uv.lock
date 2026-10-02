@@ -4,16 +4,12 @@ requires-python = ">=3.11"
 
 [[package]]
 name = "actenon-kernel"
-version = "1.2.1"
-source = { registry = "https://pypi.org/simple" }
+version = "1.3.0rc1"
+source = { git = "https://github.com/Actenon/actenon-kernel?rev=032df8e4aa40283e0d8567895ee990ad22b8022d#032df8e4aa40283e0d8567895ee990ad22b8022d" }
 dependencies = [
     { name = "actenon-protocol" },
     { name = "cryptography" },
     { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c8/41/1a5618ede9360d641dcbb8ea7601f2b1454b98858bff16a239f329510daf/actenon_kernel-1.2.1.tar.gz", hash = "sha256:851d69eee41279f4d468baf7e5abe1d4b62e5cedf003075a1e3516d9b2a438a3", size = 402679, upload-time = "2026-07-24T23:17:11.632Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/e9/dda034422cfff9123386d69efac6428284306378eff6113d2a44e83f0cd5/actenon_kernel-1.2.1-py3-none-any.whl", hash = "sha256:faeb243e77088f7bd69f9b21dd47c432b3deda0f481b1ec8a80565d573136ef9", size = 494565, upload-time = "2026-07-24T23:17:10.284Z" },
 ]
 
 [package.optional-dependencies]
@@ -23,7 +19,7 @@ asymmetric = [
 
 [[package]]
 name = "actenon-permit"
-version = "1.4.0"
+version = "2.0.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "actenon-kernel", extra = ["asymmetric"] },
@@ -47,7 +43,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "actenon-kernel", extras = ["asymmetric"], specifier = ">=1.0.0" },
+    { name = "actenon-kernel", extras = ["asymmetric"], git = "https://github.com/Actenon/actenon-kernel?rev=032df8e4aa40283e0d8567895ee990ad22b8022d" },
     { name = "actenon-protocol", specifier = ">=1.1.0,<2" },
     { name = "fastapi", specifier = ">=0.110" },
     { name = "httpx", specifier = ">=0.27" },
