@@ -135,7 +135,6 @@ def test_ed25519_pccb_verifies_with_correct_key(ed25519_keyfile, tmp_db, monkeyp
 
     from actenon_permit.ed25519_signer import build_ed25519_signer
     from actenon_permit.kernel_bridge import _build_context
-
     from actenon_permit.revocation import StoreRevocationChecker
 
     signer = build_ed25519_signer(kp)

@@ -185,6 +185,7 @@ class TestExternalSigning:
         )
         assert pccb is not None
         from actenon.proof import PCCBVerifier, build_local_proof_signer
+
         from actenon_permit.revocation import StoreRevocationChecker
         verifier = PCCBVerifier(
             signer=build_local_proof_signer(secret="external-supplied-secret-key"),

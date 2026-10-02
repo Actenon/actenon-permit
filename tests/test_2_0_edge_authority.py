@@ -13,12 +13,11 @@ from __future__ import annotations
 import importlib.metadata
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
-
 from actenon.gate import ActenonGate
 from actenon.replay import ReplayProtector, SqliteReplayStore
+
 from actenon_permit.ed25519_signer import (
     Ed25519KeyError,
     generate_ed25519_keypair,
@@ -162,6 +161,7 @@ def test_edge_without_a_revocation_source_refuses_permit_proofs(issuer, store, t
 
 def test_permit_own_edge_refuses_a_revoked_grant(issuer, store):
     from actenon.core import ProofVerificationError
+
     from actenon_permit.kernel_bridge import verify_pccb_at_edge
 
     grant = _grant(store, ["payments.*"])

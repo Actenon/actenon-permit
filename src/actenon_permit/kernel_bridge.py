@@ -278,7 +278,6 @@ def verify_pccb_at_edge(
     """
     # Resolve the signer for verification — same resolution as minting.
     from .ed25519_signer import resolve_signer
-
     from .revocation import StoreRevocationChecker
     from .state import get_default_store
 
