@@ -124,7 +124,7 @@ describe("token encode/decode", () => {
       signature: "deadbeef".repeat(16),
     };
     const token = encodeGrantToken(grant);
-    expect(token.startsWith("v1.")).toBe(true);
+    expect(token.startsWith("v2.")).toBe(true);
     const decoded = decodeGrantToken(token, { verify: false });
     expect(decoded.id).toBe(grant.id);
     expect(decoded.agent_id).toBe(grant.agent_id);
@@ -199,7 +199,7 @@ describe("control plane + gateway end-to-end", () => {
         expect(grant.budget.limit).toBe(50);
 
         const { token } = await cp.mintToken(grant.id);
-        expect(token.startsWith("v1.")).toBe(true);
+        expect(token.startsWith("v2.")).toBe(true);
 
         const gw = new GatewayClient({ baseUrl: BASE_URL, grantToken: token });
 

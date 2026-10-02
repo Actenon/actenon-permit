@@ -1,7 +1,14 @@
 /**
  * Grant token wire format — TS mirror of Python `actenon_permit.token`.
  *
- * Format: `v1.<base64url(canonical_json(signed_grant_object))>`
+ * Formats:
+ *   `v2.<base64url(ACTENON-JCS-STRICT-1(signed_grant_object))>` — minted from 2.0.0
+ *   `v1.<base64url(json(signed_grant_object))>`                — pre-2.0.0, verify-only
+ *
+ * The HMAC-SHA256 signature covers the grant minus `signature`, encoded with
+ * the canonicaliser of the token's version: ACTENON-JCS-STRICT-1 for `v2.`
+ * (literal UTF-8), Python's ASCII-escaping `json.dumps(sort_keys=True)` for
+ * `v1.`. `v1.` tokens are accepted until actenon-permit 3.0.0.
  *
  * The signing key MUST match the `ACTENON_SIGNING_KEY` the server uses. In
  * the browser / agent process, the key is typically NOT present — the agent
@@ -9,11 +16,14 @@
  * it, not verify it. Verification is for tooling (CLI, dashboards).
  */
 
+import { canonicalizeJson, canonicalizeStrictJson } from "./canonical.js";
 import type { Grant } from "./types.js";
 import { TokenError } from "./types.js";
 
-const VERSION = "v1";
-const PREFIX = `${VERSION}.`;
+const PREFIX_V1 = "v1.";
+const PREFIX_V2 = "v2.";
+
+type TokenVersion = "v1" | "v2";
 
 // --- base64url helpers (browser + node compatible) ---
 
@@ -33,22 +43,6 @@ function base64UrlToBytes(s: string): Uint8Array {
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
-}
-
-// --- canonical JSON (matches Python: sort_keys + compact separators) ---
-
-function canonicalJson(obj: unknown): string {
-  return JSON.stringify(sortKeys(obj));
-}
-
-function sortKeys(value: unknown): unknown {
-  if (value === null || typeof value !== "object") return value;
-  if (Array.isArray(value)) return value.map(sortKeys);
-  const sorted: Record<string, unknown> = {};
-  for (const k of Object.keys(value as Record<string, unknown>).sort()) {
-    sorted[k] = sortKeys((value as Record<string, unknown>)[k]);
-  }
-  return sorted;
 }
 
 // --- HMAC-SHA256 via Web Crypto (browser + node >= 15) ---
@@ -78,20 +72,22 @@ function strToBytes(s: string): Uint8Array {
 
 // --- public API ---
 
+/** Encode a signed grant as a `v2.` token (ACTENON-JCS-STRICT-1 body). */
 export function encodeGrantToken(grant: Grant): string {
   if (!grant.signature) {
     throw new TokenError("grant is not signed — cannot encode token");
   }
-  const body = canonicalJson(grant);
-  const encoded = bytesToBase64Url(strToBytes(body));
-  return `${PREFIX}${encoded}`;
+  return `${PREFIX_V2}${bytesToBase64Url(strToBytes(canonicalizeStrictJson(grant)))}`;
 }
 
-export function decodeGrantToken(token: string, opts: { verify?: boolean; signingKey?: string } = {}): Grant {
-  const verify = opts.verify ?? true;
+function splitToken(token: unknown): { version: TokenVersion; encoded: string } {
   if (typeof token !== "string") throw new TokenError("token must be a string");
-  if (!token.startsWith(PREFIX)) throw new TokenError(`unsupported token version (expected '${PREFIX}')`);
-  const encoded = token.slice(PREFIX.length);
+  if (token.startsWith(PREFIX_V2)) return { version: "v2", encoded: token.slice(PREFIX_V2.length) };
+  if (token.startsWith(PREFIX_V1)) return { version: "v1", encoded: token.slice(PREFIX_V1.length) };
+  throw new TokenError(`unsupported token version (expected '${PREFIX_V1}' or '${PREFIX_V2}')`);
+}
+
+function parsePayload(encoded: string): Grant {
   let bytes: Uint8Array;
   try {
     bytes = base64UrlToBytes(encoded);
@@ -100,7 +96,8 @@ export function decodeGrantToken(token: string, opts: { verify?: boolean; signin
   }
   let payload: unknown;
   try {
-    payload = JSON.parse(new TextDecoder().decode(bytes));
+    // fatal: invalid UTF-8 is an error (as in Python), not a silent U+FFFD.
+    payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch (e) {
     throw new TokenError(`invalid JSON payload: ${(e as Error).message}`);
   }
@@ -108,9 +105,16 @@ export function decodeGrantToken(token: string, opts: { verify?: boolean; signin
     throw new TokenError("invalid grant payload: not an object");
   }
   const grant = payload as Grant;
-  if (!grant.id || !grant.signature) {
+  if (!grant.id || typeof grant.signature !== "string" || !grant.signature) {
     throw new TokenError("invalid grant payload: missing id or signature");
   }
+  return grant;
+}
+
+export function decodeGrantToken(token: string, opts: { verify?: boolean; signingKey?: string } = {}): Grant {
+  const verify = opts.verify ?? true;
+  const { encoded } = splitToken(token);
+  const grant = parsePayload(encoded);
   // Structural signature check; cryptographic verification is async (below).
   if (verify && !opts.signingKey) {
     // Without a key we can only do the structural check. Throw to surface
@@ -121,11 +125,17 @@ export function decodeGrantToken(token: string, opts: { verify?: boolean; signin
 }
 
 export async function verifyGrantToken(token: string, signingKey: string): Promise<Grant> {
-  const grant = decodeGrantToken(token, { verify: false });
+  const { version, encoded } = splitToken(token);
+  const grant = parsePayload(encoded);
   const { signature, ...rest } = grant;
-  const expected = await hmacSha256Hex(strToBytes(signingKey), strToBytes(canonicalJson(rest)));
-  // Constant-time-ish comparison (lengths are equal so this is fine).
-  if (expected.length !== signature.length || !timingSafeEqual(expected, signature)) {
+  let signed: string;
+  try {
+    signed = version === "v2" ? canonicalizeStrictJson(rest) : canonicalizeJson(rest);
+  } catch (e) {
+    throw new TokenError(`grant payload has no canonical encoding: ${(e as Error).message}`);
+  }
+  const expected = await hmacSha256Hex(strToBytes(signingKey), strToBytes(signed));
+  if (!timingSafeEqual(expected, signature)) {
     throw new TokenError("signature verification failed — token is forged or was signed with a different key");
   }
   return grant;

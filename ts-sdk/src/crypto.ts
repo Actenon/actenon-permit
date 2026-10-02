@@ -1,101 +1,22 @@
 /**
  * Actenon TypeScript SDK — canonicalisation + receipt verification.
  *
- * Parity with Python `actenon_permit.sdk.receipt` and
- * `actenon_protocol.canonicalisation`.
- *
- * The canonicalisation is JCS (JSON Canonicalization Scheme, RFC 8785)
- * compatible — sorted keys, no insignificant whitespace, UTF-8 encoded.
- * This is the same canonicalisation used by the Kernel's
- * `actenon-jcs-sha256-v1` profile and by the `ResourceReceiptVerifier`.
+ * Parity with Python `actenon_permit.sdk.receipt`. Receipts are signed over
+ * the ASCII-escaped `json.dumps(sort_keys=True, separators=(",", ":"))`
+ * encoding the kernel's `ResourceReceiptVerifier` uses (`canonicalizeJson`).
+ * That is NOT ACTENON-JCS-STRICT-1 for non-ASCII strings; the strict profile
+ * is `canonicalizeStrictJson`. Both live in `canonical.ts`.
  */
 
 import { createHmac } from "node:crypto";
 
 // ---------------------------------------------------------------------------
-// Canonical JSON (parity: actenon_protocol.canonicalisation.canonicalize_json)
+// Canonical JSON (see canonical.ts: the receipt encoding is the ASCII-escaped one)
 // ---------------------------------------------------------------------------
 
-/** Thrown when a value has no single canonical encoding shared with Python. */
-export class CanonicalizationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "CanonicalizationError";
-  }
-}
+import { canonicalizeJson } from "./canonical.js";
 
-/**
- * Canonicalise a JSON value exactly as the Python reference does
- * (`json.dumps(obj, sort_keys=True, separators=(",", ":"))`, used by the
- * kernel's ResourceReceiptVerifier):
- *   - object keys sorted by Unicode code point (not UTF-16 code unit)
- *   - no insignificant whitespace
- *   - every non-ASCII character escaped as lowercase `\uXXXX`
- *     (surrogate pairs as two escapes), control characters as Python does
- *
- * Fails closed (throws `CanonicalizationError`) on values whose encoding
- * would differ between languages or silently lose information: numbers
- * that are not safe integers (floats, -0, NaN, Infinity, |n| > 2^53-1),
- * unpaired surrogates, and anything that is not a plain JSON value
- * (undefined, functions, symbols, bigint, Date, Map, Set, class instances).
- */
-export function canonicalizeJson(value: unknown): string {
-  return canon(value, "$");
-}
-
-const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-
-function quote(s: string, path: string): string {
-  if (LONE_SURROGATE.test(s)) {
-    throw new CanonicalizationError(`${path}: unpaired surrogate has no UTF-8 encoding`);
-  }
-  return JSON.stringify(s).replace(
-    /[\u0080-\uffff]/g,
-    (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"),
-  );
-}
-
-function compareCodePoints(a: string, b: string): number {
-  const ca = Array.from(a, (c) => c.codePointAt(0) as number);
-  const cb = Array.from(b, (c) => c.codePointAt(0) as number);
-  for (let i = 0; i < Math.min(ca.length, cb.length); i++) {
-    if (ca[i] !== cb[i]) return ca[i] - cb[i];
-  }
-  return ca.length - cb.length;
-}
-
-function canon(value: unknown, path: string): string {
-  if (value === null) return "null";
-  switch (typeof value) {
-    case "boolean":
-      return value ? "true" : "false";
-    case "number":
-      if (!Number.isSafeInteger(value) || Object.is(value, -0)) {
-        throw new CanonicalizationError(`${path}: ${value} is not a safe integer`);
-      }
-      return String(value);
-    case "string":
-      return quote(value, path);
-    case "object": {
-      if (Array.isArray(value)) {
-        return "[" + value.map((v, i) => canon(v, `${path}[${i}]`)).join(",") + "]";
-      }
-      const proto = Object.getPrototypeOf(value);
-      if (proto !== Object.prototype && proto !== null) {
-        throw new CanonicalizationError(`${path}: not a plain JSON object`);
-      }
-      const obj = value as Record<string, unknown>;
-      const keys = Object.keys(obj).sort(compareCodePoints);
-      return (
-        "{" +
-        keys.map((k) => quote(k, path) + ":" + canon(obj[k], `${path}.${k}`)).join(",") +
-        "}"
-      );
-    }
-    default:
-      throw new CanonicalizationError(`${path}: ${typeof value} is not a JSON value`);
-  }
-}
+export { CanonicalizationError, canonicalizeJson, canonicalizeStrictJson } from "./canonical.js";
 
 // ---------------------------------------------------------------------------
 // HMAC-SHA256 receipt verification

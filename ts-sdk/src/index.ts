@@ -10,7 +10,7 @@
  *
  * const client = Actenon.cloud({
  *   baseUrl: "http://localhost:7780",
- *   grantToken: "v1.YOUR_TOKEN",
+ *   grantToken: "v2.YOUR_TOKEN",
  * });
  *
  * const intent = await client.authorisedExecutionIntents.create({
@@ -35,6 +35,7 @@ export * from "./protocol.js";
 export {
   CanonicalizationError,
   canonicalizeJson,
+  canonicalizeStrictJson,
   computeReceiptSignature,
   verifyResourceReceipt,
 } from "./crypto.js";

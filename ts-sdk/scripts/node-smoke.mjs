@@ -3,13 +3,18 @@
 import assert from "node:assert/strict";
 
 const sdk = await import("../dist/index.js");
-for (const name of ["Actenon", "ExecutionRefusedError", "canonicalizeJson", "verifyResourceReceipt", "encodeGrantToken"]) {
+for (const name of ["Actenon", "ExecutionRefusedError", "canonicalizeJson", "verifyResourceReceipt", "encodeGrantToken", "verifyGrantToken", "canonicalizeStrictJson"]) {
   assert.ok(name in sdk, `missing export ${name}`);
 }
 const body = { receipt_id: "r1", amount: 5, signing_key_id: "k1" };
 const secret = new TextEncoder().encode("s3cret");
 const signature = sdk.computeReceiptSignature(body, secret);
 assert.equal(sdk.verifyResourceReceipt({ ...body, signature }, new Map([["k1", secret]])), true);
+// v2 grant tokens verify in plain Node with the cross-language vectors.
+const { readFileSync } = await import("node:fs");
+const vectors = JSON.parse(readFileSync(new URL("../tests/vectors/grant_tokens.json", import.meta.url), "utf8"));
+for (const v of vectors.valid) assert.equal((await sdk.verifyGrantToken(v.token, vectors.signing_key)).id, v.grant_id);
+for (const v of vectors.tampered) await assert.rejects(sdk.verifyGrantToken(v.token, vectors.signing_key));
 await import("../dist/protocol.js");
 await import("../dist/crypto.js");
 console.log("node smoke: OK");
