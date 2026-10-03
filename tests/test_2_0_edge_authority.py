@@ -69,6 +69,8 @@ def _mint(store, grant):
 def _edge(tmp_path, keypair, **kwargs) -> ActenonGate:
     from actenon_permit.boundary.proofs import Ed25519PublicKeyVerifier
 
+    # The edge declares what it performs (protocol 13 E1).
+    kwargs.setdefault("capabilities", ("payments.refund",))
     return ActenonGate(
         verifier=Ed25519PublicKeyVerifier([keypair.public_key_jwk]),
         audience=AUDIENCE,
@@ -76,6 +78,17 @@ def _edge(tmp_path, keypair, **kwargs) -> ActenonGate:
         replay_protector=ReplayProtector(SqliteReplayStore(tmp_path / "edge-replay.sqlite3")),
         **kwargs,
     )
+
+
+def test_edge_declaring_another_capability_refuses(issuer, store, tmp_path):
+    from actenon_permit.revocation import StoreRevocationChecker
+
+    intent, pccb = _mint(store, _grant(store, ["payments.*"]))
+    edge = _edge(tmp_path, issuer, capabilities=("payments.read",), revocation_checker=StoreRevocationChecker(store))
+    calls: list[int] = []
+    out = edge.protect(intent, pccb, lambda: calls.append(1))
+    assert out.reason_code == "SCOPE_CAPABILITY_MISMATCH"
+    assert calls == []
 
 
 def test_glob_scoped_grant_proof_names_the_exact_capability(issuer, store, tmp_path):
