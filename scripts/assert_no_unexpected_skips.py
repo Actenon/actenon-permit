@@ -16,6 +16,10 @@ import xml.etree.ElementTree as ET
 ALLOWED_SKIPS = {
     ("tests.test_real_agent", "test_real_llm_agent_through_gateway"):
         "needs the external z-ai LLM CLI, which CI does not have; it drives a live model",
+    ("tests.test_cross_repo_conformance", "test_permit_and_cloud_produce_identical_action_hashes"):
+        "needs a checkout of the private actenon-cloud repository, which public CI cannot clone",
+    ("tests.test_cross_repo_conformance", "test_cloud_pccb_verifies_with_kernel_verifier"):
+        "needs a checkout of the private actenon-cloud repository, which public CI cannot clone",
 }
 
 
