@@ -153,7 +153,8 @@ from .token import TokenError, grant_to_token, token_to_grant
 # Backward-compat aliases for the pre-rename names. The product was originally
 # called "Leash" internally; it's now "Permit". These aliases keep old code
 # working but the canonical names are PermitDenied / PermitApprovalRequired.
-# TODO: remove these aliases in v2.0.
+# Kept in 2.0.0 (tests/test_nits.py asserts them). Any removal will be announced
+# in CHANGELOG.md one major version ahead.
 LeashDenied = PermitDenied
 LeashApprovalRequired = PermitApprovalRequired
 
