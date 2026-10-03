@@ -106,7 +106,7 @@ allow-direct-references = true
 # uv sources never reach the wheel's metadata, but this table MUST be removed
 # (and uv.lock regenerated against PyPI) once actenon-kernel 1.3.0 is
 # published and before actenon-permit 2.0.0 is released.
-actenon-kernel = { git = "https://github.com/Actenon/actenon-kernel", rev = "78efcf173d6e658eee8de4ea5732f551c6822f3f" }
+actenon-kernel = { git = "https://github.com/Actenon/actenon-kernel", rev = "e775389fb633ccf10d744d70d12570216691c979" }
 
 [tool.ruff]
 line-length = 100
