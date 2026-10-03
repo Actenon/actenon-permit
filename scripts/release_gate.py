@@ -52,7 +52,7 @@ def _matrix_rows(matrix) -> list[dict]:
     if not isinstance(matrix, dict):
         return [{}]
     axes = {k: v for k, v in matrix.items() if k not in ("include", "exclude") and isinstance(v, list)}
-    rows = [dict(zip(axes, combo)) for combo in itertools.product(*axes.values())] if axes else [{}]
+    rows = [dict(zip(axes, combo, strict=True)) for combo in itertools.product(*axes.values())] if axes else [{}]
     for extra in matrix.get("include", []) or []:
         rows.append(dict(extra))
     excludes = matrix.get("exclude", []) or []
