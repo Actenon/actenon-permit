@@ -6,11 +6,30 @@ on:
   pull_request:
     branches: [main, master]
   schedule:
-    # Nightly live-compat: run against current kernel main so drift is
-    # caught in a day, not at a customer. (ARCHITECTURE.md §6)
+    # Nightly: the live-compat job runs the suite against current kernel
+    # main, so drift is caught in a day, not at a customer.
+    # (ARCHITECTURE.md §6)
     - cron: "0 3 * * *"
 
+# bash with -o pipefail, so a failing command in a pipeline fails the step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
+  required-checks:
+    # Branch protection and the publish workflows' release gate read
+    # .github/required-checks.json. Every name in it must be produced by a job.
+    name: Required-check names exist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pyyaml
+      - run: python scripts/release_gate.py validate
+
   test-python:
     runs-on: ubuntu-latest
     strategy:
@@ -29,7 +48,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       # Claim-verification steps moved to verify-claims.yml (one copy of
       # each check; the README badge links there).
@@ -38,7 +57,10 @@ jobs:
         run: uv run ruff check .
 
       - name: Run tests
-        run: uv run pytest
+        run: uv run pytest -rs --junitxml=junit.xml
+
+      - name: No unexpected skips
+        run: python3 scripts/assert_no_unexpected_skips.py junit.xml
 
       - name: Run v0 demo (smoke test)
         run: uv run permit demo --auto-approve
@@ -62,7 +84,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install permit (which pulls actenon-kernel)
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Run kernel conformance suite
         # Run from /tmp so permit's local examples/ directory doesn't
@@ -87,7 +109,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install Python package (so TS tests can spawn the gateway)
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -105,6 +127,36 @@ jobs:
       - name: TS SDK tests
         working-directory: ts-sdk
         run: bun test
+
+      - name: Built package imports in plain Node (ESM)
+        working-directory: ts-sdk
+        run: bun run smoke:node
+
+  live-compat:
+    # Scheduled only. The other jobs install the LOCKED kernel; this one
+    # replaces it with kernel main and runs the full suite, which is what
+    # "nightly live-compat" promises.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install locked dependencies, then kernel main over them
+        run: |
+          uv sync --locked --extra dev
+          uv pip install --reinstall "actenon-kernel[asymmetric] @ git+https://github.com/Actenon/actenon-kernel@main"
+          uv run --no-sync python -c "import importlib.metadata as m; print('actenon-kernel', m.version('actenon-kernel'))"
+
+      - name: Run tests against kernel main
+        run: |
+          uv run --no-sync pytest -rs --junitxml=junit.xml
+          python3 scripts/assert_no_unexpected_skips.py junit.xml
 
   # The verify-claims job moved to verify-claims.yml so the README
   # badge can link to a dedicated gate.

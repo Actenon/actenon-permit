@@ -190,7 +190,10 @@ def _build_context(
     return DynamicContextInput(
         request_id=f"req_{uuid4().hex[:8]}",
         audience=AudienceRef(type="service", id=audience_id),
-        scope_capabilities=tuple(grant.scopes.allow) or (action.type,),
+        # The proof names the exact capability. Grant scopes may be patterns
+        # (payments.*); the PDP has already matched them, and verifiers compare
+        # capabilities exactly (actenon-protocol protocol/13 E1).
+        scope_capabilities=(action.type,),
         now=datetime.now(UTC),
         max_ttl_seconds=max(
             1, min(PCCB_TTL_SECONDS, int((grant.expires_at - datetime.now(UTC)).total_seconds()))
@@ -242,7 +245,10 @@ def mint_pccb_for_action(
         signer=signer,
         issuer=PartyRef(type="service", id=issuer_id),
     )
-    pccb = minter.mint(intent, kernel_decision, context)
+    # Signed, revocable authority reference: every edge must consult this
+    # grant's revocation state before executing (protocol/13 E5).
+    authority = {"issuer": f"service:{issuer_id}", "grant_id": grant.id, "revocable": True}
+    pccb = minter.mint(intent, kernel_decision, context, extensions={"authority": authority})
     return intent, pccb
 
 
@@ -254,8 +260,13 @@ def verify_pccb_at_edge(
     *,
     signing_secret: bytes | str | None = None,
     audience_id: str = "actenon-permit-gateway",
+    store: Any = None,
 ) -> None:
     """Verify a PCCB at the execution edge before releasing the credential.
+
+    ``store`` is the grant state the revocation check consults (default: the
+    process's default store). A revoked grant, or a revoked ancestor, refuses
+    with ``AUTHORITY_REVOKED``.
 
     Raises ``ProofVerificationError`` (from the kernel) if the proof is
     invalid for ANY reason: signature, intent mismatch, expiry, audience,
@@ -267,9 +278,14 @@ def verify_pccb_at_edge(
     """
     # Resolve the signer for verification — same resolution as minting.
     from .ed25519_signer import resolve_signer
+    from .revocation import StoreRevocationChecker
+    from .state import get_default_store
 
     signer = resolve_signer(hmac_secret=signing_secret)
-    verifier = PCCBVerifier(signer=signer)
+    verifier = PCCBVerifier(
+        signer=signer,
+        revocation_checker=StoreRevocationChecker(store if store is not None else get_default_store()),
+    )
     context = _build_context(grant, action, audience_id=audience_id)
 
     # Build a FRESH intent from the ACTUAL action being attempted at the edge.

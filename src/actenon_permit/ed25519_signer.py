@@ -284,13 +284,26 @@ def resolve_signer(
                 f"configured Ed25519 key file could not be loaded ({type(e).__name__}): {path}"
             ) from e
 
-    # Fall back to HMAC
+    # Fall back to HMAC with a configured secret.
     secret = hmac_secret
     if secret is None:
         env_key = os.environ.get("ACTENON_SIGNING_KEY", "").strip()
         if env_key:
             secret = env_key
-    return build_local_proof_signer(secret=secret) if secret is not None else build_local_proof_signer()
+    if secret is not None:
+        return build_local_proof_signer(secret=secret)
+    # Nothing configured: only explicit development intent may sign with the
+    # kernel's public development secret (a proof signed with it proves
+    # nothing). Outside development, refuse instead of silently minting.
+    from actenon.security_posture import development_intent
+
+    if not development_intent():
+        raise Ed25519KeyError(
+            "no proof signing key is configured: set ACTENON_ED25519_KEY_FILE (run "
+            "`permit init-keys` to create one) or ACTENON_SIGNING_KEY. For local "
+            "development, demos or tests set ACTENON_ENV=development."
+        )
+    return build_local_proof_signer()
 
 
 __all__ = [

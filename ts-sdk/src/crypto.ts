@@ -1,45 +1,22 @@
 /**
  * Actenon TypeScript SDK — canonicalisation + receipt verification.
  *
- * Parity with Python `actenon_permit.sdk.receipt` and
- * `actenon_protocol.canonicalisation`.
- *
- * The canonicalisation is JCS (JSON Canonicalization Scheme, RFC 8785)
- * compatible — sorted keys, no insignificant whitespace, UTF-8 encoded.
- * This is the same canonicalisation used by the Kernel's
- * `actenon-jcs-sha256-v1` profile and by the `ResourceReceiptVerifier`.
+ * Parity with Python `actenon_permit.sdk.receipt`. Receipts are signed over
+ * the ASCII-escaped `json.dumps(sort_keys=True, separators=(",", ":"))`
+ * encoding the kernel's `ResourceReceiptVerifier` uses (`canonicalizeJson`).
+ * That is NOT ACTENON-JCS-STRICT-1 for non-ASCII strings; the strict profile
+ * is `canonicalizeStrictJson`. Both live in `canonical.ts`.
  */
 
+import { createHmac } from "node:crypto";
+
 // ---------------------------------------------------------------------------
-// Canonical JSON (parity: actenon_protocol.canonicalisation.canonicalize_json)
+// Canonical JSON (see canonical.ts: the receipt encoding is the ASCII-escaped one)
 // ---------------------------------------------------------------------------
 
-/**
- * Canonicalise a JSON-serialisable value using JCS-compatible rules:
- *   - sorted object keys (lexicographic byte order)
- *   - no insignificant whitespace
- *   - UTF-8 encoded
- *
- * This matches Python's `json.dumps(obj, sort_keys=True, separators=(",", ":"))`.
- */
-export function canonicalizeJson(value: unknown): string {
-  return JSON.stringify(sortKeys(value));
-}
+import { canonicalizeJson } from "./canonical.js";
 
-function sortKeys(value: unknown): unknown {
-  if (value === null || typeof value !== "object") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value.map(sortKeys);
-  }
-  const obj = value as Record<string, unknown>;
-  const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(obj).sort()) {
-    sorted[key] = sortKeys(obj[key]);
-  }
-  return sorted;
-}
+export { CanonicalizationError, canonicalizeJson, canonicalizeStrictJson } from "./canonical.js";
 
 // ---------------------------------------------------------------------------
 // HMAC-SHA256 receipt verification
@@ -119,9 +96,8 @@ function verifyHmacSha256Sync(
 }
 
 function hmacSha256HexSync(message: string, secret: Uint8Array): string {
-  // Use Node's crypto module (available in Node 18+).
-  // In a browser, this would need a polyfill or Web Crypto (async).
-  const { createHmac } = require("node:crypto") as typeof import("node:crypto");
+  // Node's crypto module (Node 18+), imported statically: `require` does
+  // not exist in an ES module under Node.
   const hmac = createHmac("sha256", Buffer.from(secret));
   hmac.update(message, "utf-8");
   return hmac.digest("hex");

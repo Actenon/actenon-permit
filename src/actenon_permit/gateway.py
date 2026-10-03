@@ -443,7 +443,7 @@ class Gateway:
 
                 if kernel_intent is None or pccb is None:
                     raise kernel_bridge.KernelBridgeError("no PCCB was minted for an ALLOW")
-                kernel_bridge.verify_pccb_at_edge(kernel_intent, pccb, grant, action)
+                kernel_bridge.verify_pccb_at_edge(kernel_intent, pccb, grant, action, store=self.state)
             except Exception as e:
                 if action.est_cost:
                     with contextlib.suppress(Exception):
@@ -792,7 +792,7 @@ class Gateway:
             try:
                 from .kernel_bridge import verify_pccb_at_edge
 
-                verify_pccb_at_edge(intent, pccb, grant, action)
+                verify_pccb_at_edge(intent, pccb, grant, action, store=self.state)
             except Exception as e:
                 # Kernel verification failed — release the reservation and
                 # fail closed. The credential is NOT released.
@@ -1010,7 +1010,7 @@ def mount_intent_routes(app, gateway: Gateway) -> None:
 # ---------------------------------------------------------------------------
 
 
-def mcp_serve(gateway: Gateway, *, infile=None, outfile=None) -> None:
+def mcp_serve(gateway: Gateway, *, infile=None, outfile=None, grant_token: str | None = None) -> None:
     """Run the MCP stdio server.
 
     Reads JSON-RPC 2.0 requests line-by-line from ``infile`` (default stdin),
@@ -1018,10 +1018,14 @@ def mcp_serve(gateway: Gateway, *, infile=None, outfile=None) -> None:
 
       - ``initialize`` — handshake, returns server capabilities
       - ``tools/list`` — returns registered tools as MCP tool specs
-      - ``tools/call`` — enforces decision and executes; grant token is read
-        from ``params._meta.actenon_grant``
+      - ``tools/call`` — enforces decision and executes; the grant token is
+        ``params._meta.actenon_grant`` if present, else ``grant_token`` (set
+        at launch, e.g. ``permit mcp-serve --grant-token`` or
+        ``ACTENON_GRANT_TOKEN``), so standard MCP clients work unmodified
 
-    The server exits cleanly on EOF or on an ``exit`` notification.
+    Notifications (messages without an ``id``) never get a response, as
+    JSON-RPC 2.0 requires. The server exits cleanly on EOF or on an
+    ``exit`` notification.
     """
     infile = infile or sys.stdin
     outfile = outfile or sys.stdout
@@ -1052,9 +1056,13 @@ def mcp_serve(gateway: Gateway, *, infile=None, outfile=None) -> None:
         method = req.get("method")
         params = req.get("params") or {}
 
-        # Notification (no id) — only handle exit.
-        if req_id is None and method == "exit":
-            return
+        # Notification (no id): never answered (JSON-RPC 2.0 §4.1). Only
+        # ``exit`` has an effect; ``notifications/initialized`` etc. are
+        # acknowledged by silence.
+        if "id" not in req:
+            if method == "exit":
+                return
+            continue
 
         if method == "initialize":
             _write_jsonrpc(
@@ -1075,15 +1083,19 @@ def mcp_serve(gateway: Gateway, *, infile=None, outfile=None) -> None:
             tool_name = params.get("name")
             arguments = params.get("arguments") or {}
             meta = params.get("_meta") or {}
-            grant_token = meta.get("actenon_grant")
-            if not grant_token:
+            call_grant = meta.get("actenon_grant") or grant_token
+            if not call_grant:
                 _write_jsonrpc(
                     outfile,
                     req_id,
-                    error={"code": -32602, "message": "missing _meta.actenon_grant"},
+                    error={
+                        "code": -32602,
+                        "message": "no grant: set one at launch (--grant-token / "
+                        "ACTENON_GRANT_TOKEN) or pass _meta.actenon_grant",
+                    },
                 )
                 continue
-            result = gateway.call_tool(tool_name, arguments, grant_token)
+            result = gateway.call_tool(tool_name, arguments, call_grant)
             # MCP expects an isError flag for tool errors. We map ALLOW to
             # success and anything else to isError=true with the reason as text.
             if result["outcome"] == "ALLOW":

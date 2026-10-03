@@ -177,8 +177,10 @@ def test_permit_pccb_verifies_with_kernel_verifier(stable_key, tmp_db, monkeypat
     store.put_grant(grant)
 
     _, intent, pccb = pdp.decide_and_mint_pccb(grant, action)
+    from actenon_permit.revocation import StoreRevocationChecker
+
     signer = build_local_proof_signer(secret="cross-repo-conformance-key")
-    verifier = PCCBVerifier(signer=signer)
+    verifier = PCCBVerifier(signer=signer, revocation_checker=StoreRevocationChecker(store))
     context = _build_context(grant, action)
     verifier.verify(intent, pccb, context)  # raises on failure
 

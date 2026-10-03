@@ -25,6 +25,9 @@ from actenon_permit.control import create_app
 from actenon_permit.policy import compile_policy
 from actenon_permit.token import grant_to_token
 
+ADMIN_TOKEN = "test-admin-token"
+ADMIN_HEADERS = {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
 
 def _make_app_and_store(tmp_db, monkeypatch):
     monkeypatch.setenv("MOCK_STRIPE_KEY", "sk_mock_123")
@@ -45,7 +48,7 @@ def _make_app_and_store(tmp_db, monkeypatch):
         state=store, ledger=ledger, pdp=pdp, broker=broker, tools=tools,
         approval_gate=AutoApproveGate(),
     )
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False)
+    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False, admin_token=ADMIN_TOKEN)
     return app, store, gw
 
 
@@ -65,7 +68,7 @@ def _issue_parent(store):
 def test_attenuate_creates_weaker_child(tmp_db, monkeypatch):
     app, store, _ = _make_app_and_store(tmp_db, monkeypatch)
     parent = _issue_parent(store)
-    client = TestClient(app)
+    client = TestClient(app, headers=ADMIN_HEADERS)
 
     resp = client.post(
         f"/grants/{parent.id}/attenuate",
@@ -89,7 +92,7 @@ def test_attenuate_creates_weaker_child(tmp_db, monkeypatch):
 def test_attenuate_rejects_widening_budget(tmp_db, monkeypatch):
     app, store, _ = _make_app_and_store(tmp_db, monkeypatch)
     parent = _issue_parent(store)
-    client = TestClient(app)
+    client = TestClient(app, headers=ADMIN_HEADERS)
 
     resp = client.post(
         f"/grants/{parent.id}/attenuate",
@@ -102,7 +105,7 @@ def test_attenuate_rejects_widening_budget(tmp_db, monkeypatch):
 def test_attenuate_rejects_widening_scopes(tmp_db, monkeypatch):
     app, store, _ = _make_app_and_store(tmp_db, monkeypatch)
     parent = _issue_parent(store)
-    client = TestClient(app)
+    client = TestClient(app, headers=ADMIN_HEADERS)
 
     # parent allows [payment.refund, email.send] — try to add shell.exec
     resp = client.post(
@@ -118,7 +121,7 @@ def test_attenuate_rejects_revoked_parent(tmp_db, monkeypatch):
     app, store, _ = _make_app_and_store(tmp_db, monkeypatch)
     parent = _issue_parent(store)
     store.set_status(parent.id, GrantStatus.REVOKED)
-    client = TestClient(app)
+    client = TestClient(app, headers=ADMIN_HEADERS)
 
     resp = client.post(
         f"/grants/{parent.id}/attenuate",
@@ -143,7 +146,7 @@ def test_child_token_is_usable_and_bound_by_parent_limits(tmp_db, monkeypatch):
     """
     app, store, gw = _make_app_and_store(tmp_db, monkeypatch)
     parent = _issue_parent(store)
-    client = TestClient(app)
+    client = TestClient(app, headers=ADMIN_HEADERS)
 
     # Attenuate to a $20 budget.
     resp = client.post(

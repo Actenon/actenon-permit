@@ -39,6 +39,8 @@ from actenon_permit._mock_providers import (  # noqa: E402
 )
 from actenon_permit._net import start_uvicorn_in_thread, wait_for_server  # noqa: E402
 from actenon_permit.control import create_app  # noqa: E402
+
+ADMIN_TOKEN = "test-admin-token"  # the operator's; the agent never gets it
 from actenon_permit.policy import compile_policy  # noqa: E402
 from actenon_permit.token import grant_to_token  # noqa: E402
 
@@ -106,7 +108,7 @@ def gateway_url(tmp_db, monkeypatch):
     )
     app = create_app(
         state=store, ledger=ledger, pdp=pdp, gateway=gw,
-        wire_gateway_approvals=False,
+        wire_gateway_approvals=False, admin_token=ADMIN_TOKEN,
     )
     server, thread, url = start_uvicorn_in_thread(app, port=0)
     try:
@@ -139,7 +141,7 @@ def test_real_scripted_agent_through_gateway(gateway_url):
     from agents.runner import GatewayClient, ScriptedAgent
 
     token, grant_id = _issue_grant(gateway_url["store"])
-    client = GatewayClient(gateway_url["url"], token)
+    client = GatewayClient(gateway_url["url"], token, admin_token=ADMIN_TOKEN)
 
     # Verify the agent can see the tools.
     tools = client.list_tools()

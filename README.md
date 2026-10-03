@@ -49,8 +49,10 @@ Permit is one of the independent repositories that together close the **executio
 | **`actenon-kernel`** | The open verifier — defines what a valid proof is | `actenon-protocol` | `actenon-kernel` (PyPI) |
 | **`actenon-permit`** ← you are here | The developer on-ramp and authority broker | `actenon-kernel`, `actenon-protocol` | `actenon-permit` (PyPI) · `@actenon/sdk` (npm) |
 | **`actenon-scan`** | The independent static-analysis scanner | — | `actenon-scan` (PyPI) |
+| **`sdk-go`** | Go verifier SDK — protected-endpoint proof verification in Go | `actenon-protocol` | [repo](https://github.com/Actenon/sdk-go) |
+| **`sdk-rust`** | Rust verifier SDK — protected-endpoint proof verification in Rust | `actenon-protocol` | [repo](https://github.com/Actenon/sdk-rust) |
 
-**Optional:** [`actenon-cloud`](https://github.com/Actenon/actenon-cloud) — a managed control plane (source-available; see its LICENSE). Not required by any component above; every capability in this ecosystem works without it.
+**Optional:** `actenon-cloud` — a managed control plane (private repository, not publicly available). Not required by any component above; every capability in this ecosystem works without it.
 <!-- ECOSYSTEM-TABLE:END -->
 
 Permit is the **on-ramp**. If you are an engineer evaluating Actenon for the first time, this is the repo to start with. It runs **without Cloud** — the `Actenon.local()` SDK constructor gives you an in-process gateway with every feature below, no login, no API key, no hosted account.
@@ -124,9 +126,11 @@ The agent walks away with a Receipt it could not forge; the protected endpoint w
 Python 3.10+ for the Kernel alone. The full stack including Permit requires 3.11+.
 
 ```bash
-pip install actenon-permit              # Python SDK + unified CLI + Boundary Kit
+pip install actenon-permit              # Python SDK + unified CLI + Boundary Kit (see note below)
 npm install @actenon/sdk                # TypeScript SDK v1.4.0 — discriminated result types, receipt verification, protocol parity with Python
 ```
+
+> **Release note:** this README tracks `main`. The Boundary Kit proof binding, the kernel execution Receipts returned by brokered calls, and other fixes on `main` are newer than the latest PyPI/npm release; install from a checkout (`pip install .`) to get them until the next release.
 
 ## Hero quickstart (6 lines)
 
@@ -252,6 +256,8 @@ actenon scan                          # run the execution-gap scanner
 actenon doctor                        # diagnose configuration
 ```
 
+`permit serve` hosts the control plane (`/grants`, `/approvals`, `/ledger`) and, with `--with-gateway`, the agent-facing gateway (`/proxy/*`, `/intents/*`) on one localhost port. Control-plane routes require `Authorization: Bearer <admin token>`; the server writes the token to `~/.actenon-permit/admin-token` (0600) and prints only that path (or use `--admin-token-file` / `ACTENON_ADMIN_TOKEN`). Agents only ever hold their grant token, so an agent on the same host cannot issue itself grants, mint tokens, approve its own requests or read other grants. `permit watch` and the TS `ControlPlaneClient({ adminToken })` send the token.
+
 The CLI is the single entry point for the whole ecosystem — including Scan (which lives in a separate repo). It is intentionally a thin orchestrator: every subcommand maps to a function you can also call from the SDK.
 
 ## Boundary Kit — resource-boundary protection in 3 commands
@@ -347,8 +353,8 @@ In `resource_owned` mode, Permit still issues the Grant and mints the PCCB — b
 - **See the raw credential.** The broker resolves it internally and passes it only to the adapter.
 - **Bypass proof verification.** The Kernel verifies at the edge; the broker will not resolve the credential until verification passes.
 - **Exceed budget / scope / rate.** The PDP enforces at decision time; the lifecycle state machine prevents out-of-order execution.
-- **Replay a proof.** Single-use PCCB + lifecycle state machine + durable replay store (atomic claim-once, not check-then-write). Replays are refused with `REPLAY_DETECTED`.
-- **Mutate parameters after approval.** The PCCB binds the action-hash (SHA-256 over `ACTENON-JCS-STRICT-1` canonical JSON of the parameters). Any mutation is detected at the edge as `ACTION_HASH_MISMATCH` / `PARAMETER_DIGEST_MISMATCH`.
+- **Replay a proof.** Single-use PCCB + lifecycle state machine + durable replay store (atomic claim-once, not check-then-write). Replays are refused (a re-executed intent with `intent:not_executable`; a PCCB presented for another action with `INTENT_MISMATCH`; a reused boundary proof with `REPLAY_DETECTED`).
+- **Mutate parameters after approval.** The PCCB binds the action-hash (SHA-256 over `ACTENON-JCS-STRICT-1` canonical JSON of the parameters). Any mutation is refused at the edge by the Kernel (`ACTION_MISMATCH`), and at a Boundary Kit route as `PARAMETER_MISMATCH`.
 - **Forward proof to a different tool.** The PCCB binds `audience`. A proof minted for tool A is refused by tool B with `AUDIENCE_MISMATCH`. See the Kernel's [Multi-Agent Execution Model](https://github.com/Actenon/actenon-kernel/blob/main/docs/MULTI_AGENT_EXECUTION_MODEL.md).
 - **Silently ignore unsupported parameters.** Adapters reject unknown fields with `InvalidParametersError`.
 

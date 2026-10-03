@@ -33,7 +33,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Check generated Python badge
         run: uv run python scripts/sync_badges.py --check

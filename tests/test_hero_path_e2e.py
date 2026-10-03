@@ -9,6 +9,8 @@ expired grant are each refused, and the adapter is never called for them.
 from __future__ import annotations
 
 import json
+import os
+import re
 import subprocess
 import sys
 import warnings
@@ -67,11 +69,15 @@ def _create(client, params=PARAMS):
 
 
 def _kernel_cli(*args: str, cwd) -> subprocess.CompletedProcess:
+    # The PCCB is HS256 under the dev signing key; kernels that also verify
+    # the linked PCCB's signature take that key from ACTENON_LOCAL_HMAC_SECRET.
+    env = {**os.environ, "ACTENON_LOCAL_HMAC_SECRET": "hero-path-signing-key"}
     return subprocess.run(
         [sys.executable, "-m", "actenon.cli", *args],
         capture_output=True,
         text=True,
         cwd=cwd,
+        env=env,
     )
 
 
@@ -106,7 +112,8 @@ def test_hero_path_end_to_end(hero, tmp_path):
         cwd=tmp_path,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "Receipt verified." in proc.stdout
+    # kernel <= 1.2.1: "Receipt verified."; newer: "Receipt links verified."
+    assert re.search(r"Receipt (links )?verified\.", proc.stdout), proc.stdout
 
     # 3. Replay: the same intent cannot execute again.
     with pytest.raises(ActenonError):

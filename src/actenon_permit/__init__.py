@@ -34,7 +34,13 @@ Public API:
 
 from __future__ import annotations
 
-__version__ = "1.1.0"
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _dist_version
+
+try:
+    __version__ = _dist_version("actenon-permit")
+except _PackageNotFoundError:  # running from a source tree without install
+    __version__ = "0.0.0+unknown"
 
 from .adapters import (
     AdapterError,
@@ -147,7 +153,8 @@ from .token import TokenError, grant_to_token, token_to_grant
 # Backward-compat aliases for the pre-rename names. The product was originally
 # called "Leash" internally; it's now "Permit". These aliases keep old code
 # working but the canonical names are PermitDenied / PermitApprovalRequired.
-# TODO: remove these aliases in v2.0.
+# Kept in 2.0.0 (tests/test_nits.py asserts them). Any removal will be announced
+# in CHANGELOG.md one major version ahead.
 LeashDenied = PermitDenied
 LeashApprovalRequired = PermitApprovalRequired
 
@@ -277,4 +284,3 @@ __all__ = [
     "ResourceOwnedResult",
     "RetryableError",
 ]
-

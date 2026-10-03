@@ -71,7 +71,7 @@ def test_permit_mints_real_kernel_pccb(setup):
     from actenon.proof.service import PCCBVerifier
     from actenon.proof.signers.local import build_local_proof_signer
 
-    _, _, pdp, grant = setup
+    store, _, pdp, grant = setup
     action = _make_action(grant, amount=20)
 
     decision, intent, pccb = pdp.decide_and_mint_pccb(grant, action)
@@ -80,8 +80,10 @@ def test_permit_mints_real_kernel_pccb(setup):
     assert pccb is not None, "PCCB must be returned on ALLOW"
 
     # The PCCB must verify with the kernel's own verifier (same signer).
+    from actenon_permit.revocation import StoreRevocationChecker
+
     signer = build_local_proof_signer(secret="phase1-gate-test-key")
-    verifier = PCCBVerifier(signer=signer)
+    verifier = PCCBVerifier(signer=signer, revocation_checker=StoreRevocationChecker(store))
     from actenon_permit.kernel_bridge import _build_context
 
     context = _build_context(grant, action)
@@ -96,7 +98,7 @@ def test_pccb_action_hash_matches_kernel_canonicalization(setup):
     from actenon.proof.canonical import sha256_hex
     from actenon.proof.service import build_action_hash_input
 
-    _, _, pdp, grant = setup
+    store, _, pdp, grant = setup
     action = _make_action(grant, amount=20)
     _, intent, pccb = pdp.decide_and_mint_pccb(grant, action)
 
@@ -115,7 +117,7 @@ def test_mutation_amount_detected_at_edge(setup):
 
     from actenon_permit.kernel_bridge import verify_pccb_at_edge
 
-    _, _, pdp, grant = setup
+    store, _, pdp, grant = setup
     # Issue PCCB for $20
     action = _make_action(grant, amount=20)
     _, intent, pccb = pdp.decide_and_mint_pccb(grant, action)
@@ -133,7 +135,7 @@ def test_mutation_target_detected_at_edge(setup):
 
     from actenon_permit.kernel_bridge import verify_pccb_at_edge
 
-    _, _, pdp, grant = setup
+    store, _, pdp, grant = setup
     action = _make_action(grant, amount=20)
     _, intent, pccb = pdp.decide_and_mint_pccb(grant, action)
 
@@ -160,7 +162,7 @@ def test_mutation_action_type_detected_at_edge(setup):
 
     from actenon_permit.kernel_bridge import verify_pccb_at_edge
 
-    _, _, pdp, grant = setup
+    store, _, pdp, grant = setup
     action = _make_action(grant, amount=20, type="payment.refund")
     _, intent, pccb = pdp.decide_and_mint_pccb(grant, action)
 
@@ -185,7 +187,7 @@ def test_cross_signer_rejected(setup):
 
     from actenon_permit.kernel_bridge import _build_context
 
-    _, _, pdp, grant = setup
+    store, _, pdp, grant = setup
     action = _make_action(grant, amount=20)
     _, intent, pccb = pdp.decide_and_mint_pccb(grant, action)
 
@@ -202,7 +204,7 @@ def test_cross_signer_rejected(setup):
 
 def test_pccb_not_minted_on_deny(setup):
     """On DENY, no PCCB is minted — the credential cannot be released."""
-    _, _, pdp, grant = setup
+    store, _, pdp, grant = setup
     # Charge is denied by scope
     action = _make_action(grant, amount=100, type="payment.charge")
     decision, intent, pccb = pdp.decide_and_mint_pccb(grant, action)

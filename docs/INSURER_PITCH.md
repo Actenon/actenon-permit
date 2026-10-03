@@ -116,5 +116,5 @@ happened.
 
 *Actenon-Permit is open-source (Apache-2.0) at github.com/Actenon/actenon-permit.
 The kernel (verifier + spec + conformance) is at github.com/Actenon/actenon-kernel.
-The managed control plane is at github.com/Actenon/actenon-cloud.
+The managed control plane is actenon-cloud (a private repository, not publicly available).
 All three are auditable. Run the demo: `uv run permit demo`*
