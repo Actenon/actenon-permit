@@ -362,9 +362,12 @@ the only entry point.
 
 | Protocol | Kernel | Permit | Cloud | Scan | SDK |
 |---|---|---|---|---|---|
+| ≥ 1.1.0, < 2 | ≥ 1.3.0, < 2 | 2.0.0 | not required | independent | 2.0.0 |
 | 1.1.0 | ≥ 1.0.0 | 1.4.0 | 0.1.0 | 0.1.3 | 1.4.0 |
 
-Protocol 1.1.0 is backward-compatible with 1.0.0 (purely additive).
+Permit 2.0.0 declares `actenon-kernel[asymmetric]>=1.3.0,<2` and `actenon-protocol>=1.1.0,<2`.
+Kernel 1.3.0 implements protocol 1.4.0's edge binding (`protocol/13-edge-binding.md`), which
+Permit 2.0.0's revocable proofs rely on. Protocol 1.1.0 is backward-compatible with 1.0.0 (purely additive).
 
 ---
 
