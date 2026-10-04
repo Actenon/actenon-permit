@@ -87,5 +87,8 @@ jobs:
         # clean venv with runtime deps only.
         run: |
           python -m venv /tmp/plain-install
+          # The bootstrapped runner pip crashes on extras plus direct Git
+          # constraints; use its supported resolver for this staging input.
+          /tmp/plain-install/bin/python -m pip install --upgrade pip
           /tmp/plain-install/bin/pip install --quiet .
           /tmp/plain-install/bin/python -m pytest -q -p no:cacheprovider
