@@ -448,9 +448,13 @@ def test_effect_policy_denial_and_approval_cannot_be_bypassed_by_context(ledger)
     denied, _, _ = pdp.decide_and_mint_pccb(grant, action, effect_namespace="owner:merchant-1")
     assert denied.outcome == DecisionOutcome.DENY
     assert balance(store, grant) == 100
+    # Policy is immutable under a grant identity. Issue a new grant for the
+    # approval-required policy; never use import to overwrite live authority.
+    grant = grant.model_copy(deep=True, update={"id": "grant_approval_required"})
     grant.approval_rules = ["payment.refund > 10"]
     grant.sign()
     store.put_grant(grant)
+    action.grant_id = grant.id
     action.type = "payment.refund"
     waiting, _, _ = pdp.decide_and_mint_pccb(
         grant,

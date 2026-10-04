@@ -32,7 +32,7 @@ from decimal import Decimal
 from typing import Any
 
 from .effects import EffectLedgerMixin
-from .model import Grant, GrantStatus
+from .model import Grant, GrantStatus, canonical_json
 
 
 class StateError(RuntimeError):
@@ -208,22 +208,62 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
     # ------------------------------------------------------------------
 
     def put_grant(self, grant: Grant) -> None:
-        body = grant.model_dump_json()
+        # Own the caller's snapshot before locking: authority must not be
+        # compared from one mutable object and then stored from another view.
+        frozen = Grant.model_validate_json(grant.model_dump_json())
+        body = frozen.model_dump_json()
         now = datetime.now(UTC).isoformat()
         with self._lock:
             cur = self._conn.cursor()
-            cur.execute(
-                "INSERT OR REPLACE INTO grants (id, agent_id, body, status, remaining, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    grant.id,
-                    grant.agent_id,
-                    body,
-                    grant.status.value,
-                    float(grant.budget.remaining),
-                    now,
-                ),
-            )
+            cur.execute("BEGIN IMMEDIATE")
+            try:
+                existing = cur.execute(
+                    "SELECT body FROM grants WHERE id = ?", (frozen.id,)
+                ).fetchone()
+                if existing is not None:
+                    stored = Grant.model_validate_json(existing[0])
+                    if canonical_json(stored._signing_payload()) != canonical_json(
+                        frozen._signing_payload()
+                    ):
+                        raise StateError("changed grant authority requires a new grant identity")
+                    if stored.signature != frozen.signature:
+                        # The existing administrator mint-token path can sign a
+                        # legacy unsigned grant. Attach only a verified signature
+                        # to the current body; never restore the bearer snapshot.
+                        if stored.signature or not frozen.verify():
+                            raise StateError(
+                                "changed grant authority requires a new grant identity"
+                            )
+                        stored.signature = frozen.signature
+                        cur.execute(
+                            "UPDATE grants SET body = ? WHERE id = ?",
+                            (stored.model_dump_json(), frozen.id),
+                        )
+                    # Identical authority is an import retry, not a live-state
+                    # update. Keep spent funds, revocation, rate/effect history,
+                    # and timestamps even if a signed bearer has stale state.
+                else:
+                    remaining = _budget_amount(frozen.budget.remaining)
+                    limit = _budget_amount(frozen.budget.limit)
+                    if remaining > limit:
+                        raise StateError("grant remaining budget exceeds its signed limit")
+                    cur.execute(
+                        "INSERT INTO grants (id, agent_id, body, status, remaining, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        (
+                            frozen.id,
+                            frozen.agent_id,
+                            body,
+                            frozen.status.value,
+                            float(remaining),
+                            now,
+                        ),
+                    )
+                cur.execute("COMMIT")
+            except Exception:
+                with contextlib.suppress(Exception):
+                    cur.execute("ROLLBACK")
+                raise
 
     def get_grant(self, grant_id: str) -> Grant | None:
         with self._lock:
