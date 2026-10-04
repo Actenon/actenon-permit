@@ -83,14 +83,16 @@ Do not pin PyPI `actenon-permit` 1.4.0 for this contract. That release signs
 `status` and `budget.remaining`, so the second ALLOW in a session does not
 verify, and it does not ship `StoreRevocationChecker`.
 
-Pin the git commit that added this file (the head SHA is in the Permit PR),
-together with the kernel Airlock already pins
+The contract is in `5641b9d093b806a103610860aa633bf9e4003bd6` and later.
+Pin the head SHA named in the Permit pull request (that commit or a
+descendant on `main`). Pair it with the kernel Airlock already pins
 (`533c029d63b5ce070a1eb8d8513e8e57a75ec703`), whose `PCCBMinter.mint` accepts
 `extensions`:
 
 ```text
-actenon-permit @ git+https://github.com/Actenon/actenon-permit.git@<PR_HEAD_SHA>
+actenon-permit @ git+https://github.com/Actenon/actenon-permit.git@5641b9d093b806a103610860aa633bf9e4003bd6
 ```
 
 Package version stays `1.4.0`. PyPI `actenon-permit` 1.4.0 does not include
-this contract, and nothing here publishes a new release.
+this contract, and nothing here publishes a new release. Use the pull-request
+head if it is newer than `5641b9d`; both contain the verifier fix.
