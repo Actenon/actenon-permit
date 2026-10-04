@@ -6,9 +6,10 @@ an MCP ``_meta`` field. The format is:
 
     v1.<base64url(canonical_json(signed_grant_dict))>
 
-The grant dict is the full signed grant (including the ``signature`` field).
-Verifiers recompute the HMAC over the dict minus the signature field and
-compare. A token is valid iff:
+The grant dict is the full signed grant (including the ``signature`` field
+and the live ``status`` / ``budget.remaining``). Verifiers recompute the HMAC
+over the authority payload (see ``authority_payload``) and compare. A token
+is valid iff:
 
   1. It starts with ``v1.``.
   2. The base64url payload decodes to a JSON object.
@@ -26,7 +27,7 @@ import base64
 import json
 from typing import Any
 
-from .model import Grant, sign, verify_signature
+from .model import Grant, authority_payload, sign, verify_signature
 
 VERSION = "v1"
 _PREFIX = f"{VERSION}."
@@ -81,16 +82,14 @@ def token_to_grant(token: str, *, verify: bool = True) -> Grant:
         grant = Grant.model_validate(payload)
     except Exception as e:
         raise TokenError(f"invalid grant payload: {e}") from e
-    if verify:
-        signing_payload = {k: v for k, v in payload.items() if k != "signature"}
-        if not verify_signature(signing_payload, grant.signature):
-            raise TokenError("signature verification failed — token is forged or was signed with a different key")
+    if verify and not verify_signature(authority_payload(payload), grant.signature):
+        raise TokenError("signature verification failed — token is forged or was signed with a different key")
     return grant
 
 
 def recompute_signature(payload: dict[str, Any]) -> str:
-    """Recompute the HMAC signature for a grant payload dict (public helper)."""
-    return sign({k: v for k, v in payload.items() if k != "signature"})
+    """Recompute the HMAC over the authority payload (public helper)."""
+    return sign(authority_payload(payload))
 
 
 __all__ = ["VERSION", "TokenError", "grant_to_token", "token_to_grant", "recompute_signature"]

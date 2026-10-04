@@ -141,6 +141,7 @@ class TestFailureCodePerScenario:
         store, ledger, pdp = stack
         grant = _make_grant()
         grant.rate = Rate(max=2, per_seconds=60)
+        grant.sign()
         store.put_grant(grant)
         # Fire 3 actions — the 3rd should be rate-limited
         for _ in range(3):
@@ -165,6 +166,7 @@ class TestFailureCodePerScenario:
         store, ledger, pdp = stack
         grant = _make_grant()
         grant.approval_rules = ["email.send"]
+        grant.sign()
         store.put_grant(grant)
         action = _make_action(grant, type="email.send", amount=None)
         d = pdp.decide(grant, action)
