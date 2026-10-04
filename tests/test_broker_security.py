@@ -100,6 +100,14 @@ def _make_decision_allow() -> Decision:
     return Decision(outcome=DecisionOutcome.ALLOW, reason="test allow", rule_matched="test:allow")
 
 
+def _policy_allow(broker, grant, action):
+    """Exercise the real PDP and its durable reservation before execution."""
+    action.grant_id = grant.id
+    decision = broker.pdp.decide(grant, action)
+    assert decision.outcome == DecisionOutcome.ALLOW
+    return decision
+
+
 def _make_action(action_type: str = "issue.create", params: dict[str, Any] | None = None) -> Action:
     return Action(
         grant_id="grant_test",
@@ -144,7 +152,7 @@ def test_1_agent_cannot_retrieve_raw_credential(tmp_db):
     grant = _make_grant(tmp_db)
     broker, adapter = _make_broker(tmp_db, credential_value="ghp_SUPER_SECRET_VALUE_xyz")
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     response, cost = broker.execute_via_adapter(
         grant, action, decision, adapter,
@@ -172,7 +180,7 @@ def test_2_credential_not_logged(tmp_db, caplog):
     grant = _make_grant(tmp_db)
     broker, adapter = _make_broker(tmp_db, credential_value="ghp_LOG_SHOULD_NOT_CONTAIN_THIS")
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     # Capture all logging at DEBUG and above.
     with caplog.at_level(logging.DEBUG, logger="actenon_permit.broker"):
@@ -200,7 +208,7 @@ def test_3_credential_not_written_to_receipts(tmp_db):
     grant = _make_grant(tmp_db)
     broker, adapter = _make_broker(tmp_db, credential_value="ghp_RECEIPT_LEAK_TEST_123")
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     response, _ = broker.execute_via_adapter(
         grant, action, decision, adapter,
@@ -318,7 +326,7 @@ def test_6_provider_timeout(tmp_db):
     broker, _adapter = _make_broker(tmp_db)
     timeout_adapter = _TimeoutAdapter()
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     with pytest.raises(BrokerExecutionError) as exc:
         broker.execute_via_adapter(
@@ -371,7 +379,7 @@ def test_7_provider_partial_response(tmp_db):
     broker, _adapter = _make_broker(tmp_db)
     partial_adapter = _PartialResponseAdapter()
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     with pytest.raises(BrokerExecutionError) as exc:
         broker.execute_via_adapter(
@@ -397,6 +405,7 @@ def test_8_duplicate_request_returns_same_response(tmp_db):
 
     # First call.
     action1 = _make_action(params={"owner": "actenon", "repo": "demo", "title": "first"})
+    decision = _policy_allow(broker, grant, action1)
     response1, _ = broker.execute_via_adapter(
         grant, action1, decision, adapter,
         credential_ref="github_token",
@@ -405,6 +414,7 @@ def test_8_duplicate_request_returns_same_response(tmp_db):
 
     # Second call with the SAME params and SAME key — must return same response.
     action2 = _make_action(params={"owner": "actenon", "repo": "demo", "title": "first"})
+    decision = _policy_allow(broker, grant, action2)
     response2, _ = broker.execute_via_adapter(
         grant, action2, decision, adapter,
         credential_ref="github_token",
@@ -415,6 +425,7 @@ def test_8_duplicate_request_returns_same_response(tmp_db):
 
     # Third call with DIFFERENT params but the SAME key — must raise.
     action3 = _make_action(params={"owner": "actenon", "repo": "demo", "title": "different"})
+    decision = _policy_allow(broker, grant, action3)
     with pytest.raises(BrokerExecutionError) as exc:
         broker.execute_via_adapter(
             grant, action3, decision, adapter,
@@ -464,7 +475,7 @@ def test_9_adapter_exception_does_not_leak_credential(tmp_db):
     broker, _adapter = _make_broker(tmp_db, credential_value=secret)
     crash_adapter = _CrashingAdapter()
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     with pytest.raises(BrokerExecutionError) as exc:
         broker.execute_via_adapter(
@@ -495,7 +506,7 @@ def test_10_credential_resolver_failure(tmp_db):
     broker = Broker(pdp, credential_providers=CredentialProviderRegistry())
     adapter = GitHubAdapter(test_mode=True)
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     with pytest.raises(BrokerExecutionError) as exc:
         broker.execute_via_adapter(
@@ -624,7 +635,7 @@ def test_12_reconciliation_after_unknown_outcome(tmp_db):
     broker, _adapter = _make_broker(tmp_db)
     unknown_adapter = _UnknownOutcomeAdapter()
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     response, cost = broker.execute_via_adapter(
         grant, action, decision, unknown_adapter,
@@ -653,7 +664,7 @@ def test_dev_credential_refused_in_production_mode(tmp_db):
     grant = _make_grant(tmp_db)
     broker, adapter = _make_broker(tmp_db, production_mode=True)
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     with pytest.raises(BrokerExecutionError) as exc:
         broker.execute_via_adapter(
@@ -711,7 +722,7 @@ def test_github_adapter_test_mode_does_not_touch_network(tmp_db):
     action = _make_action(
         params={"owner": "actenon", "repo": "broker-demo", "title": "broker test issue"},
     )
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     response, cost = broker.execute_via_adapter(
         grant, action, decision, adapter,
@@ -740,6 +751,7 @@ def test_github_adapter_all_four_actions_in_test_mode(tmp_db):
         action_type="issue.create",
         params={"owner": "actenon", "repo": "demo", "title": "t1"},
     )
+    decision = _policy_allow(broker, grant, a1)
     r1, _ = broker.execute_via_adapter(grant, a1, decision, adapter, credential_ref="github_token", idempotency_key="a1")
     assert r1.ok and "issue_url" in r1.provider_evidence
 
@@ -748,6 +760,7 @@ def test_github_adapter_all_four_actions_in_test_mode(tmp_db):
         action_type="issue.comment",
         params={"owner": "actenon", "repo": "demo", "issue_number": 1, "body": "hi"},
     )
+    decision = _policy_allow(broker, grant, a2)
     r2, _ = broker.execute_via_adapter(grant, a2, decision, adapter, credential_ref="github_token", idempotency_key="a2")
     assert r2.ok and "comment_url" in r2.provider_evidence
 
@@ -756,6 +769,7 @@ def test_github_adapter_all_four_actions_in_test_mode(tmp_db):
         action_type="branch.create",
         params={"owner": "actenon", "repo": "demo", "branch": "feature/x"},
     )
+    decision = _policy_allow(broker, grant, a3)
     r3, _ = broker.execute_via_adapter(grant, a3, decision, adapter, credential_ref="github_token", idempotency_key="a3")
     assert r3.ok and "branch_url" in r3.provider_evidence
 
@@ -764,5 +778,6 @@ def test_github_adapter_all_four_actions_in_test_mode(tmp_db):
         action_type="pr.open",
         params={"owner": "actenon", "repo": "demo", "title": "pr", "head": "feature/x", "base": "main"},
     )
+    decision = _policy_allow(broker, grant, a4)
     r4, _ = broker.execute_via_adapter(grant, a4, decision, adapter, credential_ref="github_token", idempotency_key="a4")
     assert r4.ok and "pr_url" in r4.provider_evidence

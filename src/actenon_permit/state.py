@@ -21,6 +21,7 @@ against a $50 budget and asserts exactly one is ALLOWED.
 from __future__ import annotations
 
 import contextlib
+import math
 import os
 import sqlite3
 import threading
@@ -35,6 +36,22 @@ from .model import Grant, GrantStatus
 
 class StateError(RuntimeError):
     """Raised on state-store level failures (e.g. unknown grant)."""
+
+
+def _budget_amount(value: float | Decimal | int) -> Decimal:
+    """Validate and normalize a value to the store's SQLite REAL precision."""
+    if isinstance(value, bool) or not isinstance(value, (float, Decimal, int)):
+        raise StateError("budget amount must be a finite number")
+    try:
+        decimal_value = Decimal(str(value))
+        stored_value = float(decimal_value)
+    except (ValueError, OverflowError) as exc:
+        raise StateError("budget amount must be a finite number") from exc
+    if not decimal_value.is_finite() or not math.isfinite(stored_value):
+        raise StateError("budget amount must be a finite number")
+    if decimal_value != 0 and stored_value == 0:
+        raise StateError("budget amount is below the store's numeric precision")
+    return Decimal(str(stored_value))
 
 
 class StateStore(ABC):
@@ -81,14 +98,16 @@ class StateStore(ABC):
         actual_cost: float | Decimal | int,
         reserved_amount: float | Decimal | int,
     ) -> float:
-        """Commit the actual cost of an action, releasing the difference
-        between reservation and actual. Returns the new ``remaining``.
+        """Settle a matching durable reservation once. An identical commit
+        replay returns the current remaining budget without changing it.
+        Missing, mismatched or conflicting settlements raise StateError.
         """
 
     @abstractmethod
     def release(self, grant_id: str, action_id: str, reserved_amount: float | Decimal | int) -> float:
-        """Release a reservation without recording an actual cost (e.g. on
-        DENY-after-reserve failure paths). Returns the new ``remaining``.
+        """Release a matching, uncommitted reservation when non-execution is
+        established. Missing, mismatched or committed reservations raise
+        StateError. An uncertain dispatch must keep its reservation.
         """
 
     @abstractmethod
@@ -118,7 +137,7 @@ class SQLiteStore(StateStore):
             cur.executescript(
                 """
                 PRAGMA journal_mode=WAL;
-                PRAGMA synchronous=NORMAL;
+                PRAGMA synchronous=FULL;
                 PRAGMA busy_timeout=10000;
 
                 CREATE TABLE IF NOT EXISTS grants (
@@ -248,6 +267,7 @@ class SQLiteStore(StateStore):
         Returns ``(ok, reason, snapshot)`` where snapshot is the post-reserve
         grant state (status, remaining) for the PDP to log.
         """
+        dec_amount = _budget_amount(amount)
         now_ts = time.time()
         with self._lock:
             cur = self._conn.cursor()
@@ -286,9 +306,7 @@ class SQLiteStore(StateStore):
                         cur.execute("ROLLBACK")
                         return False, "rate limit", {}
 
-                # Convert to Decimal for exact arithmetic (F2 fix)
-                dec_amount = Decimal(str(amount)) if not isinstance(amount, Decimal) else amount
-                dec_remaining = Decimal(str(remaining)) if not isinstance(remaining, Decimal) else remaining
+                dec_remaining = _budget_amount(remaining)
 
                 # SECURITY: reject negative amounts
                 if dec_amount < 0:
@@ -316,7 +334,7 @@ class SQLiteStore(StateStore):
                 cur.execute(
                     "INSERT INTO rate_events (action_id, grant_id, ts, reserved_amount, committed) "
                     "VALUES (?, ?, ?, ?, 0)",
-                    (action_id, grant_id, now_ts, amount),
+                    (action_id, grant_id, now_ts, float(dec_amount)),
                 )
 
                 # Always reflect the new remaining in the body JSON so that
@@ -325,7 +343,7 @@ class SQLiteStore(StateStore):
                 # remaining from body and over-spend.
                 grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
                 new_status = grant.status
-                if new_remaining <= 0 and amount > 0:
+                if new_remaining <= 0 and dec_amount > 0:
                     new_status = GrantStatus.EXHAUSTED
                     grant.status = new_status
                     cur.execute(
@@ -354,13 +372,13 @@ class SQLiteStore(StateStore):
         actual_cost: float | Decimal | int,
         reserved_amount: float | Decimal | int,
     ) -> float:
-        """Commit actual cost and release the over-reservation."""
+        """Commit actual cost and release the over-reservation exactly once."""
         # SECURITY: reject negative actual costs — a negative actual_cost would
         # inflate the budget via the reconciliation step (release = reserved -
         # actual = 20 - (-10) = 30, adding 30 to remaining). Found by
         # adversarial testing (round 2, test_negative_actual_cost_rejected).
-        if actual_cost < 0:
-            actual_cost = 0.0
+        dec_actual = max(Decimal("0"), _budget_amount(actual_cost))
+        claimed_reserved = _budget_amount(reserved_amount)
 
         now_iso = datetime.now(UTC).isoformat()
         with self._lock:
@@ -370,26 +388,26 @@ class SQLiteStore(StateStore):
                 cur.execute("SELECT body, remaining FROM grants WHERE id = ?", (grant_id,))
                 row = cur.fetchone()
                 if not row:
-                    cur.execute("ROLLBACK")
                     raise StateError(f"grant not found: {grant_id}")
                 body, remaining = row
                 grant = Grant.model_validate_json(body)
 
-                # Decimal arithmetic (F2 fix)
-                dec_reserved = Decimal(str(reserved_amount)) if not isinstance(reserved_amount, Decimal) else reserved_amount
-                dec_actual = Decimal(str(actual_cost)) if not isinstance(actual_cost, Decimal) else actual_cost
-                if dec_actual < 0:
-                    dec_actual = Decimal("0")
+                dec_reserved, committed, settled_cost = self._reservation(cur, grant_id, action_id, claimed_reserved)
+                if committed:
+                    if settled_cost is None or _budget_amount(settled_cost) != dec_actual:
+                        raise StateError("reservation was already committed with a different cost")
+                    cur.execute("COMMIT")
+                    return float(_budget_amount(remaining))
                 release_amount = max(Decimal("0"), min(dec_reserved, dec_reserved - dec_actual))
-                new_remaining = float(Decimal(str(remaining)) + release_amount)
+                new_remaining = float(_budget_amount(remaining) + release_amount)
 
                 cur.execute(
                     "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
                     (new_remaining, now_iso, grant_id),
                 )
                 cur.execute(
-                    "UPDATE rate_events SET committed = 1, actual_cost = ? WHERE action_id = ?",
-                    (actual_cost, action_id),
+                    "UPDATE rate_events SET committed = 1, actual_cost = ? WHERE action_id = ? AND grant_id = ?",
+                    (float(dec_actual), action_id, grant_id),
                 )
                 # Reflect in body
                 grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
@@ -405,7 +423,8 @@ class SQLiteStore(StateStore):
                 raise
 
     def release(self, grant_id: str, action_id: str, reserved_amount: float | Decimal | int) -> float:
-        """Release a reservation without an actual cost (failure path)."""
+        """Release a matching reservation only after establishing no execution."""
+        claimed_reserved = _budget_amount(reserved_amount)
         now_iso = datetime.now(UTC).isoformat()
         with self._lock:
             cur = self._conn.cursor()
@@ -414,20 +433,21 @@ class SQLiteStore(StateStore):
                 cur.execute("SELECT body, remaining FROM grants WHERE id = ?", (grant_id,))
                 row = cur.fetchone()
                 if not row:
-                    cur.execute("ROLLBACK")
                     raise StateError(f"grant not found: {grant_id}")
                 body, remaining = row
                 grant = Grant.model_validate_json(body)
 
-                dec_reserved = Decimal(str(reserved_amount)) if not isinstance(reserved_amount, Decimal) else reserved_amount
-                new_remaining = float(Decimal(str(remaining)) + dec_reserved)
+                dec_reserved, committed, _ = self._reservation(cur, grant_id, action_id, claimed_reserved)
+                if committed:
+                    raise StateError("committed reservation cannot be released")
+                new_remaining = float(_budget_amount(remaining) + dec_reserved)
                 cur.execute(
                     "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
                     (new_remaining, now_iso, grant_id),
                 )
                 # Remove the rate_events row entirely — a released action
                 # should not count toward rate limit (the action didn't fire).
-                cur.execute("DELETE FROM rate_events WHERE action_id = ?", (action_id,))
+                cur.execute("DELETE FROM rate_events WHERE action_id = ? AND grant_id = ?", (action_id, grant_id))
                 grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
                 cur.execute(
                     "UPDATE grants SET body = ? WHERE id = ?",
@@ -439,6 +459,25 @@ class SQLiteStore(StateStore):
                 with contextlib.suppress(Exception):
                     cur.execute("ROLLBACK")
                 raise
+
+    @staticmethod
+    def _reservation(
+        cur: sqlite3.Cursor, grant_id: str, action_id: str, claimed_amount: Decimal,
+    ) -> tuple[Decimal, bool, float | None]:
+        """Read and validate a reservation inside the settlement transaction."""
+        cur.execute(
+            "SELECT grant_id, reserved_amount, committed, actual_cost FROM rate_events WHERE action_id = ?",
+            (action_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            raise StateError("reservation not found")
+        if row[0] != grant_id:
+            raise StateError("reservation belongs to another grant")
+        amount = _budget_amount(row[1])
+        if amount < 0 or amount != claimed_amount:
+            raise StateError("reserved amount does not match the stored reservation")
+        return amount, bool(row[2]), row[3]
 
     def rate_count(self, grant_id: str, per_seconds: int) -> int:
         now_ts = time.time()

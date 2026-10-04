@@ -98,6 +98,14 @@ def _make_decision_allow() -> Decision:
     return Decision(outcome=DecisionOutcome.ALLOW, reason="test allow", rule_matched="test:allow")
 
 
+def _policy_allow(broker, grant, action):
+    """Exercise the real PDP and its durable reservation before execution."""
+    action.grant_id = grant.id
+    decision = broker.pdp.decide(grant, action)
+    assert decision.outcome == DecisionOutcome.ALLOW
+    return decision
+
+
 def _make_action(action_type: str = "issue.create", params: dict[str, Any] | None = None) -> Action:
     return Action(
         grant_id="grant_test",
@@ -141,7 +149,7 @@ def test_1_modes_cannot_be_confused(tmp_db):
     broker, adapter, _ = _make_broker_and_adapter(tmp_db)
     coord = BrokeredExecutionCoordinator(broker=broker)
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     brokered_result = coord.coordinate(
         grant, action, decision, adapter,
@@ -201,7 +209,7 @@ def test_2_receipt_mode_is_mandatory(tmp_db):
     broker, adapter, _ = _make_broker_and_adapter(tmp_db)
     coord = BrokeredExecutionCoordinator(broker=broker)
     action = _make_action()
-    decision = _make_decision_allow()
+    decision = _policy_allow(broker, grant, action)
 
     result = coord.coordinate(
         grant, action, decision, adapter,
@@ -243,6 +251,7 @@ def test_3_brokered_success_requires_observed_provider_success(tmp_db):
 
     # Path A: adapter succeeds, broker observes.
     action_ok = _make_action(params={"owner": "actenon", "repo": "demo", "title": "ok"})
+    decision = _policy_allow(broker, grant, action_ok)
     result_ok = coord.coordinate(
         grant, action_ok, decision, adapter,
         credential_ref="GITHUB_TOKEN",
@@ -461,6 +470,7 @@ def test_7_serialisation_preserves_mode_distinction(tmp_db, monkeypatch):
 
     # Brokered
     action_b = _make_action(params={"owner": "actenon", "repo": "demo", "title": "brokered"})
+    decision = _policy_allow(broker, grant, action_b)
     brokered = coord.coordinate(
         grant, action_b, decision, adapter,
         credential_ref="GITHUB_TOKEN",
