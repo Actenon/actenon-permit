@@ -5,13 +5,18 @@ import sqlite3
 
 import pytest
 
+from actenon_permit.ledger import Ledger
 from actenon_permit.state import SQLiteStore
 
 
 def _cold_start(path, barrier, queue):
     barrier.wait(timeout=20)
     store = SQLiteStore(path)
+    ledger = None
     try:
+        ledger = Ledger(store)
+        assert ledger.verify()
+        assert ledger._conn.execute("PRAGMA synchronous").fetchone()[0] == 2
         queue.put(
             (
                 store._conn.execute("PRAGMA journal_mode").fetchone()[0],
@@ -19,6 +24,8 @@ def _cold_start(path, barrier, queue):
             )
         )
     finally:
+        if ledger is not None:
+            ledger.close()
         store.close()
 
 

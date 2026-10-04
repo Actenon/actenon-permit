@@ -122,6 +122,24 @@ def _default_db_path() -> str:
     return os.environ.get("ACTENON_DB_PATH", "actenon.db")
 
 
+def _retry_sqlite_initialization(attempt) -> None:
+    """Bounded idempotent setup retry, only for actual SQLite contention."""
+    deadline = time.monotonic() + 10
+    while True:
+        try:
+            attempt()
+            return
+        except sqlite3.OperationalError as exc:
+            code = getattr(exc, "sqlite_errorcode", None)
+            busy = (code is not None and code & 255 in {5, 6}) or (
+                code is None and str(exc) in {"database is locked", "database table is locked"}
+            )
+            remaining = deadline - time.monotonic()
+            if not busy or remaining <= 0:
+                raise
+            time.sleep(min(0.02, remaining))
+
+
 class SQLiteStore(EffectLedgerMixin, StateStore):
     """SQLite-backed state store. Single-file, local, durable."""
 
@@ -145,20 +163,7 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
         # with a busy timeout. Retry idempotent schema setup on contention only;
         # never downgrade durability, ignore other errors, or open without it.
         self._conn.execute("PRAGMA busy_timeout=10000")
-        deadline = time.monotonic() + 10
-        while True:
-            try:
-                self._init_schema_attempt()
-                return
-            except sqlite3.OperationalError as exc:
-                code = getattr(exc, "sqlite_errorcode", None)
-                busy = (code is not None and code & 255 in {5, 6}) or (
-                    code is None and str(exc) in {"database is locked", "database table is locked"}
-                )
-                remaining = deadline - time.monotonic()
-                if not busy or remaining <= 0:
-                    raise
-                time.sleep(min(0.02, remaining))
+        _retry_sqlite_initialization(self._init_schema_attempt)
 
     def _init_schema_attempt(self) -> None:
         with self._lock:
