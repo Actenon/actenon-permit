@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="7" time="23.044" timestamp="2026-10-04T18:10:42.705784+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_http_effects" name="test_lost_response_retry_is_refused_after_restart_and_credential_rotation" time="0.050" /><testcase classname="tests.test_http_effects" name="test_generic_http_response_is_not_proof_of_committed_consequence" time="0.517" /><testcase classname="tests.test_http_effects" name="test_scan_read_only_http_operations_remain_repeatable" time="0.538" /><testcase classname="tests.test_http_effects" name="test_settlement_failure_keeps_dispatch_held_and_never_claims_non_execution" time="0.535" /><testcase classname="tests.test_http_effects" name="test_distinct_http_bodies_do_not_collapse_into_one_effect" time="0.537" /><testcase classname="tests.test_http_effects" name="test_mismatched_body_length_is_refused_before_dispatch" time="0.504" /><testcase classname="tests.test_http_effects" name="test_two_airlock_processes_share_one_consequential_dispatch" time="20.272"><failure message="_queue.Empty">project = &lt;function project.&lt;locals&gt;.create at 0x108709a80&gt;
+server = ('http://127.0.0.1:64572', [('/a', b'hello', {'Host': '127.0.0.1:64572', 'Accept': '*/*', 'Accept-Encoding': 'gzip, deflate', 'Connection': 'keep-alive', ...})])
+
+    def test_two_airlock_processes_share_one_consequential_dispatch(project, server):
+        url, calls = server
+        state = project(f'import requests\nrequests.post("{url}/a")\n')
+        context = multiprocessing.get_context("spawn")
+        queue = context.Queue()
+        processes = [
+            context.Process(target=_run_one_http, args=(str(state.root), url + "/a", queue))
+            for _ in range(2)
+        ]
+        for process in processes:
+            process.start()
+        try:
+&gt;           results = [queue.get(timeout=20) for _ in processes]
+                       ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_http_effects.py:170: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;multiprocessing.queues.Queue object at 0x10815c980&gt;, block = True
+timeout = 19.999998625018634
+
+    def get(self, block=True, timeout=None):
+        if self._closed:
+            raise ValueError(f"Queue {self!r} is closed")
+        if block and timeout is None:
+            with self._rlock:
+                res = self._recv_bytes()
+            self._sem.release()
+        else:
+            if block:
+                deadline = time.monotonic() + timeout
+            if not self._rlock.acquire(block, timeout):
+                raise Empty
+            try:
+                if block:
+                    timeout = deadline - time.monotonic()
+                    if not self._poll(timeout):
+&gt;                       raise Empty
+E                       _queue.Empty
+
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/multiprocessing/queues.py:114: Empty</failure></testcase></testsuite></testsuites>

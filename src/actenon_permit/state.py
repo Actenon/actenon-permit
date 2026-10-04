@@ -130,11 +130,37 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
         # check_same_thread=False because we use our own lock; isolation_level
         # None puts the connection in autocommit mode so we control txns
         # explicitly with BEGIN IMMEDIATE.
-        self._conn = sqlite3.connect(self.db_path, check_same_thread=False, isolation_level=None)
+        self._conn = sqlite3.connect(
+            self.db_path, check_same_thread=False, isolation_level=None, timeout=10
+        )
         self._lock = threading.RLock()
-        self._init_schema()
+        try:
+            self._init_schema()
+        except Exception:
+            self._conn.close()
+            raise
 
     def _init_schema(self) -> None:
+        # journal_mode's lock upgrade can return SQLITE_BUSY immediately even
+        # with a busy timeout. Retry idempotent schema setup on contention only;
+        # never downgrade durability, ignore other errors, or open without it.
+        self._conn.execute("PRAGMA busy_timeout=10000")
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                self._init_schema_attempt()
+                return
+            except sqlite3.OperationalError as exc:
+                code = getattr(exc, "sqlite_errorcode", None)
+                busy = (code is not None and code & 255 in {5, 6}) or (
+                    code is None and str(exc) in {"database is locked", "database table is locked"}
+                )
+                remaining = deadline - time.monotonic()
+                if not busy or remaining <= 0:
+                    raise
+                time.sleep(min(0.02, remaining))
+
+    def _init_schema_attempt(self) -> None:
         with self._lock:
             cur = self._conn.cursor()
             cur.executescript(
@@ -308,7 +334,9 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
         if grant.status != GrantStatus.ACTIVE:
             return False, f"grant status is {grant.status.value}", {}
 
-        overrun = cur.execute("SELECT amount FROM budget_overruns WHERE grant_id = ?", (grant_id,)).fetchone()
+        overrun = cur.execute(
+            "SELECT amount FROM budget_overruns WHERE grant_id = ?", (grant_id,)
+        ).fetchone()
         if overrun is not None and _budget_amount(overrun[0]) > 0:
             return False, "budget overrun remains unsettled", {}
 
