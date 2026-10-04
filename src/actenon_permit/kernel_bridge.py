@@ -131,7 +131,9 @@ def _permit_action_to_kernel_intent(
     # PCCB_TTL_SECONDS long, bounded by the grant: never the grant's lifetime.
     expires_at = min(grant.expires_at, action.ts + timedelta(seconds=PCCB_TTL_SECONDS))
     if expires_at < now:
-        raise KernelBridgeError(f"proof window for action {action.action_id} closed at {expires_at}")
+        raise KernelBridgeError(
+            f"proof window for action {action.action_id} closed at {expires_at}"
+        )
 
     # The action parameters are what make this "exact": the amount, the
     # reason, the target account. The kernel hashes these and the edge
@@ -151,9 +153,12 @@ def _permit_action_to_kernel_intent(
         "parent_grant_id": grant.parent_grant_id,
         "delegation_depth": grant.delegation_depth,
     }
-    authority_ref = "authref_" + hashlib.sha256(
-        json.dumps(authority_ref_input, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()[:32]
+    authority_ref = (
+        "authref_"
+        + hashlib.sha256(
+            json.dumps(authority_ref_input, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()[:32]
+    )
 
     return ActionIntent(
         intent_id=action.action_id,  # reuse permit's action_id as the intent_id
@@ -240,6 +245,8 @@ def mint_pccb_for_action(
     issuer_id: str = "actenon-permit",
     tenant_id: str = "default",
     audience_id: str = "actenon-permit-gateway",
+    prepared_intent: ActionIntent | None = None,
+    effect_reference: dict[str, Any] | None = None,
 ) -> tuple[ActionIntent, Any]:
     """Mint a real kernel PCCB for a permitted action.
 
@@ -258,9 +265,15 @@ def mint_pccb_for_action(
         raise KernelBridgeError("grant signature could not be verified")
     proof_capability(grant, action)
 
-    intent = _permit_action_to_kernel_intent(
+    intent = prepared_intent or _permit_action_to_kernel_intent(
         grant, action, tenant_id=tenant_id, audience_id=audience_id
     )
+    if effect_reference is not None:
+        from actenon_protocol.types.effects import EffectReference
+
+        EffectReference.model_validate(effect_reference)
+        if intent.intent_id != effect_attempt_id(action):
+            raise KernelBridgeError("effect proof must bind the actual execution attempt")
     kernel_decision = _permit_decision_to_kernel_decision(decision)
     context = _build_context(grant, action, audience_id=audience_id)
 
@@ -281,7 +294,10 @@ def mint_pccb_for_action(
     # Signed, revocable authority reference: every edge must consult this
     # grant's revocation state before executing (protocol/13 E5).
     authority = {"issuer": f"service:{issuer_id}", "grant_id": grant.id, "revocable": True}
-    pccb = minter.mint(intent, kernel_decision, context, extensions={"authority": authority})
+    extensions = {"authority": authority}
+    if effect_reference is not None:
+        extensions["effect"] = dict(effect_reference)
+    pccb = minter.mint(intent, kernel_decision, context, extensions=extensions)
     return intent, pccb
 
 
@@ -294,6 +310,7 @@ def verify_pccb_at_edge(
     signing_secret: bytes | str | None = None,
     audience_id: str = "actenon-permit-gateway",
     store: Any = None,
+    effect_protector: Any = None,
 ) -> None:
     """Verify a PCCB at the execution edge before releasing the credential.
 
@@ -317,7 +334,9 @@ def verify_pccb_at_edge(
     signer = resolve_signer(hmac_secret=signing_secret)
     verifier = PCCBVerifier(
         signer=signer,
-        revocation_checker=StoreRevocationChecker(store if store is not None else get_default_store()),
+        revocation_checker=StoreRevocationChecker(
+            store if store is not None else get_default_store()
+        ),
     )
     context = _build_context(grant, action, audience_id=audience_id)
 
@@ -333,7 +352,23 @@ def verify_pccb_at_edge(
     actual_intent = _permit_action_to_kernel_intent(
         grant, action, tenant_id=intent.tenant.tenant_id, audience_id=audience_id
     )
+    if "effect" in pccb.extensions:
+        from dataclasses import replace
+
+        actual_intent = replace(actual_intent, intent_id=effect_attempt_id(action))
     verifier.verify(actual_intent, pccb, context)
+    if "effect" in pccb.extensions or effect_protector is not None:
+        from actenon.core.errors import ProofVerificationError
+        from actenon.models.runtime import ProtectedExecutionRequest
+
+        if effect_protector is None:
+            raise ProofVerificationError(
+                "POLICY_REFUSAL",
+                "Effect-bearing proof requires authoritative edge ownership verification.",
+            )
+        effect_protector.claim_request(
+            ProtectedExecutionRequest(intent=actual_intent, pccb=pccb, context=context)
+        )
 
 
 def build_execution_receipt(
@@ -395,3 +430,21 @@ __all__ = [
     "token_payload_to_pccb",
     "build_action_hash_input",
 ]
+
+
+def effect_attempt_id(action: Action) -> str:
+    """Portable execution-attempt ID, independent of the logical effect ID."""
+    return "exec_" + hashlib.sha256(action.action_id.encode("utf-8")).hexdigest()[:32]
+
+
+def claim_effect_at_edge(reference, request, *, store) -> bool:
+    """Kernel's ledger hook; exact signed bindings are checked atomically."""
+    from actenon_protocol import parse_authority_extension
+
+    authority = parse_authority_extension(request.pccb.extensions)
+    return store.claim_effect(
+        reference=reference.to_dict(),
+        grant_id=authority["grant_id"],
+        principal=request.intent.requester.id,
+        action_hash=request.pccb.action_hash.value,
+    )

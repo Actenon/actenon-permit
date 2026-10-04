@@ -31,6 +31,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from .effects import EffectLedgerMixin
 from .model import Grant, GrantStatus
 
 
@@ -104,7 +105,9 @@ class StateStore(ABC):
         """
 
     @abstractmethod
-    def release(self, grant_id: str, action_id: str, reserved_amount: float | Decimal | int) -> float:
+    def release(
+        self, grant_id: str, action_id: str, reserved_amount: float | Decimal | int
+    ) -> float:
         """Release a matching, uncommitted reservation when non-execution is
         established. Missing, mismatched or committed reservations raise
         StateError. An uncertain dispatch must keep its reservation.
@@ -119,7 +122,7 @@ def _default_db_path() -> str:
     return os.environ.get("ACTENON_DB_PATH", "actenon.db")
 
 
-class SQLiteStore(StateStore):
+class SQLiteStore(EffectLedgerMixin, StateStore):
     """SQLite-backed state store. Single-file, local, durable."""
 
     def __init__(self, db_path: str | None = None):
@@ -160,8 +163,14 @@ class SQLiteStore(StateStore):
 
                 CREATE INDEX IF NOT EXISTS idx_rate_events_grant_ts
                     ON rate_events(grant_id, ts);
+                CREATE TABLE IF NOT EXISTS budget_overruns (
+                    grant_id TEXT PRIMARY KEY,
+                    amount REAL NOT NULL CHECK (amount >= 0)
+                );
                 """
             )
+
+            self._init_effect_schema(cur)
 
     # ------------------------------------------------------------------
     # Grant CRUD
@@ -198,7 +207,10 @@ class SQLiteStore(StateStore):
         with self._lock:
             cur = self._conn.cursor()
             if agent_id:
-                cur.execute("SELECT body FROM grants WHERE agent_id = ? ORDER BY updated_at DESC", (agent_id,))
+                cur.execute(
+                    "SELECT body FROM grants WHERE agent_id = ? ORDER BY updated_at DESC",
+                    (agent_id,),
+                )
             else:
                 cur.execute("SELECT body FROM grants ORDER BY updated_at DESC")
             rows = cur.fetchall()
@@ -273,97 +285,109 @@ class SQLiteStore(StateStore):
             cur = self._conn.cursor()
             cur.execute("BEGIN IMMEDIATE")
             try:
-                cur.execute("SELECT body, status, remaining FROM grants WHERE id = ?", (grant_id,))
-                row = cur.fetchone()
-                if not row:
-                    cur.execute("ROLLBACK")
-                    return False, "grant not found", {}
-                body, status_str, remaining = row
-                grant = Grant.model_validate_json(body)
-
-                if grant.status != GrantStatus.ACTIVE:
-                    cur.execute("ROLLBACK")
-                    return False, f"grant status is {grant.status.value}", {}
-
-                # Revocation cascades to every attenuated descendant. Checked
-                # here, in the reserve transaction every ALLOW passes through,
-                # so it holds however the ancestor was revoked (HTTP, CLI
-                # kill switch by agent id, direct set_status).
-                revoked_ancestor = self._revoked_ancestor(cur, grant.parent_grant_id, grant.id)
-                if revoked_ancestor is not None:
-                    cur.execute("ROLLBACK")
-                    return False, f"ancestor grant {revoked_ancestor} is revoked", {}
-
-                # Rate check (within this same transaction so it's atomic).
-                if rate_max > 0:
-                    window_start = now_ts - rate_per_seconds
-                    cur.execute(
-                        "SELECT COUNT(*) FROM rate_events WHERE grant_id = ? AND ts >= ?",
-                        (grant_id, window_start),
-                    )
-                    n = cur.fetchone()[0]
-                    if n >= rate_max:
-                        cur.execute("ROLLBACK")
-                        return False, "rate limit", {}
-
-                dec_remaining = _budget_amount(remaining)
-
-                # SECURITY: reject negative amounts
-                if dec_amount < 0:
-                    cur.execute("ROLLBACK")
-                    return (
-                        False,
-                        "negative amounts are not allowed — this is a budget bypass attempt",
-                        {},
-                    )
-                if dec_remaining - dec_amount < 0:
-                    cur.execute("ROLLBACK")
-                    return (
-                        False,
-                        f"would exceed {grant.budget.currency} {grant.budget.limit} budget",
-                        {},
-                    )
-
-                # Reserve.
-                new_remaining = float(dec_remaining - dec_amount)
-                now_iso = datetime.now(UTC).isoformat()
-                cur.execute(
-                    "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
-                    (new_remaining, now_iso, grant_id),
+                ok, reason, snapshot = self._reserve_in_transaction(
+                    cur, grant_id, action_id, dec_amount, rate_max, rate_per_seconds, now_ts
                 )
-                cur.execute(
-                    "INSERT INTO rate_events (action_id, grant_id, ts, reserved_amount, committed) "
-                    "VALUES (?, ?, ?, ?, 0)",
-                    (action_id, grant_id, now_ts, float(dec_amount)),
-                )
-
-                # Always reflect the new remaining in the body JSON so that
-                # get_grant() (which reads body, not the column) returns the
-                # live value. Without this, concurrent reserves see stale
-                # remaining from body and over-spend.
-                grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
-                new_status = grant.status
-                if new_remaining <= 0 and dec_amount > 0:
-                    new_status = GrantStatus.EXHAUSTED
-                    grant.status = new_status
-                    cur.execute(
-                        "UPDATE grants SET status = ?, updated_at = ? WHERE id = ?",
-                        (new_status.value, now_iso, grant_id),
-                    )
-                cur.execute(
-                    "UPDATE grants SET body = ? WHERE id = ?",
-                    (grant.model_dump_json(), grant_id),
-                )
-
-                cur.execute("COMMIT")
-                return True, "reserved", {
-                    "remaining": new_remaining,
-                    "status": new_status.value,
-                }
+                cur.execute("COMMIT" if ok else "ROLLBACK")
+                return ok, reason, snapshot
             except Exception:
                 with contextlib.suppress(Exception):
                     cur.execute("ROLLBACK")
                 raise
+
+    def _reserve_in_transaction(
+        self, cur, grant_id, action_id, dec_amount, rate_max, rate_per_seconds, now_ts
+    ):
+        cur.execute("SELECT body, status, remaining FROM grants WHERE id = ?", (grant_id,))
+        row = cur.fetchone()
+        if not row:
+            return False, "grant not found", {}
+        body, status_str, remaining = row
+        grant = Grant.model_validate_json(body)
+
+        if grant.status != GrantStatus.ACTIVE:
+            return False, f"grant status is {grant.status.value}", {}
+
+        overrun = cur.execute("SELECT amount FROM budget_overruns WHERE grant_id = ?", (grant_id,)).fetchone()
+        if overrun is not None and _budget_amount(overrun[0]) > 0:
+            return False, "budget overrun remains unsettled", {}
+
+        # Revocation cascades to every attenuated descendant. Checked
+        # here, in the reserve transaction every ALLOW passes through,
+        # so it holds however the ancestor was revoked (HTTP, CLI
+        # kill switch by agent id, direct set_status).
+        revoked_ancestor = self._revoked_ancestor(cur, grant.parent_grant_id, grant.id)
+        if revoked_ancestor is not None:
+            return False, f"ancestor grant {revoked_ancestor} is revoked", {}
+
+        # Rate check (within this same transaction so it's atomic).
+        if rate_max > 0:
+            window_start = now_ts - rate_per_seconds
+            cur.execute(
+                "SELECT COUNT(*) FROM rate_events WHERE grant_id = ? AND ts >= ?",
+                (grant_id, window_start),
+            )
+            n = cur.fetchone()[0]
+            if n >= rate_max:
+                return False, "rate limit", {}
+
+        dec_remaining = _budget_amount(remaining)
+
+        # SECURITY: reject negative amounts
+        if dec_amount < 0:
+            return (
+                False,
+                "negative amounts are not allowed — this is a budget bypass attempt",
+                {},
+            )
+        if dec_remaining - dec_amount < 0:
+            return (
+                False,
+                f"would exceed {grant.budget.currency} {grant.budget.limit} budget",
+                {},
+            )
+
+        # Reserve.
+        new_remaining = float(dec_remaining - dec_amount)
+        now_iso = datetime.now(UTC).isoformat()
+        cur.execute(
+            "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
+            (new_remaining, now_iso, grant_id),
+        )
+        cur.execute(
+            "INSERT INTO rate_events (action_id, grant_id, ts, reserved_amount, committed) "
+            "VALUES (?, ?, ?, ?, 0)",
+            (action_id, grant_id, now_ts, float(dec_amount)),
+        )
+
+        # Always reflect the new remaining in the body JSON so that
+        # get_grant() (which reads body, not the column) returns the
+        # live value. Without this, concurrent reserves see stale
+        # remaining from body and over-spend.
+        grant.budget.remaining = (
+            Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
+        )
+        new_status = grant.status
+        if new_remaining <= 0 and dec_amount > 0:
+            new_status = GrantStatus.EXHAUSTED
+            grant.status = new_status
+            cur.execute(
+                "UPDATE grants SET status = ?, updated_at = ? WHERE id = ?",
+                (new_status.value, now_iso, grant_id),
+            )
+        cur.execute(
+            "UPDATE grants SET body = ? WHERE id = ?",
+            (grant.model_dump_json(), grant_id),
+        )
+
+        return (
+            True,
+            "reserved",
+            {
+                "remaining": new_remaining,
+                "status": new_status.value,
+            },
+        )
 
     def commit(
         self,
@@ -385,44 +409,59 @@ class SQLiteStore(StateStore):
             cur = self._conn.cursor()
             cur.execute("BEGIN IMMEDIATE")
             try:
-                cur.execute("SELECT body, remaining FROM grants WHERE id = ?", (grant_id,))
-                row = cur.fetchone()
-                if not row:
-                    raise StateError(f"grant not found: {grant_id}")
-                body, remaining = row
-                grant = Grant.model_validate_json(body)
-
-                dec_reserved, committed, settled_cost = self._reservation(cur, grant_id, action_id, claimed_reserved)
-                if committed:
-                    if settled_cost is None or _budget_amount(settled_cost) != dec_actual:
-                        raise StateError("reservation was already committed with a different cost")
-                    cur.execute("COMMIT")
-                    return float(_budget_amount(remaining))
-                release_amount = max(Decimal("0"), min(dec_reserved, dec_reserved - dec_actual))
-                new_remaining = float(_budget_amount(remaining) + release_amount)
-
-                cur.execute(
-                    "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
-                    (new_remaining, now_iso, grant_id),
-                )
-                cur.execute(
-                    "UPDATE rate_events SET committed = 1, actual_cost = ? WHERE action_id = ? AND grant_id = ?",
-                    (float(dec_actual), action_id, grant_id),
-                )
-                # Reflect in body
-                grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
-                cur.execute(
-                    "UPDATE grants SET body = ? WHERE id = ?",
-                    (grant.model_dump_json(), grant_id),
+                self._require_legacy_reservation(cur, action_id)
+                result = self._commit_in_transaction(
+                    cur, grant_id, action_id, dec_actual, claimed_reserved, now_iso
                 )
                 cur.execute("COMMIT")
-                return new_remaining
+                return result
             except Exception:
                 with contextlib.suppress(Exception):
                     cur.execute("ROLLBACK")
                 raise
 
-    def release(self, grant_id: str, action_id: str, reserved_amount: float | Decimal | int) -> float:
+    def _commit_in_transaction(
+        self, cur, grant_id, action_id, dec_actual, claimed_reserved, now_iso
+    ):
+        cur.execute("SELECT body, remaining FROM grants WHERE id = ?", (grant_id,))
+        row = cur.fetchone()
+        if not row:
+            raise StateError(f"grant not found: {grant_id}")
+        body, remaining = row
+        grant = Grant.model_validate_json(body)
+
+        dec_reserved, committed, settled_cost = self._reservation(
+            cur, grant_id, action_id, claimed_reserved
+        )
+        if committed:
+            if settled_cost is None or _budget_amount(settled_cost) != dec_actual:
+                raise StateError("reservation was already committed with a different cost")
+            return float(_budget_amount(remaining))
+        release_amount = dec_reserved - dec_actual
+        new_remaining = self._settled_balance(cur, grant_id, remaining, release_amount)
+
+        cur.execute(
+            "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
+            (new_remaining, now_iso, grant_id),
+        )
+        cur.execute(
+            "UPDATE rate_events SET committed = 1, actual_cost = ? WHERE action_id = ? AND grant_id = ?",
+            (float(dec_actual), action_id, grant_id),
+        )
+        self._settled_status(cur, grant, new_remaining, now_iso)
+        # Reflect in body
+        grant.budget.remaining = (
+            Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
+        )
+        cur.execute(
+            "UPDATE grants SET body = ? WHERE id = ?",
+            (grant.model_dump_json(), grant_id),
+        )
+        return new_remaining
+
+    def release(
+        self, grant_id: str, action_id: str, reserved_amount: float | Decimal | int
+    ) -> float:
         """Release a matching reservation only after establishing no execution."""
         claimed_reserved = _budget_amount(reserved_amount)
         now_iso = datetime.now(UTC).isoformat()
@@ -430,39 +469,86 @@ class SQLiteStore(StateStore):
             cur = self._conn.cursor()
             cur.execute("BEGIN IMMEDIATE")
             try:
-                cur.execute("SELECT body, remaining FROM grants WHERE id = ?", (grant_id,))
-                row = cur.fetchone()
-                if not row:
-                    raise StateError(f"grant not found: {grant_id}")
-                body, remaining = row
-                grant = Grant.model_validate_json(body)
-
-                dec_reserved, committed, _ = self._reservation(cur, grant_id, action_id, claimed_reserved)
-                if committed:
-                    raise StateError("committed reservation cannot be released")
-                new_remaining = float(_budget_amount(remaining) + dec_reserved)
-                cur.execute(
-                    "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
-                    (new_remaining, now_iso, grant_id),
-                )
-                # Remove the rate_events row entirely — a released action
-                # should not count toward rate limit (the action didn't fire).
-                cur.execute("DELETE FROM rate_events WHERE action_id = ? AND grant_id = ?", (action_id, grant_id))
-                grant.budget.remaining = Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
-                cur.execute(
-                    "UPDATE grants SET body = ? WHERE id = ?",
-                    (grant.model_dump_json(), grant_id),
+                self._require_legacy_reservation(cur, action_id)
+                result = self._release_in_transaction(
+                    cur, grant_id, action_id, claimed_reserved, now_iso
                 )
                 cur.execute("COMMIT")
-                return new_remaining
+                return result
             except Exception:
                 with contextlib.suppress(Exception):
                     cur.execute("ROLLBACK")
                 raise
 
+    def _release_in_transaction(self, cur, grant_id, action_id, claimed_reserved, now_iso):
+        cur.execute("SELECT body, remaining FROM grants WHERE id = ?", (grant_id,))
+        row = cur.fetchone()
+        if not row:
+            raise StateError(f"grant not found: {grant_id}")
+        body, remaining = row
+        grant = Grant.model_validate_json(body)
+
+        dec_reserved, committed, _ = self._reservation(cur, grant_id, action_id, claimed_reserved)
+        if committed:
+            raise StateError("committed reservation cannot be released")
+        new_remaining = self._settled_balance(cur, grant_id, remaining, dec_reserved)
+        cur.execute(
+            "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
+            (new_remaining, now_iso, grant_id),
+        )
+        # Remove the rate_events row entirely — a released action
+        # should not count toward rate limit (the action didn't fire).
+        cur.execute(
+            "DELETE FROM rate_events WHERE action_id = ? AND grant_id = ?", (action_id, grant_id)
+        )
+        self._settled_status(cur, grant, new_remaining, now_iso)
+        grant.budget.remaining = (
+            Decimal(str(new_remaining)) if isinstance(new_remaining, float) else new_remaining
+        )
+        cur.execute(
+            "UPDATE grants SET body = ? WHERE id = ?",
+            (grant.model_dump_json(), grant_id),
+        )
+        return new_remaining
+
+    @staticmethod
+    def _settled_balance(cur, grant_id, remaining, adjustment):
+        # A provider overrun is real consumption, even beyond remaining
+        # authority. Preserve the debt durably; subsequent non-execution
+        # refunds pay it before restoring available authority. Budget's
+        # public non-negative shape stays stable, and exhausted debt cannot
+        # be erased by replaying a settlement.
+        row = cur.execute(
+            "SELECT amount FROM budget_overruns WHERE grant_id = ?", (grant_id,)
+        ).fetchone()
+        debt = _budget_amount(row[0]) if row else Decimal("0")
+        balance = _budget_amount(remaining) - debt + adjustment
+        new_remaining = float(max(Decimal("0"), balance))
+        new_debt = float(max(Decimal("0"), -balance))
+        cur.execute(
+            "INSERT INTO budget_overruns(grant_id,amount) VALUES (?,?) "
+            "ON CONFLICT(grant_id) DO UPDATE SET amount = excluded.amount",
+            (grant_id, new_debt),
+        )
+        return new_remaining
+
+    @staticmethod
+    def _settled_status(cur, grant, remaining, now_iso):
+        if grant.status == GrantStatus.EXHAUSTED and remaining > 0:
+            grant.status = GrantStatus.ACTIVE
+        elif grant.status == GrantStatus.ACTIVE and remaining <= 0:
+            grant.status = GrantStatus.EXHAUSTED
+        cur.execute(
+            "UPDATE grants SET status = ?, updated_at = ? WHERE id = ?",
+            (grant.status.value, now_iso, grant.id),
+        )
+
     @staticmethod
     def _reservation(
-        cur: sqlite3.Cursor, grant_id: str, action_id: str, claimed_amount: Decimal,
+        cur: sqlite3.Cursor,
+        grant_id: str,
+        action_id: str,
+        claimed_amount: Decimal,
     ) -> tuple[Decimal, bool, float | None]:
         """Read and validate a reservation inside the settlement transaction."""
         cur.execute(
