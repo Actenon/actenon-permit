@@ -152,12 +152,11 @@ describe("token encode/decode", () => {
       false,
       ["sign"],
     );
-    const canonical = JSON.stringify(
-      Object.keys(grantWithoutSig).sort().reduce(
-        (acc, k) => ({ ...acc, [k]: (grantWithoutSig as Record<string, unknown>)[k] }),
-        {},
-      ),
-    );
+    // Independent fixture signer: v2 signs authority, not live state.
+    const { status: _status, budget, ...authority } = grantWithoutSig;
+    const { remaining: _remaining, ...budgetAuthority } = budget;
+    const { canonicalizeStrictJson } = await import("../src/canonical.ts");
+    const canonical = canonicalizeStrictJson({ ...authority, budget: budgetAuthority });
     const sig = await cryptoObj.subtle.sign("HMAC", keyObj, new TextEncoder().encode(canonical));
     const sigHex = Array.from(new Uint8Array(sig))
       .map((b) => b.toString(16).padStart(2, "0"))

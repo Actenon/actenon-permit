@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] — Unreleased (candidate 2.0.0rc1)
 
+### Capability provenance consolidation
+
+- Grant v2 HMACs cover immutable authority, excluding live status and remaining
+  budget. Limits, scopes, identity, expiry, rate and delegation remain signed.
+  Python and TypeScript agree; released v1 token bytes remain unchanged.
+- Keep the 2.0 release candidate's strict canonicalisation, v2 tokens, exact
+  action/target binding, signed authority extensions, revocation and production defaults.
+- Refuse empty issuance authority and wildcard action names under Protocol 1.5.0.
+
+
 ### BREAKING CHANGES
 
 - **Canonicalisation now delegates to ACTENON-JCS-STRICT-1.** `canonical_json`

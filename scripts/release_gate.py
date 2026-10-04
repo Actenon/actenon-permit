@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release gate shared by every Actenon repository (identical copy in each).
+"""Shared release-check gate with Permit's registry-input safeguard.
 
 Single source of truth: .github/required-checks.json
   {
@@ -114,6 +114,11 @@ def gate(version: str, tag_prefix: str) -> int:
     if ref != expected_ref:
         # Decisive: nothing else is worth checking for a run that is not the release tag.
         print(f"::error::publishing requires the tag {expected_ref}; this run is for {ref or '<no ref>'}")
+        return 1
+    import tomllib
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    if project.get("tool", {}).get("uv", {}).get("sources") or (ROOT / ".github" / "candidate-constraints.txt").exists():
+        print("::error::registry release refuses coordinated source pins: publish and verify the canonical Protocol and Kernel, remove tool.uv.sources and regenerate the lock against registries first")
         return 1
     branch = cfg.get("branch", "main")
     fetched = subprocess.run(["git", "fetch", "--no-tags", "--quiet", "origin", branch], cwd=ROOT)

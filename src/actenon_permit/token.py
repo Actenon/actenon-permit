@@ -7,9 +7,10 @@ an MCP ``_meta`` field. The format is:
     v2.<base64url(canonical_json(signed_grant_dict))>   # post-2.0.0 (current)
     v1.<base64url(json(signed_grant_dict))>             # pre-2.0.0 (deprecated)
 
-The grant dict is the full signed grant (including the ``signature`` field).
-Verifiers recompute the HMAC over the dict minus the signature field and
-compare. A token is valid iff:
+The grant dict is the full signed grant (including the ``signature`` field
+and the live ``status`` / ``budget.remaining``). Verifiers recompute the HMAC
+over the authority payload (see ``authority_payload``) and compare. A token
+is valid iff:
 
   1. It starts with ``v1.`` or ``v2.``.
   2. The base64url payload decodes to a JSON object.
@@ -44,6 +45,7 @@ from typing import Any
 from .model import (
     Grant,
     _legacy_verify_signature,
+    authority_payload,
     sign,
     verify_signature,
 )
@@ -133,7 +135,7 @@ def token_to_grant(token: str, *, verify: bool = True) -> Grant:
     if verify:
         signing_payload = {k: v for k, v in payload.items() if k != "signature"}
         if version == V2:
-            if not verify_signature(signing_payload, grant.signature):
+            if not verify_signature(authority_payload(payload), grant.signature):
                 raise TokenError(
                     "signature verification failed — token is forged or was "
                     "signed with a different key"
@@ -154,7 +156,7 @@ def recompute_signature(payload: dict[str, Any]) -> str:
     tokens that need their legacy signature recomputed should call
     ``actenon_permit.model._legacy_sign`` directly (private API).
     """
-    return sign({k: v for k, v in payload.items() if k != "signature"})
+    return sign(authority_payload(payload))
 
 
 __all__ = [

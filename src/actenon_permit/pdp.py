@@ -7,6 +7,7 @@ closed")``.
 
 Decision algorithm (exact order, top-to-bottom):
 
+    0. grant signature does not verify -> DENY("grant signature could not be verified")
     1. status != active              -> DENY
     2. now > expires_at              -> set status=expired -> DENY("expired")
     3. action matches scopes.deny    -> DENY("scope denied: <rule>")
@@ -16,6 +17,11 @@ Decision algorithm (exact order, top-to-bottom):
     6. would exceed budget           -> DENY("would exceed <currency> <limit> budget")
     7. approval_rule matches         -> REQUIRE_APPROVAL(rule)
     8. else                          -> ALLOW
+
+An unknown action type (not matched by a non-empty allow list) is step 4.
+An empty allow list stays permissive here, per SPEC §4. Minting a proof for
+that case is refused separately so the empty list is not widened into the
+attempted action.
 
 On ALLOW, the PDP calls ``state.reserve(...)`` atomically (which both
 decrements budget.remaining and bumps the rate counter in one transaction).
@@ -183,6 +189,33 @@ class PDP:
     # ------------------------------------------------------------------
 
     def _decide_inner(self, grant: Grant, action: Action, ctx: dict[str, Any]) -> Decision:
+        # 0. Signature over the authority fields. Live status and remaining
+        # budget are not signed; a tampered scope, cap, or stripped signature
+        # is not authority and must not reach a later ALLOW.
+        if not grant.verify():
+            d = Decision(
+                outcome=DecisionOutcome.DENY,
+                reason="grant signature could not be verified",
+                rule_matched="signature",
+                failure_code=FailureCode.SIGNATURE_INVALID,
+            )
+            self.ledger.append(
+                action_id=action.action_id,
+                grant_id=grant.id,
+                ts=action.ts,
+                action_type=action.type,
+                target=action.target,
+                params=action.params,
+                est_cost=action.est_cost,
+                outcome=d.outcome.value,
+                reason=d.reason,
+                rule_matched=d.rule_matched,
+                state_delta={},
+                failure_code=d.failure_code,
+                authority_boundary=_build_authority_boundary(grant, action),
+            )
+            return d
+
         # 1. status check
         if grant.status != GrantStatus.ACTIVE:
             d = Decision(
@@ -477,6 +510,38 @@ class PDP:
         This method is the concrete implementation of ARCHITECTURE.md §3:
         permit issues real kernel PCCBs, not parallel HMAC grants.
         """
+        from .kernel_bridge import KernelBridgeError, proof_capability
+
+        if grant.verify():
+            # Refuse an unmintable capability before decide() reserves budget.
+            # Unmatched concrete actions fall through so the reason stays
+            # "out of scope". Unsigned grants fall through to the signature DENY.
+            try:
+                proof_capability(grant, action)
+            except KernelBridgeError as exc:
+                d = Decision(
+                    outcome=DecisionOutcome.DENY,
+                    reason=str(exc),
+                    rule_matched="proof:capability",
+                    failure_code=FailureCode.OUT_OF_SCOPE,
+                )
+                self.ledger.append(
+                    action_id=action.action_id,
+                    grant_id=grant.id,
+                    ts=action.ts,
+                    action_type=action.type,
+                    target=action.target,
+                    params=action.params,
+                    est_cost=action.est_cost,
+                    outcome=d.outcome.value,
+                    reason=d.reason,
+                    rule_matched=d.rule_matched,
+                    state_delta={},
+                    failure_code=d.failure_code,
+                    authority_boundary=_build_authority_boundary(grant, action),
+                )
+                return d, None, None
+
         decision = self.decide(grant, action, ctx)
         if decision.outcome != DecisionOutcome.ALLOW:
             return decision, None, None

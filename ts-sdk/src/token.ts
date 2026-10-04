@@ -5,7 +5,9 @@
  *   `v2.<base64url(ACTENON-JCS-STRICT-1(signed_grant_object))>` — minted from 2.0.0
  *   `v1.<base64url(json(signed_grant_object))>`                — pre-2.0.0, verify-only
  *
- * The HMAC-SHA256 signature covers the grant minus `signature`, encoded with
+ * The v2 HMAC covers immutable authority: omit signature, status, and
+ * budget.remaining; retain budget.limit and every other authority field.
+ * The v1 HMAC retains the historical full body minus signature. Both use
  * the canonicaliser of the token's version: ACTENON-JCS-STRICT-1 for `v2.`
  * (literal UTF-8), Python's ASCII-escaping `json.dumps(sort_keys=True)` for
  * `v1.`. `v1.` tokens are accepted until actenon-permit 3.0.0.
@@ -130,7 +132,13 @@ export async function verifyGrantToken(token: string, signingKey: string): Promi
   const { signature, ...rest } = grant;
   let signed: string;
   try {
-    signed = version === "v2" ? canonicalizeStrictJson(rest) : canonicalizeJson(rest);
+    if (version === "v2") {
+      const { status: _status, budget, ...authority } = rest;
+      const { remaining: _remaining, ...budgetAuthority } = budget;
+      signed = canonicalizeStrictJson({ ...authority, budget: budgetAuthority });
+    } else {
+      signed = canonicalizeJson(rest);
+    }
   } catch (e) {
     throw new TokenError(`grant payload has no canonical encoding: ${(e as Error).message}`);
   }

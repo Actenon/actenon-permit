@@ -85,13 +85,26 @@ The signature is computed as:
 ```
 signature = HMAC-SHA256(
     key = ACTENON_SIGNING_KEY (UTF-8 bytes),
-    message = canonical_json(grant_without_signature_field)
+    message = canonical_json(authority_payload)
 ).hex()
 ```
 
+`authority_payload` is the grant object with three fields removed:
+
+- `signature` (the field being computed)
+- `status` (the store flips this on revoke, expiry, and exhaustion)
+- `budget.remaining` (the store decrements this on every reservation)
+
+`budget.limit`, `budget.currency`, scopes, expiry, rate, and identity stay
+in the payload. Reservation and revocation therefore leave `verify()` true.
+Widening the limit or the allow list leaves `verify()` false. A Grant with
+an empty or mismatched `signature` field fails verification. The PDP denies
+before it reserves when verification fails.
+
 Verification recomputes the HMAC and uses constant-time comparison
-(`hmac.compare_digest`). A Grant with an empty or mismatched `signature` field
-fails verification.
+(`hmac.compare_digest`). Live `status` and `budget.remaining` are enforced
+by the state store, not by the HMAC. A bearer token's copy of those two
+fields is not authoritative; the gateway reloads them from the store.
 
 The signing key is read from the `ACTENON_SIGNING_KEY` environment variable.
 If unset, the reference implementation generates an ephemeral dev key and

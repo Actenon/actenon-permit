@@ -94,6 +94,13 @@ verified at the edge — and the PCCB is consumed, so it cannot be replayed.
 Read the canonical problem statement in
 [`actenon-kernel/docs/THE_EXECUTION_GAP.md`](https://github.com/Actenon/actenon-kernel/blob/main/docs/THE_EXECUTION_GAP.md).
 
+Airlock compiles each Scan-named power into `Grant.scopes.allow` and asks this
+PDP to decide. The grant HMAC covers that authority and stays valid after
+reservation and revocation; a proof names the one concrete capability the PDP
+allowed. The pin Airlock should use, and the fail-closed rules for unknown
+capabilities, are in
+[`docs/CAPABILITY_PROVENANCE.md`](docs/CAPABILITY_PROVENANCE.md).
+
 ---
 
 ## What this is
@@ -130,7 +137,7 @@ pip install actenon-permit              # Python SDK + unified CLI + Boundary Ki
 npm install @actenon/sdk                # TypeScript SDK v1.4.0 — discriminated result types, receipt verification, protocol parity with Python
 ```
 
-> **Release note:** this README tracks `main`. The Boundary Kit proof binding, the kernel execution Receipts returned by brokered calls, and other fixes on `main` are newer than the latest PyPI/npm release; install from a checkout (`pip install .`) to get them until the next release.
+> **Release note:** these registry commands install the previous public release, not this source candidate. This branch consolidates Permit 2.0 with Protocol 1.5 and Kernel 1.3; those dependency versions are not yet all published. To test the candidate from this checkout, run `uv sync --locked --extra dev` so the frozen coordinated dependencies are used. Plain `pip install .` requires the candidate constraint file until those dependencies are published. See [consolidation evidence](docs/ECOSYSTEM_CONSOLIDATION.md).
 
 ## Hero quickstart (6 lines)
 

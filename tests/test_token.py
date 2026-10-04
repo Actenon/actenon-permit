@@ -129,6 +129,7 @@ def test_token_v1_legacy_token_still_verifies(monkeypatch):
 
     # Manually construct a v1. token (pre-2.0.0 wire format: json.dumps,
     # NOT canonicalize_json).
+    payload["signature"] = g.signature
     body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     encoded = base64.urlsafe_b64encode(body).rstrip(b"=").decode("ascii")
     v1_token = f"v1.{encoded}"
