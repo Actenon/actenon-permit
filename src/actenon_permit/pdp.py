@@ -41,9 +41,9 @@ from __future__ import annotations
 
 import contextlib
 import fnmatch
-import math
 import re
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from actenon.outcomes import FailureCode
@@ -109,17 +109,17 @@ def _approval_rule_matches(rule: str, action: Action) -> bool:
     m = _THRESHOLD_RE.match(rule)
     if m:
         rtype = m.group("type")
-        threshold = float(m.group("amount"))
+        threshold = Decimal(m.group("amount"))
         if action.type != rtype:
             return False
         amount = action.params.get("amount")
         if amount is None:
             amount = action.est_cost or 0.0
         try:
-            value = float(amount)
-        except (TypeError, ValueError):
+            value = Decimal(str(amount))
+        except (TypeError, ValueError, InvalidOperation):
             return True
-        return not math.isfinite(value) or value > threshold
+        return not value.is_finite() or value > threshold
     # bare type match
     return action.type == rule
 
@@ -133,6 +133,7 @@ def _build_authority_boundary(grant: Grant, action: Action) -> dict[str, Any]:
             "scopes_allow": list(grant.scopes.allow),
             "scopes_deny": list(grant.scopes.deny),
             "budget_remaining_at_decision": float(grant.budget.remaining),
+            "budget_remaining_exact": str(grant.budget.remaining),
             "expires_at": grant.expires_at.isoformat(),
             "rate_max": grant.rate.max,
             "rate_per_seconds": grant.rate.per_seconds,

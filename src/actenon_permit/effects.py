@@ -20,6 +20,7 @@ from actenon_protocol.canonicalisation import canonicalize_json
 from actenon_protocol.effects import EFFECT_PROFILE, effect_identity, validate_effect_outcome
 from actenon_protocol.types.effects import EffectReference
 
+from .budget import from_units, units
 from .model import Grant, GrantStatus
 
 
@@ -124,8 +125,8 @@ class EffectLedgerMixin:
                 cur.execute(
                     """INSERT INTO effect_reservations
                     (reservation_id,effect_id,action_id,grant_id,principal,action_hash,descriptor,
-                     reserved_amount,state,created_at,updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,'RESERVED',?,?)""",
+                     reserved_amount,state,created_at,updated_at,reserved_units)
+                    VALUES (?,?,?,?,?,?,?,?,'RESERVED',?,?,?)""",
                     (
                         reference["reservation_id"],
                         effect_id,
@@ -137,6 +138,7 @@ class EffectLedgerMixin:
                         float(dec_amount),
                         now,
                         now,
+                        str(units(dec_amount)),
                     ),
                 )
                 self._effect_event(
@@ -156,7 +158,7 @@ class EffectLedgerMixin:
         ref = EffectReference.model_validate(reference).model_dump()
         row = cur.execute(
             """SELECT reservation_id,effect_id,action_id,grant_id,principal,action_hash,
-                                    descriptor,reserved_amount,state,execution_occurred,evidence,updated_at
+                                    descriptor,reserved_units,state,execution_occurred,evidence,updated_at
                              FROM effect_reservations WHERE reservation_id = ?""",
             (ref["reservation_id"],),
         ).fetchone()
@@ -282,7 +284,7 @@ class EffectLedgerMixin:
                 if review_expires_at is not None and review_expires_at <= settled_at:
                     raise StateError("reconciliation review expired before settlement")
                 row = self._effect_row(cur, reference, grant_id, principal, action_hash)
-                state, reserved = row[8], _budget_amount(row[7])
+                state, reserved = row[8], from_units(row[7])
                 if outcome == "NOT_EXECUTED" and cost not in (None, 0):
                     raise StateError("non-execution cannot have consequential cost")
                 if outcome == "COMMITTED" and cost is None:
@@ -303,11 +305,12 @@ class EffectLedgerMixin:
                     if state != outcome or row[10] != evidence:
                         raise StateError("effect was already settled with different evidence")
                     remaining = cur.execute(
-                        "SELECT remaining FROM grants WHERE id = ?", (grant_id,)
+                        "SELECT remaining_units FROM grants WHERE id = ?", (grant_id,)
                     ).fetchone()[0]
                     cur.execute("ROLLBACK")
                     return {
-                        "remaining": remaining,
+                        "remaining": float(from_units(remaining)),
+                        "remaining_exact": str(from_units(remaining)),
                         "settled_at": row[11],
                         "effect": {
                             **dict(reference),
@@ -341,8 +344,9 @@ class EffectLedgerMixin:
                     remaining = self._release_in_transaction(cur, grant_id, row[2], reserved, now)
                 else:
                     remaining = cur.execute(
-                        "SELECT remaining FROM grants WHERE id = ?", (grant_id,)
+                        "SELECT remaining_units FROM grants WHERE id = ?", (grant_id,)
                     ).fetchone()[0]
+                    remaining = from_units(remaining)
                 cur.execute(
                     "UPDATE effect_reservations SET state = ?, execution_occurred = ?, evidence = ?, updated_at = ? WHERE reservation_id = ?",
                     (outcome, execution_occurred, evidence, now, row[0]),
@@ -350,7 +354,8 @@ class EffectLedgerMixin:
                 self._effect_event(cur, row[0], outcome, evidence, now)
                 cur.execute("COMMIT")
                 return {
-                    "remaining": remaining,
+                    "remaining": float(remaining),
+                    "remaining_exact": str(remaining),
                     "settled_at": now,
                     "effect": {
                         **dict(reference),

@@ -19,6 +19,7 @@ Example policy (YAML)::
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -38,10 +39,24 @@ class PolicyError(ValueError):
     """Raised when a policy document is malformed."""
 
 
+class _ExactPolicyLoader(yaml.SafeLoader):
+    """Retain declared decimal policy numbers before constructing authority."""
+
+
+def _policy_decimal(loader, node):
+    try:
+        return Decimal(loader.construct_scalar(node))
+    except InvalidOperation as exc:
+        raise PolicyError("policy numbers must use plain finite decimal notation") from exc
+
+
+_ExactPolicyLoader.add_constructor("tag:yaml.org,2002:float", _policy_decimal)
+
+
 def load_policy(path: str | Path) -> dict[str, Any]:
     """Load a YAML policy file from disk."""
     with open(path, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+        data = yaml.load(f, Loader=_ExactPolicyLoader)
     if not isinstance(data, dict):
         raise PolicyError(f"policy file {path} did not parse to a dict")
     return data
@@ -82,8 +97,8 @@ def compile_policy(policy: dict[str, Any], *, agent_id: str | None = None) -> Gr
     # Budget
     budget_dict = policy.get("budget") or {}
     currency = str(budget_dict.get("currency", "USD"))
-    limit = float(budget_dict.get("limit", 0.0))
-    remaining = float(budget_dict.get("remaining", limit))
+    limit = budget_dict.get("limit", 0)
+    remaining = budget_dict.get("remaining", limit)
     budget = Budget(currency=currency, limit=limit, remaining=remaining)
 
     # Scopes

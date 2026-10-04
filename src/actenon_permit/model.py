@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import math
 import os
 import secrets
 import uuid
@@ -197,7 +196,9 @@ def _coerce_decimals(obj: Any) -> Any:
         # normalize() so Decimal("50.0") and Decimal("50.00") produce
         # identical canonical bytes (both normalize to Decimal("5E+1")).
         # str() of that is "5E+1" — ugly but unambiguous and stable.
-        return str(obj.normalize())
+        from .budget import decimal_text
+
+        return decimal_text(obj)
     if isinstance(obj, bool):
         # bool is a subclass of int but must be checked first; the protocol
         # canonicaliser accepts bool natively (JSON true/false).
@@ -360,16 +361,21 @@ class Budget(BaseModel):
         with floats 0.30 - 0.10 - 0.10 = 0.09999999999999998, so the
         third $0.10 was wrongly DENIED.
         """
+        if isinstance(v, bool):
+            raise ValueError("budget values must be numeric, not boolean")
         if isinstance(v, Decimal):
             return v
         if isinstance(v, float):
+            from .budget import check_float
+
+            check_float(v)
             return Decimal(str(v))
         return Decimal(v)
 
     @field_validator("limit", "remaining")
     @classmethod
     def _non_negative(cls, v: Decimal) -> Decimal:
-        if v < 0:
+        if not v.is_finite() or v < 0:
             raise ValueError("budget values must be non-negative")
         return v
 
@@ -442,7 +448,7 @@ class Grant(BaseModel):
         expires_at: datetime | None = None,
         scopes_allow: list[str] | None = None,
         scopes_deny: list[str] | None = None,
-        budget_limit: Decimal | float | int | None = None,
+        budget_limit: Decimal | float | int | str | None = None,
         rate_max: int | None = None,
         rate_per_seconds: int | None = None,
         extra_approval_rules: list[str] | None = None,
@@ -473,14 +479,20 @@ class Grant(BaseModel):
         # An empty allow-list is permissive (only deny is enforced, SPEC §4),
         # so it is a subset in set terms but the widest scope in effect.
         if not new_allow and self.scopes.allow:
-            raise ValueError("attenuation cannot widen allow scopes (an empty allow list permits every action)")
+            raise ValueError(
+                "attenuation cannot widen allow scopes (an empty allow list permits every action)"
+            )
 
         new_deny = set(self.scopes.deny)
         if scopes_deny is not None:
             new_deny |= set(scopes_deny)
         new_deny_list = sorted(new_deny)
 
-        new_limit = budget_limit if budget_limit is not None else self.budget.remaining
+        new_limit = (
+            Budget(limit=budget_limit, remaining=0).limit
+            if budget_limit is not None
+            else self.budget.remaining
+        )
         if new_limit > self.budget.remaining:
             raise ValueError("attenuation cannot increase budget")
         new_remaining = min(new_limit, self.budget.remaining)
@@ -562,7 +574,7 @@ def parse_duration(s: str | int | float) -> int:
     Accepts ``"1h"``, ``"30m"``, ``"45s"``, ``"2d"``, or a bare integer
     (interpreted as seconds). Raises ValueError on anything else.
     """
-    if isinstance(s, (int, float)):
+    if isinstance(s, (int, float, Decimal)):
         return int(s)
     s = str(s).strip().lower()
     if not s:
@@ -583,7 +595,7 @@ class CostError(ValueError):
     """Raised when an action's cost-bearing argument is not a plain number."""
 
 
-def estimate_cost(arguments: dict[str, Any], cost_from: str | None = None) -> float | None:
+def estimate_cost(arguments: dict[str, Any], cost_from: str | None = None) -> Decimal | None:
     """Return the cost to reserve for a call, from its arguments.
 
     The cost field is ``cost_from`` if that argument is present, else
@@ -602,8 +614,10 @@ def estimate_cost(arguments: dict[str, Any], cost_from: str | None = None) -> fl
         value = arguments[key]
         if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
             raise CostError(f"cost field {key!r} must be a number, got {type(value).__name__}")
-        cost = float(value)
-        if not math.isfinite(cost):
-            raise CostError(f"cost field {key!r} must be finite")
-        return cost
+        from .state import StateError, _budget_amount
+
+        try:
+            return _budget_amount(value)
+        except StateError as exc:
+            raise CostError(f"cost field {key!r}: {exc}") from exc
     return None

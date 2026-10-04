@@ -45,11 +45,11 @@ keys, no insignificant whitespace).
 | `issued_at` | ISO-8601 string (UTC) | yes | When the grant was created. |
 | `expires_at` | ISO-8601 string (UTC) | yes | When the grant expires. The PDP transitions the grant to `expired` on first decision after this time. |
 | `scopes` | object | yes | `{allow: [string], deny: [string]}`. Glob-style (`shell.*`). |
-| `budget` | object | yes | `{currency: string, limit: float, remaining: float}`. `limit` is the original cap; `remaining` is mutable state. |
+| `budget` | object | yes | `{currency: string, limit: decimal string, remaining: decimal string}`. `limit` is the signed cap; `remaining` is mutable exact state. See fixed-point accounting below. |
 | `rate` | object | yes | `{max: int, per_seconds: int}`. `max=0` disables rate limiting. |
 | `approval_rules` | array of string | yes (may be empty) | Rules that force REQUIRE_APPROVAL. |
 | `status` | string | yes | One of `active`, `revoked`, `expired`, `exhausted`. |
-| `signature` | string | yes | HMAC-SHA256 hex digest over canonical JSON of every other field. |
+| `signature` | string | yes | HMAC-SHA256 over immutable authority (excluding live status and remaining). |
 
 ### 2.1 Canonical JSON
 
@@ -492,3 +492,38 @@ can:
 The gateway verifies the token's signature against the shared signing key
 and loads live state. The child process never needs to call back to the
 parent — the token is self-contained.
+
+## Fixed-point budget accounting (2.0 candidate)
+
+The store accounts in integer units of 10^-9 of the named currency/metric,
+with a maximum absolute magnitude below 10^39. SQLite stores these units as
+decimal integer TEXT, independently of SQLite REAL, 64-bit integer limits,
+and Python Decimal context. Unrepresentable precision/range is refused,
+never rounded. Grant fields serialize as decimal strings. YAML policy parsing
+and the administrator attenuation CLI retain exact declared decimals; use
+quoted decimal strings for JSON fractional budget values. Floats whose ULP
+exceeds one budget unit are refused before authority construction or spending.
+
+Reserve, settlement, overrun debt, effect ownership and refunds use exact
+columns in the existing transactions. REAL columns and numeric `remaining`
+responses are compatibility/display approximations; they never authorize
+spending. `remaining_exact` is the exact decimal response. An ambiguous effect
+continues to hold its reservation. New grant imports cannot reset live state.
+
+Precision migration serializes inspection, ALTERs and backfill in one write
+transaction. Legacy balances are conservatively narrowed by float uncertainty
+and retained charge history against their signed cap. This cannot reconstruct
+lost historical evidence; tiny uncertainty margins remain withheld after old
+settlements. Unsupported precision, missing committed-cost evidence and failed
+DDL refuse startup, roll back changes and close the failed connection.
+
+New audit entries use `chain_version=3`, `entry_format=v3`, exact cost TEXT and
+context-independent audit normalization. Their persisted view is frozen before
+hashing. Null-version legacy and v2 candidate entries retain their own verifier;
+unknown versions are refused. This is audit formatting, not a new action-hash
+profile: execution proof hashing remains the Protocol implementation.
+
+This section does not claim rolling windows or aggregate parent consumption.
+Those remain separate required programme work; the current delegation behavior
+elsewhere in this document has not yet been replaced. Public registry release
+and Airlock product budget configuration are also pending.

@@ -22,8 +22,8 @@ post-2.0.0 code, each entry carries a ``chain_version`` field:
 
   - ``chain_version`` absent  -> entry written by <2.0.0; verify with
     ``_legacy_canonical_json`` (kept private in ``model.py``)
-  - ``chain_version = 2``     -> entry written by >=2.0.0; verify with
-    ``canonical_json`` (delegates to ACTENON-JCS-STRICT-1)
+  - ``chain_version = 2``     -> historical candidate entries, original coercion
+  - ``chain_version = 3``     -> exact-cost TEXT and context-independent audit normalization
 
 A mixed-version ledger (some legacy, some new) verifies intact as long as
 each entry's hash matches the canonicaliser its ``chain_version`` selects.
@@ -37,16 +37,18 @@ import hashlib
 import json
 import threading
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, Protocol
 
+from .budget import decimal_text, exact_json_numbers
 from .model import _legacy_canonical_json, canonical_json
 
 GENESIS_PREV_HASH = "0" * 64
 
 # The chain version this code writes. Entries written by <2.0.0 have no
 # chain_version column (NULL in SQLite); entries written by >=2.0.0 have
-# chain_version=2. Bump this if the canonicaliser changes again.
-CURRENT_CHAIN_VERSION = 2
+# chain_version=3 stores exact costs. V2 verification is retained unchanged.
+CURRENT_CHAIN_VERSION = 3
 
 
 class _Canonicaliser(Protocol):
@@ -185,6 +187,12 @@ def _hash_entry_v2(prev_hash: str, entry_body: dict[str, Any]) -> str:
     )
 
 
+def _hash_entry_v3(prev_hash: str, entry_body: dict[str, Any]) -> str:
+    return _hash_entry(
+        prev_hash, entry_body, canonicaliser=canonical_json, normaliser=exact_json_numbers
+    )
+
+
 def _hash_entry_legacy(prev_hash: str, entry_body: dict[str, Any]) -> str:
     """Hash a legacy (chain_version absent) entry (pre-2.0.0 canonicaliser)."""
     return _hash_entry(
@@ -275,7 +283,8 @@ class Ledger:
                     hash TEXT NOT NULL UNIQUE,
                     failure_code TEXT,
                     authority_boundary TEXT,
-                    chain_version INTEGER
+                    chain_version INTEGER,
+                    est_cost_exact TEXT
                 )
                 """)
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_grant ON ledger(grant_id)")
@@ -285,9 +294,11 @@ class Ledger:
                     cur.execute("ALTER TABLE ledger ADD COLUMN failure_code TEXT")
                 if "authority_boundary" not in columns:
                     cur.execute("ALTER TABLE ledger ADD COLUMN authority_boundary TEXT")
-                # NULL retains legacy hash verification; new entries write v2.
+                # NULL retains legacy hashes; versions 2 and 3 verify independently.
                 if "chain_version" not in columns:
                     cur.execute("ALTER TABLE ledger ADD COLUMN chain_version INTEGER")
+                if "est_cost_exact" not in columns:
+                    cur.execute("ALTER TABLE ledger ADD COLUMN est_cost_exact TEXT")
                 cur.execute("COMMIT")
             except Exception:
                 with contextlib.suppress(Exception):
@@ -318,11 +329,17 @@ class Ledger:
         """Append a single entry. Computes and stores the hash. Returns the entry.
 
         All new entries are written with ``chain_version = CURRENT_CHAIN_VERSION``
-        (2 as of actenon-permit 2.0.0) and hashed via the ACTENON-JCS-STRICT-1
+        (3 for exact-cost entries) and hashed via the ACTENON-JCS-STRICT-1
         canonicaliser. Legacy entries (written by <2.0.0) have ``chain_version``
         NULL and are verified with ``_legacy_canonical_json`` — see ``verify()``.
         """
         ts_str = ts.astimezone(UTC).isoformat() if isinstance(ts, datetime) else ts
+        # Freeze the persisted view before hashing. Decimal params remain exact
+        # JSON strings; the exact cost gets its own authoritative TEXT column.
+        params = json.loads(json.dumps(params, sort_keys=True, default=str))
+        state_delta = json.loads(json.dumps(state_delta, sort_keys=True, default=str))
+        authority_boundary = json.loads(json.dumps(authority_boundary, default=str))
+        est_cost_exact = decimal_text(Decimal(str(est_cost))) if est_cost is not None else None
 
         with self._lock:
             cur = self._conn.cursor()
@@ -333,7 +350,7 @@ class Ledger:
                 prev_hash = row[0] if row else GENESIS_PREV_HASH
 
                 entry_body: dict[str, Any] = {
-                    "entry_format": "v2",
+                    "entry_format": "v3",
                     "chain_version": CURRENT_CHAIN_VERSION,
                     "action_id": action_id,
                     "grant_id": grant_id,
@@ -341,7 +358,7 @@ class Ledger:
                     "action_type": action_type,
                     "target": target,
                     "params": params,
-                    "est_cost": est_cost,
+                    "est_cost": est_cost_exact,
                     "outcome": outcome,
                     "reason": reason,
                     "rule_matched": rule_matched,
@@ -350,7 +367,7 @@ class Ledger:
                     "authority_boundary": authority_boundary,
                     "prev_hash": prev_hash,
                 }
-                h = _hash_entry_v2(prev_hash, entry_body)
+                h = _hash_entry_v3(prev_hash, entry_body)
 
                 cur.execute(
                     """
@@ -358,8 +375,8 @@ class Ledger:
                         action_id, grant_id, ts, action_type, target, params,
                         est_cost, outcome, reason, rule_matched, state_delta,
                         failure_code, authority_boundary, prev_hash, hash,
-                        chain_version
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        chain_version, est_cost_exact
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         action_id,
@@ -368,7 +385,7 @@ class Ledger:
                         action_type,
                         target,
                         json.dumps(params, sort_keys=True, default=str),
-                        est_cost,
+                        float(est_cost) if est_cost is not None else None,
                         outcome,
                         reason,
                         rule_matched,
@@ -380,6 +397,7 @@ class Ledger:
                         prev_hash,
                         h,
                         CURRENT_CHAIN_VERSION,
+                        est_cost_exact,
                     ),
                 )
                 cur.execute("COMMIT")
@@ -400,7 +418,7 @@ class Ledger:
                 cur.execute(
                     "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
                     "est_cost, outcome, reason, rule_matched, state_delta, "
-                    "failure_code, authority_boundary, prev_hash, hash, chain_version "
+                    "failure_code, authority_boundary, prev_hash, hash, chain_version, est_cost_exact "
                     "FROM ledger WHERE grant_id = ? ORDER BY seq ASC LIMIT ?",
                     (grant_id, limit),
                 )
@@ -408,7 +426,7 @@ class Ledger:
                 cur.execute(
                     "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
                     "est_cost, outcome, reason, rule_matched, state_delta, "
-                    "failure_code, authority_boundary, prev_hash, hash, chain_version "
+                    "failure_code, authority_boundary, prev_hash, hash, chain_version, est_cost_exact "
                     "FROM ledger ORDER BY seq ASC LIMIT ?",
                     (limit,),
                 )
@@ -425,7 +443,7 @@ class Ledger:
                     "action_type": r[4],
                     "target": r[5],
                     "params": json.loads(r[6]) if r[6] else {},
-                    "est_cost": r[7],
+                    "est_cost": r[17] if r[16] == 3 else r[7],
                     "outcome": r[8],
                     "reason": r[9],
                     "rule_matched": r[10],
@@ -457,8 +475,9 @@ class Ledger:
 
           - ``chain_version`` NULL  -> legacy entry; verify with
             ``_legacy_canonical_json`` (pre-2.0.0 canonicaliser).
-          - ``chain_version = 2``   -> new entry; verify with
-            ``canonical_json`` (ACTENON-JCS-STRICT-1).
+          - ``chain_version = 2``   -> original candidate normalization.
+          - ``chain_version = 3``   -> exact TEXT cost and context-free normalization.
+          - any unknown version    -> refuse.
 
         A mixed-version ledger (some legacy, some new) verifies intact as
         long as each entry's hash matches its own canonicaliser and the
@@ -469,7 +488,7 @@ class Ledger:
             cur.execute(
                 "SELECT seq, action_id, grant_id, ts, action_type, target, params, "
                 "est_cost, outcome, reason, rule_matched, state_delta, "
-                "failure_code, authority_boundary, prev_hash, hash, chain_version "
+                "failure_code, authority_boundary, prev_hash, hash, chain_version, est_cost_exact "
                 "FROM ledger ORDER BY seq ASC"
             )
             rows = cur.fetchall()
@@ -495,6 +514,7 @@ class Ledger:
                 "prev_hash",
                 "hash",
                 "chain_version",
+                "est_cost_exact",
             ]
             row_dict = dict(zip(cols, r, strict=True))
             action_id = row_dict["action_id"]
@@ -546,11 +566,11 @@ class Ledger:
                     "prev_hash": prev_hash,
                 }
                 expected_hash = _hash_entry_legacy(prev_hash, entry_body)
-            else:
-                # chain_version == 2 (or future versions, when added).
+            elif chain_version in {2, 3}:
+                # Preserve historical v2 semantics; v3 uses exact TEXT cost.
                 # New entries include chain_version in the hashed body.
                 entry_body = {
-                    "entry_format": "v2",
+                    "entry_format": "v3" if chain_version == 3 else "v2",
                     "chain_version": chain_version,
                     "action_id": action_id,
                     "grant_id": grant_id,
@@ -558,7 +578,7 @@ class Ledger:
                     "action_type": action_type,
                     "target": target,
                     "params": json.loads(params_json) if params_json else {},
-                    "est_cost": est_cost,
+                    "est_cost": row_dict["est_cost_exact"] if chain_version == 3 else est_cost,
                     "outcome": outcome,
                     "reason": reason,
                     "rule_matched": rule_matched,
@@ -567,7 +587,11 @@ class Ledger:
                     "authority_boundary": authority_boundary,
                     "prev_hash": prev_hash,
                 }
-                expected_hash = _hash_entry_v2(prev_hash, entry_body)
+                expected_hash = (_hash_entry_v3 if chain_version == 3 else _hash_entry_v2)(
+                    prev_hash, entry_body
+                )
+            else:
+                return False  # unknown versions never fall back to v2
 
             if expected_hash != stored_hash:
                 return False

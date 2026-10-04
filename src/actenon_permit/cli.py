@@ -89,14 +89,19 @@ def _build_demo_gateway():
         input_schema={
             "type": "object",
             "properties": {
-                "amount": {"type": "number", "description": "Amount to refund, in major currency units."},
+                "amount": {
+                    "type": "number",
+                    "description": "Amount to refund, in major currency units.",
+                },
                 "reason": {"type": "string", "default": "customer_request"},
             },
             "required": ["amount"],
         },
         cost_from="amount",
         credential_name="MOCK_STRIPE_KEY",
-        real_call=lambda secret, amount, reason="customer_request": mock_stripe_refund(secret, amount, reason),
+        real_call=lambda secret, amount, reason="customer_request": mock_stripe_refund(
+            secret, amount, reason
+        ),
     )
     tools.register(
         "charge",
@@ -113,7 +118,9 @@ def _build_demo_gateway():
         },
         cost_from="amount",
         credential_name="MOCK_STRIPE_KEY",
-        real_call=lambda secret, amount, description="": mock_stripe_charge(secret, amount, description),
+        real_call=lambda secret, amount, description="": mock_stripe_charge(
+            secret, amount, description
+        ),
     )
     tools.register(
         "send_email",
@@ -133,7 +140,11 @@ def _build_demo_gateway():
         real_call=lambda secret, to, subject, body="": mock_send_email(secret, to, subject, body),
     )
     return Gateway(
-        state=store, ledger=ledger, pdp=pdp, broker=broker, tools=tools,
+        state=store,
+        ledger=ledger,
+        pdp=pdp,
+        broker=broker,
+        tools=tools,
         approval_gate=AutoApproveGate(),
     )
 
@@ -255,7 +266,9 @@ def init_keys(
     typer.echo("")
     typer.echo("  PCCBs will now be signed with Ed25519 instead of dev-HMAC.")
     typer.echo("  To use a different key file: set ACTENON_ED25519_KEY_FILE=/path/to/key.json")
-    typer.echo("  For real production: wire a KMS/HSM backend via the kernel's external_managed adapter.")
+    typer.echo(
+        "  For real production: wire a KMS/HSM backend via the kernel's external_managed adapter."
+    )
 
 
 @app.command()
@@ -410,7 +423,7 @@ def watch(
         typer.echo(
             "watch: no TTY available. Use `permit watch --once` to print pending "
             "approvals non-interactively, or approve directly via the API:\n"
-            "  curl -X POST -H \"Authorization: Bearer $(cat ~/.actenon-permit/admin-token)\" \\\n"
+            '  curl -X POST -H "Authorization: Bearer $(cat ~/.actenon-permit/admin-token)" \\\n'
             "    http://127.0.0.1:7780/approvals/<action_id>/approve",
             err=True,
         )
@@ -570,8 +583,12 @@ def mcp_serve(
 @app.command()
 def attenuate(
     grant_id: str = typer.Argument(..., help="Parent grant id to attenuate."),
-    agent_id: str | None = typer.Option(None, "--agent-id", help="New agent id for the child grant."),
-    budget_limit: float | None = typer.Option(None, "--budget-limit", help="Smaller budget cap."),
+    agent_id: str | None = typer.Option(
+        None, "--agent-id", help="New agent id for the child grant."
+    ),
+    budget_limit: str | None = typer.Option(
+        None, "--budget-limit", help="Smaller exact decimal budget cap."
+    ),
     scopes_allow: str | None = typer.Option(
         None, "--scopes-allow", help="Comma-separated subset of parent's allow scopes."
     ),
@@ -623,7 +640,9 @@ def attenuate(
 @app.command()
 def mint_token(
     grant_id: str = typer.Argument(..., help="Grant id to mint a bearer token for."),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the token (suppress warnings to stderr)."),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Print only the token (suppress warnings to stderr)."
+    ),
 ) -> None:
     """Mint a v1 bearer token for a grant. The token is presented to the
     gateway as the X-Actenon-Grant header."""
