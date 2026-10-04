@@ -137,6 +137,26 @@ def verify_signature(payload: dict[str, Any], signature: str) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
+def authority_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """The grant fields the HMAC covers.
+
+    Permit rewrites ``status`` and ``budget.remaining`` inside the stored
+    grant body on reserve, commit, release, and set_status. Those are live
+    store facts (the PDP and ``StoreRevocationChecker`` read them). Including
+    them in the signature made every decision after the first ALLOW fail
+    verification when the caller reloaded the stored grant.
+
+    ``budget.limit`` and ``budget.currency`` stay signed, so a stored body
+    cannot widen the cap. Scopes, expiry, rate, identity, and delegation
+    stay signed. An empty signature still fails ``Grant.verify``.
+    """
+    signed = {key: value for key, value in payload.items() if key not in {"signature", "status"}}
+    budget = signed.get("budget")
+    if isinstance(budget, dict):
+        signed["budget"] = {key: value for key, value in budget.items() if key != "remaining"}
+    return signed
+
+
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
@@ -235,10 +255,8 @@ class Grant(BaseModel):
     # ------------------------------------------------------------------
 
     def _signing_payload(self) -> dict[str, Any]:
-        """Return the dict that gets signed — everything except the signature itself."""
-        d = self.model_dump(mode="json")
-        d.pop("signature", None)
-        return d
+        """Authority fields. Live ``status`` and ``budget.remaining`` are omitted."""
+        return authority_payload(self.model_dump(mode="json"))
 
     def sign(self) -> Grant:
         """Compute and attach the HMAC signature. Returns self for chaining."""
@@ -246,7 +264,12 @@ class Grant(BaseModel):
         return self
 
     def verify(self) -> bool:
-        """True iff the signature matches the current contents."""
+        """True iff the signature matches the authority fields.
+
+        Live ``status`` and ``budget.remaining`` may change after signing.
+        A missing signature, a widened ``budget.limit``, or any other
+        authority change returns False.
+        """
         if not self.signature:
             return False
         return verify_signature(self._signing_payload(), self.signature)

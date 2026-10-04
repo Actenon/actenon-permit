@@ -22,6 +22,7 @@ canonicalization — it always goes through this bridge.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -49,6 +50,30 @@ class KernelBridgeError(RuntimeError):
 # long as the grant: revoking a grant cannot recall a proof already minted,
 # so this is the window in which a revoked grant's last proof is usable.
 PCCB_TTL_SECONDS = 120
+
+# Glob metacharacters. A proof names one concrete capability; a pattern is a
+# grant scope, not something the kernel can compare exactly.
+_GLOB_CHARS = frozenset("*?[]")
+
+
+def proof_capability(grant: Grant, action: Action) -> str:
+    """The single concrete capability a PCCB may carry.
+
+    Scan-named powers and every other allow entry are matched by the PDP.
+    The proof then names that one action. It does not copy the allow list,
+    and it does not substitute the attempted action when the allow list is
+    empty (that list is permissive at ``decide`` and would widen here).
+    """
+    capability = action.type
+    if not isinstance(capability, str) or not capability or any(ch in capability for ch in _GLOB_CHARS):
+        raise KernelBridgeError(
+            "proof capability must name one concrete action; a wildcard is not a capability"
+        )
+    if not grant.scopes.allow:
+        raise KernelBridgeError(
+            "empty allow-list cannot mint a proof; refusing to widen to the attempted action"
+        )
+    return capability
 
 
 def _canonicalize_value(v: Any) -> Any:
@@ -187,10 +212,16 @@ def _build_context(
     audience_id: str = "actenon-permit-gateway",
 ) -> DynamicContextInput:
     """Build the kernel's DynamicContextInput from permit's Grant + Action."""
+    # Exact capability. Grant scopes may be patterns (``payments.*``); the PDP
+    # has already matched them. Kernel verifiers compare capabilities as exact
+    # strings, so the proof must not carry ``*`` or the rest of the allow list.
+    # An empty tuple would hit the kernel minter's ``or (intent.capability,)``
+    # fallback and widen an unnamed action into the proof.
+    capability = proof_capability(grant, action)
     return DynamicContextInput(
         request_id=f"req_{uuid4().hex[:8]}",
         audience=AudienceRef(type="service", id=audience_id),
-        scope_capabilities=tuple(grant.scopes.allow) or (action.type,),
+        scope_capabilities=(capability,),
         now=datetime.now(UTC),
         max_ttl_seconds=max(
             1, min(PCCB_TTL_SECONDS, int((grant.expires_at - datetime.now(UTC)).total_seconds()))
@@ -221,6 +252,9 @@ def mint_pccb_for_action(
     """
     if decision.outcome != DecisionOutcome.ALLOW:
         raise KernelBridgeError(f"cannot mint PCCB for non-ALLOW decision: {decision.outcome}")
+    if not grant.verify():
+        raise KernelBridgeError("grant signature could not be verified")
+    proof_capability(grant, action)
 
     intent = _permit_action_to_kernel_intent(
         grant, action, tenant_id=tenant_id, audience_id=audience_id
@@ -242,7 +276,15 @@ def mint_pccb_for_action(
         signer=signer,
         issuer=PartyRef(type="service", id=issuer_id),
     )
-    pccb = minter.mint(intent, kernel_decision, context)
+    # Signed, revocable authority reference. Airlock passes StoreRevocationChecker
+    # to ActenonGate; the kernel calls it with the PCCB. Kernels whose mint()
+    # accepts ``extensions`` (Airlock pins actenon-kernel 533c029) embed it.
+    # PyPI kernel 1.2.1 cannot sign extensions; the checker then fails closed.
+    authority = {"issuer": f"service:{issuer_id}", "grant_id": grant.id, "revocable": True}
+    mint_kwargs: dict[str, Any] = {}
+    if "extensions" in inspect.signature(minter.mint).parameters:
+        mint_kwargs["extensions"] = {"authority": authority}
+    pccb = minter.mint(intent, kernel_decision, context, **mint_kwargs)
     return intent, pccb
 
 
@@ -338,6 +380,7 @@ def token_payload_to_pccb(payload: dict[str, Any]) -> Any:
 __all__ = [
     "PCCB_TTL_SECONDS",
     "KernelBridgeError",
+    "proof_capability",
     "mint_pccb_for_action",
     "verify_pccb_at_edge",
     "build_execution_receipt",

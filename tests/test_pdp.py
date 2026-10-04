@@ -307,6 +307,9 @@ def test_grant_signature_roundtrip(tmp_db):
     g = _make_grant(allow=["payment.refund"])
     g.sign()
     assert g.verify()
-    # Tamper
-    g.budget.remaining = 9999
+    # Live remaining is rewritten by reserve() and stays verifiable.
+    g.budget.remaining = 0
+    assert g.verify()
+    # The cap is authority. Widening it breaks the signature.
+    g.budget.limit = 9999
     assert not g.verify()

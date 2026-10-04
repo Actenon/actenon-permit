@@ -92,6 +92,13 @@ verified at the edge — and the PCCB is consumed, so it cannot be replayed.
 Read the canonical problem statement in
 [`actenon-kernel/docs/THE_EXECUTION_GAP.md`](https://github.com/Actenon/actenon-kernel/blob/main/docs/THE_EXECUTION_GAP.md).
 
+Airlock compiles each Scan-named power into `Grant.scopes.allow` and asks this
+PDP to decide. The grant HMAC covers that authority and stays valid after
+reservation and revocation; a proof names the one concrete capability the PDP
+allowed. The pin Airlock should use, and the fail-closed rules for unknown
+capabilities, are in
+[`docs/CAPABILITY_PROVENANCE.md`](docs/CAPABILITY_PROVENANCE.md).
+
 ---
 
 ## What this is
