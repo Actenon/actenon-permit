@@ -28,9 +28,12 @@ from actenon_permit import (
 from actenon_permit.kernel_bridge import KernelBridgeError, mint_pccb_for_action, proof_capability
 from actenon_permit.model import Decision
 from actenon_permit.revocation import PERMIT_ISSUER, RevocationLookupError, StoreRevocationChecker
+from actenon_permit.state import StateError
 
 
-def _grant(*, allow: list[str] | None = None, deny: list[str] | None = None, limit: int = 100) -> Grant:
+def _grant(
+    *, allow: list[str] | None = None, deny: list[str] | None = None, limit: int = 100
+) -> Grant:
     grant = Grant(
         agent_id="airlock:source",
         issued_at=datetime.now(UTC),
@@ -97,14 +100,19 @@ def test_widened_scope_or_budget_fails_verification(tmp_db):
     widened_scope = store.get_grant(grant.id)
     assert widened_scope is not None
     widened_scope.scopes.allow.append("*")
-    store.put_grant(widened_scope)
+    with pytest.raises(StateError, match="authority.*identity"):
+        store.put_grant(widened_scope)
+    # A storage-level attacker still cannot bypass the PDP signature check.
+    # The public import API now refuses this mutation even before the PDP.
+    store._conn.execute(
+        "UPDATE grants SET body = ? WHERE id = ?",
+        (widened_scope.model_dump_json(), grant.id),
+    )
     denied = pdp.decide(store.get_grant(grant.id), _action(grant, "airlock.http.post"))
     assert denied.outcome == DecisionOutcome.DENY
     assert denied.reason == "grant signature could not be verified"
 
-    store.put_grant(grant)
-    widened_budget = store.get_grant(grant.id)
-    assert widened_budget is not None
+    widened_budget = grant.model_copy(deep=True)
     widened_budget.budget.limit = 10**9
     assert not widened_budget.verify()
 
@@ -135,7 +143,9 @@ def test_empty_allow_decides_per_spec_but_cannot_mint(tmp_db):
     action = _action(grant, "airlock.http.post", cost=0)
     assert pdp.decide(grant, action).outcome == DecisionOutcome.ALLOW
 
-    decision, intent, proof = pdp.decide_and_mint_pccb(grant, _action(grant, "airlock.http.post", cost=0))
+    decision, intent, proof = pdp.decide_and_mint_pccb(
+        grant, _action(grant, "airlock.http.post", cost=0)
+    )
     assert decision.outcome == DecisionOutcome.DENY
     assert intent is None and proof is None
     assert "empty allow-list" in decision.reason

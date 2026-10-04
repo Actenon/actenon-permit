@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="12" skipped="0" tests="12" time="0.244" timestamp="2026-10-04T19:36:26.468826+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_grant_import_identity" name="test_reimport_cannot_restore_spent_budget_or_reservation" time="0.015"><failure message="AssertionError: assert Decimal('50') == Decimal('20')&#10; +  where Decimal('50') = Budget(currency='USD', limit=Decimal('50'), remaining=Decimal('50')).remaining&#10; +    where Budget(currency='USD', limit=Decimal('50'), remaining=Decimal('50')) = Grant(id='grant_5d415203980b443b', agent_id='imported-agent', issued_at=datetime.datetime(2026, 10, 4, 18, 36, 26, 634...signature='3a9b3016a493d4cfe25326de4459fb3614d4132a2d149613d48cd29c94d8f1b1', parent_grant_id=None, delegation_depth=0).budget&#10; +      where Grant(id='grant_5d415203980b443b', agent_id='imported-agent', issued_at=datetime.datetime(2026, 10, 4, 18, 36, 26, 634...signature='3a9b3016a493d4cfe25326de4459fb3614d4132a2d149613d48cd29c94d8f1b1', parent_grant_id=None, delegation_depth=0) = get_grant('grant_5d415203980b443b')&#10; +        where get_grant = &lt;actenon_permit.state.SQLiteStore object at 0x10bdc5130&gt;.get_grant&#10; +        and   'grant_5d415203980b443b' = Grant(id='grant_5d415203980b443b', agent_id='imported-agent', issued_at=datetime.datetime(2026, 10, 4, 18, 36, 26, 634...signature='3a9b3016a493d4cfe25326de4459fb3614d4132a2d149613d48cd29c94d8f1b1', parent_grant_id=None, delegation_depth=0).id&#10; +  and   Decimal('20') = Decimal('20')">tests/test_grant_import_identity.py:32: in test_reimport_cannot_restore_spent_budget_or_reservation
+    assert second.get_grant(original.id).budget.remaining == Decimal("20")
+E   AssertionError: assert Decimal('50') == Decimal('20')
+E    +  where Decimal('50') = Budget(currency='USD', limit=Decimal('50'), remaining=Decimal('50')).remaining
+E    +    where Budget(currency='USD', limit=Decimal('50'), remaining=Decimal('50')) = Grant(id='grant_5d415203980b443b', agent_id='imported-agent', issued_at=datetime.datetime(2026, 10, 4, 18, 36, 26, 634...signature='3a9b3016a493d4cfe25326de4459fb3614d4132a2d149613d48cd29c94d8f1b1', parent_grant_id=None, delegation_depth=0).budget
+E    +      where Grant(id='grant_5d415203980b443b', agent_id='imported-agent', issued_at=datetime.datetime(2026, 10, 4, 18, 36, 26, 634...signature='3a9b3016a493d4cfe25326de4459fb3614d4132a2d149613d48cd29c94d8f1b1', parent_grant_id=None, delegation_depth=0) = get_grant('grant_5d415203980b443b')
+E    +        where get_grant = &lt;actenon_permit.state.SQLiteStore object at 0x10bdc5130&gt;.get_grant
+E    +        and   'grant_5d415203980b443b' = Grant(id='grant_5d415203980b443b', agent_id='imported-agent', issued_at=datetime.datetime(2026, 10, 4, 18, 36, 26, 634...signature='3a9b3016a493d4cfe25326de4459fb3614d4132a2d149613d48cd29c94d8f1b1', parent_grant_id=None, delegation_depth=0).id
+E    +  and   Decimal('20') = Decimal('20')</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_reimport_cannot_reactivate_grant[revoked]" time="0.003"><failure message="AssertionError: assert &lt;GrantStatus.ACTIVE: 'active'&gt; == &lt;GrantStatus....ED: 'revoked'&gt;&#10;  &#10;  - revoked&#10;  + active">tests/test_grant_import_identity.py:46: in test_reimport_cannot_reactivate_grant
+    assert store.get_grant(original.id).status == status
+E   AssertionError: assert &lt;GrantStatus.ACTIVE: 'active'&gt; == &lt;GrantStatus....ED: 'revoked'&gt;
+E     
+E     - revoked
+E     + active</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_reimport_cannot_reactivate_grant[expired]" time="0.002"><failure message="AssertionError: assert &lt;GrantStatus.ACTIVE: 'active'&gt; == &lt;GrantStatus....ED: 'expired'&gt;&#10;  &#10;  - expired&#10;  + active">tests/test_grant_import_identity.py:46: in test_reimport_cannot_reactivate_grant
+    assert store.get_grant(original.id).status == status
+E   AssertionError: assert &lt;GrantStatus.ACTIVE: 'active'&gt; == &lt;GrantStatus....ED: 'expired'&gt;
+E     
+E     - expired
+E     + active</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_reimport_cannot_reactivate_grant[exhausted]" time="0.002"><failure message="AssertionError: assert &lt;GrantStatus.ACTIVE: 'active'&gt; == &lt;GrantStatus....: 'exhausted'&gt;&#10;  &#10;  - exhausted&#10;  + active">tests/test_grant_import_identity.py:46: in test_reimport_cannot_reactivate_grant
+    assert store.get_grant(original.id).status == status
+E   AssertionError: assert &lt;GrantStatus.ACTIVE: 'active'&gt; == &lt;GrantStatus....: 'exhausted'&gt;
+E     
+E     - exhausted
+E     + active</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_even_resigned_changed_authority_requires_new_identity[scope]" time="0.002"><failure message="Failed: DID NOT RAISE StateError">tests/test_grant_import_identity.py:71: in test_even_resigned_changed_authority_requires_new_identity
+    with pytest.raises(StateError, match="authority.*identity"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE StateError</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_even_resigned_changed_authority_requires_new_identity[cap]" time="0.002"><failure message="Failed: DID NOT RAISE StateError">tests/test_grant_import_identity.py:71: in test_even_resigned_changed_authority_requires_new_identity
+    with pytest.raises(StateError, match="authority.*identity"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE StateError</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_even_resigned_changed_authority_requires_new_identity[subject]" time="0.002"><failure message="Failed: DID NOT RAISE StateError">tests/test_grant_import_identity.py:71: in test_even_resigned_changed_authority_requires_new_identity
+    with pytest.raises(StateError, match="authority.*identity"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE StateError</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_even_resigned_changed_authority_requires_new_identity[expiry]" time="0.003"><failure message="Failed: DID NOT RAISE StateError">tests/test_grant_import_identity.py:71: in test_even_resigned_changed_authority_requires_new_identity
+    with pytest.raises(StateError, match="authority.*identity"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE StateError</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_even_resigned_changed_authority_requires_new_identity[approval]" time="0.002"><failure message="Failed: DID NOT RAISE StateError">tests/test_grant_import_identity.py:71: in test_even_resigned_changed_authority_requires_new_identity
+    with pytest.raises(StateError, match="authority.*identity"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE StateError</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_even_resigned_changed_authority_requires_new_identity[parent]" time="0.002"><failure message="Failed: DID NOT RAISE StateError">tests/test_grant_import_identity.py:71: in test_even_resigned_changed_authority_requires_new_identity
+    with pytest.raises(StateError, match="authority.*identity"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE StateError</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_two_importing_clients_do_not_reset_each_others_spend" time="0.007"><failure message="assert [True, True] == [False, True]&#10;  &#10;  At index 0 diff: True != False&#10;  Use -v to get more diff">tests/test_grant_import_identity.py:89: in test_two_importing_clients_do_not_reset_each_others_spend
+    assert sorted(results) == [False, True]
+E   assert [True, True] == [False, True]
+E     
+E     At index 0 diff: True != False
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_grant_import_identity" name="test_new_grant_cannot_start_above_signed_cap" time="0.002"><failure message="Failed: DID NOT RAISE StateError">tests/test_grant_import_identity.py:99: in test_new_grant_cannot_start_above_signed_cap
+    with pytest.raises(StateError, match="remaining.*limit"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE StateError</failure></testcase></testsuite></testsuites>
