@@ -364,9 +364,12 @@ def test_execute_brokered_succeeded_transitions_lifecycle(tmp_db):
         requester_subject="alice",
         requester_agent_id="bot",
     )
+    action = mgr._to_action(intent, grant)
+    decision = broker.pdp.decide(grant, action)
+    assert decision.outcome == DecisionOutcome.ALLOW
     updated, result = mgr.execute_brokered(
         intent, grant=grant, decision=decision, broker=broker,
-        adapter=adapter, credential_ref="GITHUB_TOKEN",
+        adapter=adapter, credential_ref="GITHUB_TOKEN", action=action,
     )
     assert updated.lifecycle_state == IntentLifecycle.SUCCEEDED
     assert result.state == "succeeded"
@@ -391,9 +394,12 @@ def test_execute_brokered_refused_transitions_lifecycle(tmp_db):
         requester_subject="alice",
         requester_agent_id="bot",
     )
+    action = mgr._to_action(intent, grant)
+    decision = broker.pdp.decide(grant, action)
+    assert decision.outcome == DecisionOutcome.ALLOW
     updated, result = mgr.execute_brokered(
         intent, grant=grant, decision=decision, broker=broker,
-        adapter=adapter, credential_ref="GITHUB_TOKEN",
+        adapter=adapter, credential_ref="GITHUB_TOKEN", action=action,
     )
     assert updated.lifecycle_state == IntentLifecycle.REFUSED
     assert result.state == "refused"
@@ -414,9 +420,12 @@ def test_execute_dispatches_by_mode_brokered(tmp_db):
         requester_subject="alice",
         requester_agent_id="bot",
     )
+    action = mgr._to_action(intent, grant)
+    decision = broker.pdp.decide(grant, action)
+    assert decision.outcome == DecisionOutcome.ALLOW
     updated, result = mgr.execute(
         intent, grant=grant, decision=decision, broker=broker,
-        adapter=adapter, credential_ref="GITHUB_TOKEN",
+        adapter=adapter, credential_ref="GITHUB_TOKEN", action=action,
     )
     assert updated.lifecycle_state == IntentLifecycle.SUCCEEDED
     assert result.mode == "brokered"
@@ -613,9 +622,12 @@ def test_brokered_and_resource_owned_results_are_not_interchangeable(tmp_db, mon
         requester_subject="alice",
         requester_agent_id="bot",
     )
+    action = mgr._to_action(b_intent, grant)
+    decision = broker.pdp.decide(grant, action)
+    assert decision.outcome == DecisionOutcome.ALLOW
     _, b_result = mgr.execute_brokered(
         b_intent, grant=grant, decision=decision, broker=broker,
-        adapter=adapter, credential_ref="GITHUB_TOKEN",
+        adapter=adapter, credential_ref="GITHUB_TOKEN", action=action,
     )
     assert b_result.mode == "brokered"
 
