@@ -231,20 +231,33 @@ class Ledger:
         else:
             db_path = str(conn_or_store)
 
-        self._conn = sqlite3.connect(db_path, check_same_thread=False, isolation_level=None)
+        self._conn = sqlite3.connect(
+            db_path, check_same_thread=False, isolation_level=None, timeout=10
+        )
         self._owns_conn = True
         self._lock = threading.RLock()
-        self._init_schema()
+        try:
+            self._init_schema()
+        except Exception:
+            self._conn.close()
+            raise
 
     def _init_schema(self) -> None:
+        from .state import _retry_sqlite_initialization
+
+        self._conn.execute("PRAGMA busy_timeout=10000")
+        _retry_sqlite_initialization(self._init_schema_attempt)
+
+    def _init_schema_attempt(self) -> None:
         with self._lock:
             cur = self._conn.cursor()
-            cur.executescript(
-                """
-                PRAGMA journal_mode=WAL;
-                PRAGMA synchronous=NORMAL;
-                PRAGMA busy_timeout=10000;
-
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA synchronous=FULL")
+            cur.execute("BEGIN IMMEDIATE")
+            try:
+                # executescript implicitly commits: use individual statements
+                # so inspection and all ALTERs retain this shared write lock.
+                cur.execute("""
                 CREATE TABLE IF NOT EXISTS ledger (
                     seq INTEGER PRIMARY KEY AUTOINCREMENT,
                     action_id TEXT NOT NULL,
@@ -259,25 +272,27 @@ class Ledger:
                     rule_matched TEXT,
                     state_delta TEXT NOT NULL,
                     prev_hash TEXT NOT NULL,
-                    hash TEXT NOT NULL UNIQUE
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_ledger_grant ON ledger(grant_id);
-                CREATE INDEX IF NOT EXISTS idx_ledger_action ON ledger(action_id);
-                """
-            )
-
-            # Migration: add v2 columns if they don't exist
-            columns = {row[1] for row in cur.execute("PRAGMA table_info(ledger)").fetchall()}
-            if "failure_code" not in columns:
-                cur.execute("ALTER TABLE ledger ADD COLUMN failure_code TEXT")
-            if "authority_boundary" not in columns:
-                cur.execute("ALTER TABLE ledger ADD COLUMN authority_boundary TEXT")
-            # WO-4: chain_version discriminator. NULL (absent) = legacy
-            # (<2.0.0) entry, verify with _legacy_canonical_json. 2 = entry
-            # written by >=2.0.0, verify with canonical_json (ACTENON-JCS-STRICT-1).
-            if "chain_version" not in columns:
-                cur.execute("ALTER TABLE ledger ADD COLUMN chain_version INTEGER")
+                    hash TEXT NOT NULL UNIQUE,
+                    failure_code TEXT,
+                    authority_boundary TEXT,
+                    chain_version INTEGER
+                )
+                """)
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_grant ON ledger(grant_id)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_ledger_action ON ledger(action_id)")
+                columns = {row[1] for row in cur.execute("PRAGMA table_info(ledger)").fetchall()}
+                if "failure_code" not in columns:
+                    cur.execute("ALTER TABLE ledger ADD COLUMN failure_code TEXT")
+                if "authority_boundary" not in columns:
+                    cur.execute("ALTER TABLE ledger ADD COLUMN authority_boundary TEXT")
+                # NULL retains legacy hash verification; new entries write v2.
+                if "chain_version" not in columns:
+                    cur.execute("ALTER TABLE ledger ADD COLUMN chain_version INTEGER")
+                cur.execute("COMMIT")
+            except Exception:
+                with contextlib.suppress(Exception):
+                    cur.execute("ROLLBACK")
+                raise
 
     # ------------------------------------------------------------------
     # Append

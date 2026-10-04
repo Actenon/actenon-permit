@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="3" time="0.437" timestamp="2026-10-04T19:23:26.143887+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_ledger_migration" name="test_independent_ledger_clients_migrate_without_duplicate_columns[False]" time="0.113" /><testcase classname="tests.test_ledger_migration" name="test_independent_ledger_clients_migrate_without_duplicate_columns[True]" time="0.110"><failure message="sqlite3.OperationalError: duplicate column name: failure_code">tests/test_ledger_migration.py:57: in test_independent_ledger_clients_migrate_without_duplicate_columns
+    assert list(pool.map(lambda _: initialize(), range(4))) == ["wal"] * 4
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/concurrent/futures/_base.py:619: in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/concurrent/futures/_base.py:317: in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/concurrent/futures/_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_ledger_migration.py:57: in &lt;lambda&gt;
+    assert list(pool.map(lambda _: initialize(), range(4))) == ["wal"] * 4
+                                   ^^^^^^^^^^^^
+tests/test_ledger_migration.py:47: in initialize
+    ledger = Ledger(path)
+             ^^^^^^^^^^^^
+src/actenon_permit/ledger.py:237: in __init__
+    self._init_schema()
+src/actenon_permit/ledger.py:273: in _init_schema
+    cur.execute("ALTER TABLE ledger ADD COLUMN failure_code TEXT")
+tests/test_ledger_migration.py:16: in execute
+    return super().execute(sql, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   sqlite3.OperationalError: duplicate column name: failure_code</failure></testcase><testcase classname="tests.test_ledger_migration" name="test_failed_migration_rolls_back_prior_columns_and_closes_connection" time="0.003"><failure message="AssertionError: assert 'failure_code' not in {'action_id', 'action_type', 'est_cost', 'failure_code', 'grant_id', 'hash', ...}">tests/test_ledger_migration.py:93: in test_failed_migration_rolls_back_prior_columns_and_closes_connection
+    assert "failure_code" not in columns
+E   AssertionError: assert 'failure_code' not in {'action_id', 'action_type', 'est_cost', 'failure_code', 'grant_id', 'hash', ...}</failure></testcase></testsuite></testsuites>
