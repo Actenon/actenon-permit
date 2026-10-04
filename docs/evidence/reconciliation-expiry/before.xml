@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="0.452" timestamp="2026-10-04T18:51:53.426442+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_effect_ledger" name="test_review_expiring_while_waiting_for_store_lock_cannot_refund" time="0.224"><failure message="TypeError: EffectLedgerMixin.settle_effect() got an unexpected keyword argument 'review_expires_at'">tests/test_effect_ledger.py:527: in test_review_expiring_while_waiting_for_store_lock_cannot_refund
+    task.result(timeout=5)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/concurrent/futures/_base.py:449: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/concurrent/futures/thread.py:59: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_effect_ledger.py:510: in reconcile
+    return contender.settle_effect(
+E   TypeError: EffectLedgerMixin.settle_effect() got an unexpected keyword argument 'review_expires_at'</failure></testcase><testcase classname="tests.test_effect_ledger" name="test_settlement_audit_time_is_stable_for_identical_terminal_replay" time="0.003"><failure message="TypeError: EffectLedgerMixin.settle_effect() got an unexpected keyword argument 'review_expires_at'">tests/test_effect_ledger.py:545: in test_settlement_audit_time_is_stable_for_identical_terminal_replay
+    result = store.settle_effect(**args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: EffectLedgerMixin.settle_effect() got an unexpected keyword argument 'review_expires_at'</failure></testcase></testsuite></testsuites>

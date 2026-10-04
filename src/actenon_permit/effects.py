@@ -156,7 +156,7 @@ class EffectLedgerMixin:
         ref = EffectReference.model_validate(reference).model_dump()
         row = cur.execute(
             """SELECT reservation_id,effect_id,action_id,grant_id,principal,action_hash,
-                                    descriptor,reserved_amount,state,execution_occurred,evidence
+                                    descriptor,reserved_amount,state,execution_occurred,evidence,updated_at
                              FROM effect_reservations WHERE reservation_id = ?""",
             (ref["reservation_id"],),
         ).fetchone()
@@ -237,6 +237,7 @@ class EffectLedgerMixin:
         actual_cost=None,
         reconciliation: bool = False,
         expected_event_sequence: int | None = None,
+        review_expires_at: datetime | None = None,
     ):
         """Record trusted certainty and settle the held budget atomically.
 
@@ -262,6 +263,12 @@ class EffectLedgerMixin:
             or expected_event_sequence <= 0
         ):
             raise StateError("reviewed event sequence requires a positive integer reconciliation")
+        if review_expires_at is not None and (
+            not reconciliation
+            or not isinstance(review_expires_at, datetime)
+            or review_expires_at.utcoffset() is None
+        ):
+            raise StateError("review expiry requires a timezone-aware reconciliation deadline")
         cost = _budget_amount(actual_cost) if actual_cost is not None else None
         if cost is not None and cost < 0:
             raise StateError("effect settlement cost cannot be negative")
@@ -270,6 +277,10 @@ class EffectLedgerMixin:
             cur = self._conn.cursor()
             cur.execute("BEGIN IMMEDIATE")
             try:
+                settled_at = datetime.now(UTC)
+                now = settled_at.isoformat()
+                if review_expires_at is not None and review_expires_at <= settled_at:
+                    raise StateError("reconciliation review expired before settlement")
                 row = self._effect_row(cur, reference, grant_id, principal, action_hash)
                 state, reserved = row[8], _budget_amount(row[7])
                 if outcome == "NOT_EXECUTED" and cost not in (None, 0):
@@ -297,6 +308,7 @@ class EffectLedgerMixin:
                     cur.execute("ROLLBACK")
                     return {
                         "remaining": remaining,
+                        "settled_at": row[11],
                         "effect": {
                             **dict(reference),
                             "outcome": outcome,
@@ -339,6 +351,7 @@ class EffectLedgerMixin:
                 cur.execute("COMMIT")
                 return {
                     "remaining": remaining,
+                    "settled_at": now,
                     "effect": {
                         **dict(reference),
                         "outcome": outcome,
