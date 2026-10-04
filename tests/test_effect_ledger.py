@@ -2,6 +2,7 @@
 
 import multiprocessing as mp
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
@@ -492,3 +493,65 @@ def test_overrun_debt_survives_reopen_and_refunds_pay_debt_first(ledger):
         assert settle(reopened, grant, original, "COMMITTED", cost=110)["remaining"] == 0
     finally:
         reopened.close()
+
+
+def test_review_expiring_while_waiting_for_store_lock_cannot_refund(ledger):
+    store, grant, path = ledger
+    _, _, snap = reserve(store, grant)
+    assert store.claim_effect(**owner(grant, snap))
+    settle(store, grant, snap, "AMBIGUOUS")
+    reviewed = store.get_effect(snap["effect"]["effect_id"])[-1]
+    contender = SQLiteStore(path)
+    started = threading.Event()
+    deadline = datetime.now(UTC) + timedelta(milliseconds=150)
+
+    def reconcile():
+        started.set()
+        return contender.settle_effect(
+            **owner(grant, snap),
+            outcome="NOT_EXECUTED",
+            execution_occurred=False,
+            evidence_hash="c" * 64,
+            observer="operator:expires-while-waiting",
+            reconciliation=True,
+            expected_event_sequence=reviewed["event_sequence"],
+            review_expires_at=deadline,
+        )
+
+    store._conn.execute("BEGIN IMMEDIATE")
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            task = pool.submit(reconcile)
+            assert started.wait(2)
+            # A distinct store client holds the database until the review expires.
+            threading.Event().wait(0.2)
+            assert datetime.now(UTC) > deadline
+            store._conn.execute("ROLLBACK")
+            with pytest.raises(StateError, match="expired before settlement"):
+                task.result(timeout=5)
+    finally:
+        if store._conn.in_transaction:
+            store._conn.execute("ROLLBACK")
+        contender.close()
+    assert balance(store, grant) == 80
+    assert store.get_effect(snap["effect"]["effect_id"])[-1]["state"] == "AMBIGUOUS"
+
+
+def test_settlement_audit_time_is_stable_for_identical_terminal_replay(ledger):
+    store, grant, _ = ledger
+    _, _, snap = reserve(store, grant)
+    reviewed = store.get_effect(snap["effect"]["effect_id"])[-1]
+    deadline = datetime.now(UTC) + timedelta(seconds=10)
+    args = dict(
+        **owner(grant, snap),
+        outcome="NOT_EXECUTED",
+        execution_occurred=False,
+        evidence_hash="c" * 64,
+        observer="operator:confirmed-nonexecution",
+        reconciliation=True,
+        expected_event_sequence=reviewed["event_sequence"],
+        review_expires_at=deadline,
+    )
+    result = store.settle_effect(**args)
+    assert datetime.fromisoformat(result["settled_at"]) < deadline
+    assert store.settle_effect(**args)["settled_at"] == result["settled_at"]
