@@ -415,3 +415,14 @@ Permit depends on [`actenon-kernel`](https://github.com/Actenon/actenon-kernel) 
 ## License
 
 Apache-2.0 — see [`LICENSE`](LICENSE).
+
+### Consequential effect ownership
+
+`SQLiteStore` can reserve an `ACTENON-EFFECT-1` identity and its grant budget in
+one transaction. Use the trusted `effect_namespace` option on
+`PDP.decide_and_mint_pccb` and connect Kernel's `EffectProtector` to
+`kernel_bridge.claim_effect_at_edge`. The signed proof is bound to one durable
+reservation owner before credentials are released. Uncertain dispatch keeps
+the effect and budget held; trusted reconciliation must establish COMMITTED
+or NOT_EXECUTED before a repeat can become eligible. See
+[the contract, limitations and integrated attack evidence](docs/evidence/effect-ledger/README.md).

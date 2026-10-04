@@ -153,11 +153,18 @@ class PDP:
     # Public API
     # ------------------------------------------------------------------
 
-    def decide(self, grant: Grant, action: Action, ctx: dict[str, Any] | None = None) -> Decision:
+    def decide(
+        self,
+        grant: Grant,
+        action: Action,
+        ctx: dict[str, Any] | None = None,
+        *,
+        _effect_reservation: dict[str, Any] | None = None,
+    ) -> Decision:
         """Run the decision algorithm. Fail-closed on any exception."""
         ctx = ctx or {}
         try:
-            return self._decide_inner(grant, action, ctx)
+            return self._decide_inner(grant, action, ctx, _effect_reservation=_effect_reservation)
         except Exception as e:  # noqa: BLE001 — fail-closed is the contract
             # Try to record the failure in the ledger too.
             with contextlib.suppress(Exception):
@@ -188,7 +195,14 @@ class PDP:
     # Inner decision
     # ------------------------------------------------------------------
 
-    def _decide_inner(self, grant: Grant, action: Action, ctx: dict[str, Any]) -> Decision:
+    def _decide_inner(
+        self,
+        grant: Grant,
+        action: Action,
+        ctx: dict[str, Any],
+        *,
+        _effect_reservation: dict[str, Any] | None = None,
+    ) -> Decision:
         # 0. Signature over the authority fields. Live status and remaining
         # budget are not signed; a tampered scope, cap, or stripped signature
         # is not authority and must not reach a later ALLOW.
@@ -357,17 +371,57 @@ class PDP:
                 )
                 return d
 
+        # Protected effects never use the legacy caller's action-id approval
+        # shortcut. Exact signed single-use approval is a separate contract.
+        # Until supplied, a matching human rule remains REQUIRE_APPROVAL;
+        # neither an effect nor budget is reserved for a waiting request.
+        if _effect_reservation is not None:
+            for rule in grant.approval_rules:
+                if _approval_rule_matches(rule, action):
+                    d = Decision(
+                        outcome=DecisionOutcome.REQUIRE_APPROVAL,
+                        reason=f"exact effect approval required: {rule}",
+                        rule_matched=f"approval:{rule}",
+                        state_delta={},
+                        failure_code=FailureCode.APPROVAL_REQUIRED,
+                    )
+                    self.ledger.append(
+                        action_id=action.action_id,
+                        grant_id=grant.id,
+                        ts=action.ts,
+                        action_type=action.type,
+                        target=action.target,
+                        params=action.params,
+                        est_cost=action.est_cost,
+                        outcome=d.outcome.value,
+                        reason=d.reason,
+                        rule_matched=d.rule_matched,
+                        state_delta={},
+                        failure_code=d.failure_code,
+                        authority_boundary=_build_authority_boundary(grant, action),
+                    )
+                    return d
+
         # 6 + reserve. Atomic reserve-then-record. If reserve fails, it
         # failed because of budget or a race — DENY with the reason reserve
         # returned.
         est_cost = action.est_cost or 0.0
-        ok, reserve_reason, snapshot = self.state.reserve(
-            grant_id=grant.id,
-            action_id=action.action_id,
-            amount=est_cost,
-            rate_max=grant.rate.max,
-            rate_per_seconds=grant.rate.per_seconds,
-        )
+        if _effect_reservation is not None:
+            ok, reserve_reason, snapshot = self.state.reserve_effect(
+                grant_id=grant.id,
+                amount=est_cost,
+                rate_max=grant.rate.max,
+                rate_per_seconds=grant.rate.per_seconds,
+                **_effect_reservation,
+            )
+        else:
+            ok, reserve_reason, snapshot = self.state.reserve(
+                grant_id=grant.id,
+                action_id=action.action_id,
+                amount=est_cost,
+                rate_max=grant.rate.max,
+                rate_per_seconds=grant.rate.per_seconds,
+            )
         if not ok:
             # Map the reserve_reason onto a structured FailureCode so callers
             # and the ledger get a stable taxonomy, not free-text prose.
@@ -497,6 +551,9 @@ class PDP:
         grant: Grant,
         action: Action,
         ctx: dict[str, Any] | None = None,
+        *,
+        effect_namespace: str | None = None,
+        effect_descriptor_builder: Any = None,
     ) -> tuple[Decision, Any, Any]:
         """Run the decision algorithm AND, on ALLOW, mint a kernel PCCB.
 
@@ -510,7 +567,7 @@ class PDP:
         This method is the concrete implementation of ARCHITECTURE.md §3:
         permit issues real kernel PCCBs, not parallel HMAC grants.
         """
-        from .kernel_bridge import KernelBridgeError, proof_capability
+        from .kernel_bridge import KernelBridgeError, build_action_hash_input, proof_capability
 
         if grant.verify():
             # Refuse an unmintable capability before decide() reserves budget.
@@ -542,7 +599,77 @@ class PDP:
                 )
                 return d, None, None
 
-        decision = self.decide(grant, action, ctx)
+        effect_reservation = None
+        prepared_intent = None
+        if effect_namespace is not None:
+            # Trusted adapter configuration derives identity. Nothing in ctx
+            # or the agent's nonce can choose the resource-owner namespace.
+            try:
+                from actenon.proof.canonical import sha256_hex
+                from actenon_protocol.effects import EFFECT_PROFILE, effect_identity
+
+                from .kernel_bridge import _permit_action_to_kernel_intent, effect_attempt_id
+
+                prepared_intent = _permit_action_to_kernel_intent(grant, action)
+                from dataclasses import replace
+
+                prepared_intent = replace(prepared_intent, intent_id=effect_attempt_id(action))
+                descriptor = {
+                    "profile": EFFECT_PROFILE,
+                    "namespace": effect_namespace,
+                    "kind": "exact",
+                    "action_type": prepared_intent.action.capability,
+                    "target": {
+                        "type": prepared_intent.target.resource_type,
+                        "id": prepared_intent.target.resource_id,
+                    },
+                    "parameters": prepared_intent.action.parameters,
+                }
+                if effect_descriptor_builder is not None:
+                    from actenon_protocol.canonicalisation import canonicalize_bytes
+
+                    expected = descriptor
+                    descriptor = dict(effect_descriptor_builder(prepared_intent))
+                    for field in ("profile", "namespace", "action_type", "target"):
+                        if canonicalize_bytes(descriptor.get(field)) != canonicalize_bytes(
+                            expected[field]
+                        ):
+                            raise ValueError("effect descriptor changed the exact request")
+                    if descriptor.get("kind") == "exact" and canonicalize_bytes(
+                        descriptor.get("parameters")
+                    ) != canonicalize_bytes(expected["parameters"]):
+                        raise ValueError("exact descriptor dropped consequential parameters")
+                effect_identity(descriptor)  # refuse malformed before debit
+                effect_reservation = {
+                    "action_id": prepared_intent.intent_id,
+                    "descriptor": descriptor,
+                    "action_hash": sha256_hex(build_action_hash_input(prepared_intent)),
+                    "principal": prepared_intent.requester.id,
+                }
+            except Exception:
+                return (
+                    Decision(
+                        outcome=DecisionOutcome.DENY,
+                        reason="effect identity could not be derived — failing closed",
+                        rule_matched="effect:identity",
+                        failure_code=FailureCode.ENGINE_ERROR,
+                    ),
+                    None,
+                    None,
+                )
+        elif effect_descriptor_builder is not None:
+            return (
+                Decision(
+                    outcome=DecisionOutcome.DENY,
+                    reason="effect namespace must be owner configured",
+                    rule_matched="effect:namespace",
+                    failure_code=FailureCode.ENGINE_ERROR,
+                ),
+                None,
+                None,
+            )
+
+        decision = self.decide(grant, action, ctx, _effect_reservation=effect_reservation)
         if decision.outcome != DecisionOutcome.ALLOW:
             return decision, None, None
 
@@ -552,7 +679,16 @@ class PDP:
         from .kernel_bridge import mint_pccb_for_action
 
         try:
-            intent, pccb = mint_pccb_for_action(grant, action, decision)
+            if prepared_intent is not None:
+                intent, pccb = mint_pccb_for_action(
+                    grant,
+                    action,
+                    decision,
+                    prepared_intent=prepared_intent,
+                    effect_reference=decision.state_delta["effect"],
+                )
+            else:
+                intent, pccb = mint_pccb_for_action(grant, action, decision)
             return decision, intent, pccb
         except Exception:
             # If the kernel bridge fails for ANY reason (including

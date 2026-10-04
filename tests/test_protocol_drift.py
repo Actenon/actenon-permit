@@ -39,7 +39,7 @@ from actenon_protocol.canonicalisation import canonicalize_json
 # 0. Pinned protocol version
 # ---------------------------------------------------------------------------
 
-EXPECTED_PROTOCOL_VERSION = "1.2.0"
+EXPECTED_PROTOCOL_VERSION = "1.3.0"
 
 
 def test_protocol_version_is_pinned():

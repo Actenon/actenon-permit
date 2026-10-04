@@ -33,7 +33,7 @@ dependencies = [
     # shipped no `actenon.boundary` module, which the Boundary Kit
     # middleware requires.
     "actenon-kernel[asymmetric]>=1.3.0,<2",
-    "actenon-protocol>=1.5.0,<2",
+    "actenon-protocol>=1.6.0,<2",
     # pytest-asyncio is a runtime dep, not a dev dep, because:
     #   1. pyproject.toml sets `asyncio_mode = "auto"` under
     #      `[tool.pytest.ini_options]`, which requires pytest-asyncio to
@@ -106,8 +106,8 @@ allow-direct-references = true
 # uv sources never reach the wheel's metadata, but this table MUST be removed
 # (and uv.lock regenerated against PyPI) once actenon-kernel 1.3.0 is
 # published and before actenon-permit 2.0.0 is released.
-actenon-kernel = { git = "https://github.com/Actenon/actenon-kernel", rev = "8f5ab060874057e60253edd801b905e95b75d84e" }
-actenon-protocol = { git = "https://github.com/Actenon/actenon-protocol", rev = "4cbd8f04e0db331b2ffd490d50c0a7aede2d35ff" }
+actenon-kernel = { git = "https://github.com/Actenon/actenon-kernel", rev = "5cbe8f58bdb8025fe305d5d460cdc94a09d98562" }
+actenon-protocol = { git = "https://github.com/Actenon/actenon-protocol", rev = "3442bf3cffe0b55ac7d531e66ca0355d2c0784e5" }
 
 [tool.ruff]
 line-length = 100
