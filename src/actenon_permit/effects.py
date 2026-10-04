@@ -236,6 +236,7 @@ class EffectLedgerMixin:
         observer: str,
         actual_cost=None,
         reconciliation: bool = False,
+        expected_event_sequence: int | None = None,
     ):
         """Record trusted certainty and settle the held budget atomically.
 
@@ -244,6 +245,9 @@ class EffectLedgerMixin:
         This is a trusted engine API, not an agent-callable reconcile route.
         Ambiguity keeps ownership and budget. No timer or lease clears it.
         A repeated identical settlement is read-only; conflict is refused.
+        Signed/staged reconciliations must supply the reviewed event sequence.
+        It is checked in the settlement transaction, so a decision prepared
+        before dispatch cannot subsequently release an in-flight effect.
         """
         from .state import StateError, _budget_amount
 
@@ -252,6 +256,12 @@ class EffectLedgerMixin:
             raise StateError("effect settlement requires a trusted observer")
         if type(reconciliation) is not bool:
             raise StateError("reconciliation must be explicit")
+        if expected_event_sequence is not None and (
+            not reconciliation
+            or type(expected_event_sequence) is not int
+            or expected_event_sequence <= 0
+        ):
+            raise StateError("reviewed event sequence requires a positive integer reconciliation")
         cost = _budget_amount(actual_cost) if actual_cost is not None else None
         if cost is not None and cost < 0:
             raise StateError("effect settlement cost cannot be negative")
@@ -294,6 +304,15 @@ class EffectLedgerMixin:
                             "evidence_hash": evidence_hash,
                         },
                     }
+                if expected_event_sequence is not None:
+                    latest = cur.execute(
+                        "SELECT MAX(sequence) FROM effect_events WHERE reservation_id = ?",
+                        (row[0],),
+                    ).fetchone()[0]
+                    if latest != expected_event_sequence:
+                        raise StateError(
+                            "effect changed since review; obtain a fresh reconciliation"
+                        )
                 if state == "AMBIGUOUS" and outcome != "AMBIGUOUS" and not reconciliation:
                     raise StateError("ambiguous outcome requires trusted reconciliation")
                 if state == "RESERVED" and outcome != "NOT_EXECUTED":
@@ -364,7 +383,10 @@ class EffectLedgerMixin:
         with self._lock:
             rows = self._conn.execute(
                 """SELECT reservation_id,action_id,grant_id,principal,action_hash,state,
-                  execution_occurred,evidence FROM effect_reservations WHERE effect_id = ? ORDER BY created_at""",
+                  execution_occurred,evidence,descriptor,
+                  (SELECT MAX(sequence) FROM effect_events e
+                   WHERE e.reservation_id = effect_reservations.reservation_id)
+                  FROM effect_reservations WHERE effect_id = ? ORDER BY created_at""",
                 (effect_id,),
             ).fetchall()
         return [
@@ -381,6 +403,8 @@ class EffectLedgerMixin:
                 "state": r[5],
                 "execution_occurred": None if r[6] is None else bool(r[6]),
                 "evidence": json.loads(r[7]) if r[7] else None,
+                "descriptor": json.loads(r[8]),
+                "event_sequence": r[9],
             }
             for r in rows
         ]
