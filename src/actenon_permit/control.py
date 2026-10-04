@@ -34,6 +34,7 @@ import secrets
 import threading
 import time
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -91,7 +92,9 @@ class ApprovalStore:
             evt = self._pending.pop(action_id, None)
             self._decisions[action_id] = decision
         if evt:
-            self._broadcast({"event": "resolved", "action_id": action_id, "decision": decision, **evt})
+            self._broadcast(
+                {"event": "resolved", "action_id": action_id, "decision": decision, **evt}
+            )
 
     def list_pending(self) -> list[dict[str, Any]]:
         with self._lock:
@@ -179,7 +182,9 @@ def read_admin_token(
     env_token = os.environ.get(ADMIN_TOKEN_ENV, "").strip()
     if env_token:
         return env_token
-    path = (Path(state_dir) if state_dir is not None else default_state_dir()) / ADMIN_TOKEN_FILENAME
+    path = (
+        Path(state_dir) if state_dir is not None else default_state_dir()
+    ) / ADMIN_TOKEN_FILENAME
     return _read_token_file(path) if path.is_file() else None
 
 
@@ -224,7 +229,7 @@ class AttenuateRequest(BaseModel):
     expires_at: str | None = None
     scopes_allow: list[str] | None = None
     scopes_deny: list[str] | None = None
-    budget_limit: float | None = None
+    budget_limit: Decimal | None = None
     rate_max: int | None = None
     rate_per_seconds: int | None = None
     extra_approval_rules: list[str] | None = None

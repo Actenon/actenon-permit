@@ -34,6 +34,7 @@ import contextlib
 import logging
 import os
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any
 
 from .adapters import (
@@ -301,7 +302,7 @@ class Broker:
 
         # 7. Reconcile cost. Adapters may report a cost (e.g. usage-
         # based billing). If they don't, fall back to the reservation.
-        actual_cost = response.cost if response.cost is not None else float(action.est_cost or 0.0)
+        actual_cost = response.cost if response.cost is not None else (action.est_cost or 0)
         self.pdp.commit(grant, action, actual_cost)
 
         return response, actual_cost
@@ -381,7 +382,7 @@ class Broker:
         }
 
 
-def extract_cost(result: Any, action: Action) -> float:
+def extract_cost(result: Any, action: Action) -> Decimal:
     """Extract the actual cost of a completed call from its result.
 
     Public helper (was ``Broker._extract_cost``). Used by both the broker
@@ -393,17 +394,18 @@ def extract_cost(result: Any, action: Action) -> float:
     3. Fall back to ``action.est_cost`` (the reservation). The broker does
        NOT inflate cost.
 
-    This is deliberately permissive: real provider SDKs return a variety of
-    shapes, and we'd rather fall back to the reservation than crash.
+    Missing cost falls back to the reservation. A present invalid cost is
+    refused; it cannot silently replace reported consumption with a guess.
     """
-    if isinstance(result, (int, float)):
-        return float(result)
+    from .state import _budget_amount
+
+    if isinstance(result, (int, float, Decimal)) and not isinstance(result, bool):
+        return _budget_amount(result)
     if isinstance(result, dict):
-        for k in ("amount", "cost", "actual_cost", "charged"):
-            if k in result and isinstance(result[k], (int, float)):
-                return float(result[k])
-    # Fall back to the reservation. The broker does NOT inflate cost.
-    return float(action.est_cost or 0.0)
+        for key in ("amount", "cost", "actual_cost", "charged"):
+            if key in result:
+                return _budget_amount(result[key])
+    return _budget_amount(action.est_cost or 0)
 
 
 def _scrub_text(text: str, secret: str) -> str:
@@ -435,6 +437,7 @@ def _adapter_supports_action(
     # hard dependency.
     try:
         from .adapters.github import _normalise_action as _gh_normalise
+
         normalised = _gh_normalise(action_type)
         if normalised in adapter_actions:
             return True

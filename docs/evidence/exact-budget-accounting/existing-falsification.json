@@ -1,0 +1,26 @@
+{
+  "precision": {
+    "initial": "10000000000000000",
+    "accepted_costs": [
+      "1",
+      "1",
+      "1"
+    ],
+    "accepted": [
+      true,
+      true,
+      true
+    ],
+    "remaining": "1E+16",
+    "expected_remaining": "9999999999999997"
+  },
+  "delegation": {
+    "parent_limit": "50",
+    "accepted": [
+      true,
+      true
+    ],
+    "parent_remaining": "50",
+    "total_attempted": "60"
+  }
+}

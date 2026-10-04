@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="2" time="0.202" timestamp="2026-10-04T22:01:36.403955+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_budget_precision" name="test_real_pdp_records_and_verifies_exact_decimal_cost" time="0.010"><failure message="AssertionError: assert 'DENY' == 'ALLOW'&#10;  &#10;  - ALLOW&#10;  + DENY">tests/test_budget_precision.py:98: in test_real_pdp_records_and_verifies_exact_decimal_cost
+    assert decision.outcome.value == "ALLOW"
+E   AssertionError: assert 'DENY' == 'ALLOW'
+E     
+E     - ALLOW
+E     + DENY</failure></testcase><testcase classname="tests.test_budget_precision" name="test_legacy_migration_cannot_restore_known_lost_charges" time="0.005" /></testsuite></testsuites>

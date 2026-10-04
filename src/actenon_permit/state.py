@@ -21,7 +21,6 @@ against a $50 budget and asserts exactly one is ALLOWED.
 from __future__ import annotations
 
 import contextlib
-import math
 import os
 import sqlite3
 import threading
@@ -31,6 +30,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from .budget import from_units, subtract, units
 from .effects import EffectLedgerMixin
 from .model import Grant, GrantStatus, canonical_json
 
@@ -40,19 +40,9 @@ class StateError(RuntimeError):
 
 
 def _budget_amount(value: float | Decimal | int) -> Decimal:
-    """Validate and normalize a value to the store's SQLite REAL precision."""
-    if isinstance(value, bool) or not isinstance(value, (float, Decimal, int)):
-        raise StateError("budget amount must be a finite number")
-    try:
-        decimal_value = Decimal(str(value))
-        stored_value = float(decimal_value)
-    except (ValueError, OverflowError) as exc:
-        raise StateError("budget amount must be a finite number") from exc
-    if not decimal_value.is_finite() or not math.isfinite(stored_value):
-        raise StateError("budget amount must be a finite number")
-    if decimal_value != 0 and stored_value == 0:
-        raise StateError("budget amount is below the store's numeric precision")
-    return Decimal(str(stored_value))
+    from .budget import amount
+
+    return amount(value)
 
 
 class StateStore(ABC):
@@ -202,6 +192,16 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
             )
 
             self._init_effect_schema(cur)
+            cur.execute("BEGIN IMMEDIATE")
+            try:
+                from .budget import migrate
+
+                migrate(cur)
+                cur.execute("COMMIT")
+            except Exception:
+                with contextlib.suppress(Exception):
+                    cur.execute("ROLLBACK")
+                raise
 
     # ------------------------------------------------------------------
     # Grant CRUD
@@ -248,8 +248,8 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
                     if remaining > limit:
                         raise StateError("grant remaining budget exceeds its signed limit")
                     cur.execute(
-                        "INSERT INTO grants (id, agent_id, body, status, remaining, updated_at) "
-                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO grants (id, agent_id, body, status, remaining, updated_at, remaining_units) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
                         (
                             frozen.id,
                             frozen.agent_id,
@@ -257,6 +257,7 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
                             frozen.status.value,
                             float(remaining),
                             now,
+                            str(units(remaining)),
                         ),
                     )
                 cur.execute("COMMIT")
@@ -369,20 +370,21 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
     def _reserve_in_transaction(
         self, cur, grant_id, action_id, dec_amount, rate_max, rate_per_seconds, now_ts
     ):
-        cur.execute("SELECT body, status, remaining FROM grants WHERE id = ?", (grant_id,))
+        cur.execute("SELECT body, status, remaining_units FROM grants WHERE id = ?", (grant_id,))
         row = cur.fetchone()
         if not row:
             return False, "grant not found", {}
-        body, status_str, remaining = row
+        body, status_str, remaining_raw = row
+        remaining = from_units(remaining_raw)
         grant = Grant.model_validate_json(body)
 
         if grant.status != GrantStatus.ACTIVE:
             return False, f"grant status is {grant.status.value}", {}
 
         overrun = cur.execute(
-            "SELECT amount FROM budget_overruns WHERE grant_id = ?", (grant_id,)
+            "SELECT amount_units FROM budget_overruns WHERE grant_id = ?", (grant_id,)
         ).fetchone()
-        if overrun is not None and _budget_amount(overrun[0]) > 0:
+        if overrun is not None and from_units(overrun[0]) > 0:
             return False, "budget overrun remains unsettled", {}
 
         # Revocation cascades to every attenuated descendant. Checked
@@ -413,7 +415,7 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
                 "negative amounts are not allowed — this is a budget bypass attempt",
                 {},
             )
-        if dec_remaining - dec_amount < 0:
+        if units(dec_remaining) < units(dec_amount):
             return (
                 False,
                 f"would exceed {grant.budget.currency} {grant.budget.limit} budget",
@@ -421,16 +423,16 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
             )
 
         # Reserve.
-        new_remaining = float(dec_remaining - dec_amount)
+        new_remaining = subtract(dec_remaining, dec_amount)
         now_iso = datetime.now(UTC).isoformat()
         cur.execute(
-            "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
-            (new_remaining, now_iso, grant_id),
+            "UPDATE grants SET remaining = ?, remaining_units = ?, updated_at = ? WHERE id = ?",
+            (float(new_remaining), str(units(new_remaining)), now_iso, grant_id),
         )
         cur.execute(
-            "INSERT INTO rate_events (action_id, grant_id, ts, reserved_amount, committed) "
-            "VALUES (?, ?, ?, ?, 0)",
-            (action_id, grant_id, now_ts, float(dec_amount)),
+            "INSERT INTO rate_events (action_id, grant_id, ts, reserved_amount, committed, reserved_units) "
+            "VALUES (?, ?, ?, ?, 0, ?)",
+            (action_id, grant_id, now_ts, float(dec_amount), str(units(dec_amount))),
         )
 
         # Always reflect the new remaining in the body JSON so that
@@ -457,7 +459,8 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
             True,
             "reserved",
             {
-                "remaining": new_remaining,
+                "remaining": float(new_remaining),
+                "remaining_exact": str(new_remaining),
                 "status": new_status.value,
             },
         )
@@ -496,11 +499,12 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
     def _commit_in_transaction(
         self, cur, grant_id, action_id, dec_actual, claimed_reserved, now_iso
     ):
-        cur.execute("SELECT body, remaining FROM grants WHERE id = ?", (grant_id,))
+        cur.execute("SELECT body, remaining_units FROM grants WHERE id = ?", (grant_id,))
         row = cur.fetchone()
         if not row:
             raise StateError(f"grant not found: {grant_id}")
-        body, remaining = row
+        body, remaining_raw = row
+        remaining = from_units(remaining_raw)
         grant = Grant.model_validate_json(body)
 
         dec_reserved, committed, settled_cost = self._reservation(
@@ -509,17 +513,17 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
         if committed:
             if settled_cost is None or _budget_amount(settled_cost) != dec_actual:
                 raise StateError("reservation was already committed with a different cost")
-            return float(_budget_amount(remaining))
-        release_amount = dec_reserved - dec_actual
+            return _budget_amount(remaining)
+        release_amount = subtract(dec_reserved, dec_actual)
         new_remaining = self._settled_balance(cur, grant_id, remaining, release_amount)
 
         cur.execute(
-            "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
-            (new_remaining, now_iso, grant_id),
+            "UPDATE grants SET remaining = ?, remaining_units = ?, updated_at = ? WHERE id = ?",
+            (float(new_remaining), str(units(new_remaining)), now_iso, grant_id),
         )
         cur.execute(
-            "UPDATE rate_events SET committed = 1, actual_cost = ? WHERE action_id = ? AND grant_id = ?",
-            (float(dec_actual), action_id, grant_id),
+            "UPDATE rate_events SET committed = 1, actual_cost = ?, actual_units = ? WHERE action_id = ? AND grant_id = ?",
+            (float(dec_actual), str(units(dec_actual)), action_id, grant_id),
         )
         self._settled_status(cur, grant, new_remaining, now_iso)
         # Reflect in body
@@ -554,11 +558,12 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
                 raise
 
     def _release_in_transaction(self, cur, grant_id, action_id, claimed_reserved, now_iso):
-        cur.execute("SELECT body, remaining FROM grants WHERE id = ?", (grant_id,))
+        cur.execute("SELECT body, remaining_units FROM grants WHERE id = ?", (grant_id,))
         row = cur.fetchone()
         if not row:
             raise StateError(f"grant not found: {grant_id}")
-        body, remaining = row
+        body, remaining_raw = row
+        remaining = from_units(remaining_raw)
         grant = Grant.model_validate_json(body)
 
         dec_reserved, committed, _ = self._reservation(cur, grant_id, action_id, claimed_reserved)
@@ -566,8 +571,8 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
             raise StateError("committed reservation cannot be released")
         new_remaining = self._settled_balance(cur, grant_id, remaining, dec_reserved)
         cur.execute(
-            "UPDATE grants SET remaining = ?, updated_at = ? WHERE id = ?",
-            (new_remaining, now_iso, grant_id),
+            "UPDATE grants SET remaining = ?, remaining_units = ?, updated_at = ? WHERE id = ?",
+            (float(new_remaining), str(units(new_remaining)), now_iso, grant_id),
         )
         # Remove the rate_events row entirely — a released action
         # should not count toward rate limit (the action didn't fire).
@@ -592,16 +597,16 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
         # public non-negative shape stays stable, and exhausted debt cannot
         # be erased by replaying a settlement.
         row = cur.execute(
-            "SELECT amount FROM budget_overruns WHERE grant_id = ?", (grant_id,)
+            "SELECT amount_units FROM budget_overruns WHERE grant_id = ?", (grant_id,)
         ).fetchone()
-        debt = _budget_amount(row[0]) if row else Decimal("0")
-        balance = _budget_amount(remaining) - debt + adjustment
-        new_remaining = float(max(Decimal("0"), balance))
-        new_debt = float(max(Decimal("0"), -balance))
+        debt = from_units(row[0]) if row else Decimal("0")
+        balance_units = units(remaining) - units(debt) + units(adjustment)
+        new_remaining = from_units(max(0, balance_units))
+        new_debt = from_units(max(0, -balance_units))
         cur.execute(
-            "INSERT INTO budget_overruns(grant_id,amount) VALUES (?,?) "
-            "ON CONFLICT(grant_id) DO UPDATE SET amount = excluded.amount",
-            (grant_id, new_debt),
+            "INSERT INTO budget_overruns(grant_id,amount,amount_units) VALUES (?,?,?) "
+            "ON CONFLICT(grant_id) DO UPDATE SET amount = excluded.amount, amount_units = excluded.amount_units",
+            (grant_id, float(new_debt), str(units(new_debt))),
         )
         return new_remaining
 
@@ -625,7 +630,7 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
     ) -> tuple[Decimal, bool, float | None]:
         """Read and validate a reservation inside the settlement transaction."""
         cur.execute(
-            "SELECT grant_id, reserved_amount, committed, actual_cost FROM rate_events WHERE action_id = ?",
+            "SELECT grant_id, reserved_units, committed, actual_units FROM rate_events WHERE action_id = ?",
             (action_id,),
         )
         row = cur.fetchone()
@@ -633,10 +638,10 @@ class SQLiteStore(EffectLedgerMixin, StateStore):
             raise StateError("reservation not found")
         if row[0] != grant_id:
             raise StateError("reservation belongs to another grant")
-        amount = _budget_amount(row[1])
+        amount = from_units(row[1])
         if amount < 0 or amount != claimed_amount:
             raise StateError("reserved amount does not match the stored reservation")
-        return amount, bool(row[2]), row[3]
+        return amount, bool(row[2]), from_units(row[3]) if row[3] is not None else None
 
     def rate_count(self, grant_id: str, per_seconds: int) -> int:
         now_ts = time.time()

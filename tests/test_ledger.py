@@ -188,8 +188,8 @@ def test_mixed_version_ledger_verifies_intact(tmp_db):
     # Sanity: all 4 are chain_version=2 and verify.
     entries = ledger.list_entries()
     assert len(entries) == 4
-    assert all(e["chain_version"] == 2 for e in entries), (
-        f"expected all chain_version=2, got {[e['chain_version'] for e in entries]}"
+    assert all(e["chain_version"] == 3 for e in entries), (
+        f"expected all chain_version=3, got {[e['chain_version'] for e in entries]}"
     )
     assert ledger.verify() is True
 
@@ -319,7 +319,7 @@ def test_mixed_version_ledger_verifies_intact(tmp_db):
         }
         new_hash = _hash_entry_v2(prev, body)
         cur.execute(
-            "UPDATE ledger SET prev_hash = ?, hash = ? WHERE seq = ?",
+            "UPDATE ledger SET prev_hash = ?, hash = ?, chain_version = 2 WHERE seq = ?",
             (prev, new_hash, seq),
         )
         prev = new_hash
@@ -346,8 +346,8 @@ def test_mixed_version_ledger_verifies_intact(tmp_db):
     )
 
 
-def test_new_entries_have_chain_version_2(tmp_db):
-    """WO-4: all new entries written by >=2.0.0 carry chain_version=2."""
+def test_new_entries_have_exact_cost_chain_version_3(tmp_db):
+    """New entries use v3 exact-cost evidence; v2 stays a legacy verifier."""
     store = SQLiteStore()
     ledger = Ledger(store)
     pdp = PDP(store, ledger)
@@ -359,7 +359,7 @@ def test_new_entries_have_chain_version_2(tmp_db):
 
     entries = ledger.list_entries()
     assert len(entries) == 1
-    assert entries[0]["chain_version"] == 2
+    assert entries[0]["chain_version"] == 3
 
 
 def test_legacy_entry_with_wrong_hash_breaks_chain(tmp_db):
