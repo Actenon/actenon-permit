@@ -197,6 +197,71 @@ def test_not_executed_releases_once_and_retains_history(ledger):
     assert balance(store, grant) == 80
 
 
+def test_signed_reconciliation_cannot_release_a_newer_dispatch(ledger):
+    store, grant, _ = ledger
+    _, _, snap = reserve(store, grant)
+    reviewed = store.effect_history(snap["effect"]["effect_id"])[-1]["sequence"]
+    assert store.claim_effect(**owner(grant, snap))
+    with pytest.raises(StateError, match="changed since review"):
+        store.settle_effect(
+            **owner(grant, snap),
+            outcome="NOT_EXECUTED",
+            execution_occurred=False,
+            evidence_hash="c" * 64,
+            observer="operator:reviewed-reservation",
+            reconciliation=True,
+            expected_event_sequence=reviewed,
+        )
+    assert balance(store, grant) == 80
+    assert store.get_effect(snap["effect"]["effect_id"])[-1]["state"] == "DISPATCHING"
+    assert not reserve(store, grant)[0]
+
+
+@pytest.mark.parametrize("sequence", [True, False, 0, -1, "1", 1.0])
+def test_invalid_review_sequence_never_releases_budget(ledger, sequence):
+    store, grant, _ = ledger
+    _, _, snap = reserve(store, grant)
+    with pytest.raises(StateError, match="positive integer"):
+        store.settle_effect(
+            **owner(grant, snap),
+            outcome="NOT_EXECUTED",
+            execution_occurred=False,
+            evidence_hash="c" * 64,
+            observer="operator:invalid-sequence",
+            reconciliation=True,
+            expected_event_sequence=sequence,
+        )
+    assert balance(store, grant) == 80
+
+
+def test_reconciliation_snapshot_and_identical_replay_do_not_refund_twice(ledger):
+    store, grant, _ = ledger
+    _, _, snap = reserve(store, grant)
+    assert store.claim_effect(**owner(grant, snap))
+    settle(store, grant, snap, "AMBIGUOUS")
+    reviewed = store.get_effect(snap["effect"]["effect_id"])[-1]
+    assert reviewed["descriptor"] == DESCRIPTOR
+    assert (
+        reviewed["event_sequence"]
+        == store.effect_history(snap["effect"]["effect_id"])[-1]["sequence"]
+    )
+    args = dict(
+        **owner(grant, snap),
+        outcome="NOT_EXECUTED",
+        execution_occurred=False,
+        evidence_hash="c" * 64,
+        observer="operator:reviewed-ambiguity",
+        reconciliation=True,
+        expected_event_sequence=reviewed["event_sequence"],
+    )
+    assert store.settle_effect(**args)["remaining"] == 100
+    assert store.settle_effect(**args)["remaining"] == 100
+    assert balance(store, grant) == 100
+    assert [r["state"] for r in store.effect_history(snap["effect"]["effect_id"])].count(
+        "NOT_EXECUTED"
+    ) == 1
+
+
 def test_confirmed_nonexecution_restores_exhausted_grant(ledger):
     store, grant, _ = ledger
     _, _, snap = reserve(store, grant, amount=100)
