@@ -5,7 +5,7 @@ requires-python = ">=3.11"
 [[package]]
 name = "actenon-kernel"
 version = "1.3.0"
-source = { git = "https://github.com/Actenon/actenon-kernel?rev=5cbe8f58bdb8025fe305d5d460cdc94a09d98562#5cbe8f58bdb8025fe305d5d460cdc94a09d98562" }
+source = { git = "https://github.com/Actenon/actenon-kernel?rev=9dd6af89622f070e3131c39d335be44e3f30149d#9dd6af89622f070e3131c39d335be44e3f30149d" }
 dependencies = [
     { name = "actenon-protocol" },
     { name = "cryptography" },
@@ -43,7 +43,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "actenon-kernel", extras = ["asymmetric"], git = "https://github.com/Actenon/actenon-kernel?rev=5cbe8f58bdb8025fe305d5d460cdc94a09d98562" },
+    { name = "actenon-kernel", extras = ["asymmetric"], git = "https://github.com/Actenon/actenon-kernel?rev=9dd6af89622f070e3131c39d335be44e3f30149d" },
     { name = "actenon-protocol", git = "https://github.com/Actenon/actenon-protocol?rev=3442bf3cffe0b55ac7d531e66ca0355d2c0784e5" },
     { name = "fastapi", specifier = ">=0.110" },
     { name = "httpx", specifier = ">=0.27" },
