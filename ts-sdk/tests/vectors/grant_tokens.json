@@ -1,0 +1,100 @@
+{
+  "comment": "Grant-token interop vectors. Released Permit 1.4.0 v1 bytes remain unchanged. Unified 2.0 v2 signs immutable authority only (status and budget.remaining excluded; budget.limit retained). Mutable state is read from the authoritative store, never authorized by token verification. Both Python and TypeScript verify this file.",
+  "signing_key": "permit-interop-probe-key-0123456789abcdef",
+  "valid": [
+    {
+      "name": "v1_ascii",
+      "version": "v1",
+      "token": "v1.eyJhZ2VudF9pZCI6ImFnZW50LWFzY2lpIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJVU0QiLCJsaW1pdCI6IjEwLjAwIiwicmVtYWluaW5nIjoiMTAuMDAifSwiZGVsZWdhdGlvbl9kZXB0aCI6MCwiZXhwaXJlc19hdCI6IjIwMzYtMDktMjlUMTI6MDA6MDBaIiwiaWQiOiJncmFudF9hc2NpaSIsImlzc3VlZF9hdCI6IjIwMjYtMTAtMDJUMTI6MDA6MDBaIiwicGFyZW50X2dyYW50X2lkIjpudWxsLCJyYXRlIjp7Im1heCI6MCwicGVyX3NlY29uZHMiOjYwfSwic2NvcGVzIjp7ImFsbG93IjpbInBheW1lbnRzLioiXSwiZGVueSI6W119LCJzaWduYXR1cmUiOiI4NjRhOGZlOWY3MmU0NzY2OTczYTcyM2RlNGViN2NhZDE5ZmI4YTQwNTVmMWU2MzIwNGE5Y2QyMmRkZTRmMDRjIiwic3RhdHVzIjoiYWN0aXZlIn0",
+      "grant_id": "grant_ascii",
+      "agent_id": "agent-ascii"
+    },
+    {
+      "name": "v1_non_ascii",
+      "version": "v1",
+      "token": "v1.eyJhZ2VudF9pZCI6ImFnXHUwMGVibnQtXHUwMGZjblx1MDBlZmNvZGUtXHU2NWU1XHU2NzJjIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJFVVIiLCJsaW1pdCI6IjUiLCJyZW1haW5pbmciOiI1In0sImRlbGVnYXRpb25fZGVwdGgiOjAsImV4cGlyZXNfYXQiOiIyMDM2LTA5LTI5VDEyOjAwOjAwWiIsImlkIjoiZ3JhbnRfbm9uX2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6ImY5MGJlMjlhNWE0NjE0MGUyNWFhYWIzYWU5YTFiYzYxNzI5YzllMGYyODUxMTI4MmVlMDk5MzEzNWY0ODVlYzQiLCJzdGF0dXMiOiJhY3RpdmUifQ",
+      "grant_id": "grant_non_ascii",
+      "agent_id": "agënt-ünïcode-日本"
+    },
+    {
+      "name": "v1_decimal_trailing_zero",
+      "version": "v1",
+      "token": "v1.eyJhZ2VudF9pZCI6ImFnZW50LWRlYyIsImFwcHJvdmFsX3J1bGVzIjpbXSwiYnVkZ2V0Ijp7ImN1cnJlbmN5IjoiVVNEIiwibGltaXQiOiIwLjEwIiwicmVtYWluaW5nIjoiMC4xIn0sImRlbGVnYXRpb25fZGVwdGgiOjAsImV4cGlyZXNfYXQiOiIyMDM2LTA5LTI5VDEyOjAwOjAwWiIsImlkIjoiZ3JhbnRfZGVjaW1hbF90cmFpbGluZ196ZXJvIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6IjkzMWRmYTE4MDg1Yzg0YTE3MmNjMGRiMzA2YjRlNGExNTk0YjBlNWRiMGIzMGQzMjIwNzBmMjQ1OTViNzUwMzIiLCJzdGF0dXMiOiJhY3RpdmUifQ",
+      "grant_id": "grant_decimal_trailing_zero",
+      "agent_id": "agent-dec"
+    },
+    {
+      "name": "v2_ascii",
+      "version": "v2",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnZW50LWFzY2lpIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJVU0QiLCJsaW1pdCI6IjEwLjAwIiwicmVtYWluaW5nIjoiMTAuMDAifSwiZGVsZWdhdGlvbl9kZXB0aCI6MCwiZXhwaXJlc19hdCI6IjIwMzYtMDktMjlUMTI6MDA6MDBaIiwiaWQiOiJncmFudF92Ml9hc2NpaSIsImlzc3VlZF9hdCI6IjIwMjYtMTAtMDJUMTI6MDA6MDBaIiwicGFyZW50X2dyYW50X2lkIjpudWxsLCJyYXRlIjp7Im1heCI6MCwicGVyX3NlY29uZHMiOjYwfSwic2NvcGVzIjp7ImFsbG93IjpbInBheW1lbnRzLioiXSwiZGVueSI6W119LCJzaWduYXR1cmUiOiIxZjkxMjgwODAwZWRmYzU2MGYyNzRkYzI1YTViMzkwNDBlYzhiMWIzZDFmNjA1ZTIyYzc4YTMxZTFjMTI5YTU0Iiwic3RhdHVzIjoiYWN0aXZlIn0",
+      "grant_id": "grant_v2_ascii",
+      "agent_id": "agent-ascii"
+    },
+    {
+      "name": "v2_non_ascii",
+      "version": "v2",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnw6tudC3DvG7Dr2NvZGUt5pel5pysIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJFVVIiLCJsaW1pdCI6IjUiLCJyZW1haW5pbmciOiI1In0sImRlbGVnYXRpb25fZGVwdGgiOjAsImV4cGlyZXNfYXQiOiIyMDM2LTA5LTI5VDEyOjAwOjAwWiIsImlkIjoiZ3JhbnRfdjJfbm9uX2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6ImYzNTZkMDU1ZTUwNzBhYTNjZjlkYTQ5MWFlYjU3OWEyOTIyNDI5NDk2NTcyYTA3NjU1ZmRlMGYzY2EwMjUyMTEiLCJzdGF0dXMiOiJhY3RpdmUifQ",
+      "grant_id": "grant_v2_non_ascii",
+      "agent_id": "agënt-ünïcode-日本"
+    },
+    {
+      "name": "v2_astral",
+      "version": "v2",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnZW50LfCfp74t8J2UmCIsImFwcHJvdmFsX3J1bGVzIjpbXSwiYnVkZ2V0Ijp7ImN1cnJlbmN5IjoiRVVSIiwibGltaXQiOiI1IiwicmVtYWluaW5nIjoiNSJ9LCJkZWxlZ2F0aW9uX2RlcHRoIjowLCJleHBpcmVzX2F0IjoiMjAzNi0wOS0yOVQxMjowMDowMFoiLCJpZCI6ImdyYW50X3YyX2FzdHJhbCIsImlzc3VlZF9hdCI6IjIwMjYtMTAtMDJUMTI6MDA6MDBaIiwicGFyZW50X2dyYW50X2lkIjpudWxsLCJyYXRlIjp7Im1heCI6MCwicGVyX3NlY29uZHMiOjYwfSwic2NvcGVzIjp7ImFsbG93IjpbInBheW1lbnRzLioiXSwiZGVueSI6W119LCJzaWduYXR1cmUiOiJjNjk4YzIxMTFjMDM1MDE4ZWJjZTRiMWY4MjA0ZGU2YmNiZWU2MTkwODFjNDdiOTAxOTBmY2Y5NDdjODJiZWQ1Iiwic3RhdHVzIjoiYWN0aXZlIn0",
+      "grant_id": "grant_v2_astral",
+      "agent_id": "agent-🧾-𝔘"
+    },
+    {
+      "name": "v2_decimal_trailing_zero",
+      "version": "v2",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnZW50LWRlYyIsImFwcHJvdmFsX3J1bGVzIjpbXSwiYnVkZ2V0Ijp7ImN1cnJlbmN5IjoiVVNEIiwibGltaXQiOiIwLjEwIiwicmVtYWluaW5nIjoiMC4xIn0sImRlbGVnYXRpb25fZGVwdGgiOjAsImV4cGlyZXNfYXQiOiIyMDM2LTA5LTI5VDEyOjAwOjAwWiIsImlkIjoiZ3JhbnRfdjJfZGVjaW1hbF90cmFpbGluZ196ZXJvIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6Ijc0MmIzYzkxMzRmNzE0OWI1ZmJiNWMxNDQzYzQ1MGM1MTVjMDc5NWIwOTBjY2JmYmQ4YTQwOGMyZGFhNjAyYjUiLCJzdGF0dXMiOiJhY3RpdmUifQ",
+      "grant_id": "grant_v2_decimal_trailing_zero",
+      "agent_id": "agent-dec"
+    },
+    {
+      "name": "v2_mutable_state_after_reservation",
+      "version": "v2",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnZW50LWFzY2lpIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJVU0QiLCJsaW1pdCI6IjEwLjAwIiwicmVtYWluaW5nIjoiMSJ9LCJkZWxlZ2F0aW9uX2RlcHRoIjowLCJleHBpcmVzX2F0IjoiMjAzNi0wOS0yOVQxMjowMDowMFoiLCJpZCI6ImdyYW50X3YyX2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6IjFmOTEyODA4MDBlZGZjNTYwZjI3NGRjMjVhNWIzOTA0MGVjOGIxYjNkMWY2MDVlMjJjNzhhMzFlMWMxMjlhNTQiLCJzdGF0dXMiOiJleGhhdXN0ZWQifQ",
+      "grant_id": "grant_v2_ascii",
+      "agent_id": "agent-ascii"
+    }
+  ],
+  "tampered": [
+    {
+      "name": "v1_ascii_agent_changed",
+      "token": "v1.eyJhZ2VudF9pZCI6ImFnZW50LWV2aWwiLCJhcHByb3ZhbF9ydWxlcyI6W10sImJ1ZGdldCI6eyJjdXJyZW5jeSI6IlVTRCIsImxpbWl0IjoiMTAuMDAiLCJyZW1haW5pbmciOiIxMC4wMCJ9LCJkZWxlZ2F0aW9uX2RlcHRoIjowLCJleHBpcmVzX2F0IjoiMjAzNi0wOS0yOVQxMjowMDowMFoiLCJpZCI6ImdyYW50X2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6Ijg2NGE4ZmU5ZjcyZTQ3NjY5NzNhNzIzZGU0ZWI3Y2FkMTlmYjhhNDA1NWYxZTYzMjA0YTljZDIyZGRlNGYwNGMiLCJzdGF0dXMiOiJhY3RpdmUifQ"
+    },
+    {
+      "name": "v2_ascii_agent_changed",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnZW50LWV2aWwiLCJhcHByb3ZhbF9ydWxlcyI6W10sImJ1ZGdldCI6eyJjdXJyZW5jeSI6IlVTRCIsImxpbWl0IjoiMTAuMDAiLCJyZW1haW5pbmciOiIxMC4wMCJ9LCJkZWxlZ2F0aW9uX2RlcHRoIjowLCJleHBpcmVzX2F0IjoiMjAzNi0wOS0yOVQxMjowMDowMFoiLCJpZCI6ImdyYW50X3YyX2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6IjFmOTEyODA4MDBlZGZjNTYwZjI3NGRjMjVhNWIzOTA0MGVjOGIxYjNkMWY2MDVlMjJjNzhhMzFlMWMxMjlhNTQiLCJzdGF0dXMiOiJhY3RpdmUifQ"
+    },
+    {
+      "name": "v3_prefix",
+      "token": "v3.eyJhZ2VudF9pZCI6ImFnZW50LWRlYyIsImFwcHJvdmFsX3J1bGVzIjpbXSwiYnVkZ2V0Ijp7ImN1cnJlbmN5IjoiVVNEIiwibGltaXQiOiIwLjEwIiwicmVtYWluaW5nIjoiMC4xIn0sImRlbGVnYXRpb25fZGVwdGgiOjAsImV4cGlyZXNfYXQiOiIyMDM2LTA5LTI5VDEyOjAwOjAwWiIsImlkIjoiZ3JhbnRfdjJfZGVjaW1hbF90cmFpbGluZ196ZXJvIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6IjU0NjNlOWM5MjkxMWM1N2RkNjVmY2NkYTI5NzdjZjUzNGQyNDI0YjFiNjI1OGI4ODA4YTBhZWFiZDE5YWYyZmQiLCJzdGF0dXMiOiJhY3RpdmUifQ"
+    },
+    {
+      "name": "v1_non_ascii_relabelled_v2",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnXHUwMGVibnQtXHUwMGZjblx1MDBlZmNvZGUtXHU2NWU1XHU2NzJjIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJFVVIiLCJsaW1pdCI6IjUiLCJyZW1haW5pbmciOiI1In0sImRlbGVnYXRpb25fZGVwdGgiOjAsImV4cGlyZXNfYXQiOiIyMDM2LTA5LTI5VDEyOjAwOjAwWiIsImlkIjoiZ3JhbnRfbm9uX2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6ImY5MGJlMjlhNWE0NjE0MGUyNWFhYWIzYWU5YTFiYzYxNzI5YzllMGYyODUxMTI4MmVlMDk5MzEzNWY0ODVlYzQiLCJzdGF0dXMiOiJhY3RpdmUifQ",
+      "why": "v1 signature is over the ASCII-escaped encoding; a v2 verifier must not accept it"
+    },
+    {
+      "name": "v2_non_ascii_relabelled_v1",
+      "token": "v1.eyJhZ2VudF9pZCI6ImFnw6tudC3DvG7Dr2NvZGUt5pel5pysIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJFVVIiLCJsaW1pdCI6IjUiLCJyZW1haW5pbmciOiI1In0sImRlbGVnYXRpb25fZGVwdGgiOjAsImV4cGlyZXNfYXQiOiIyMDM2LTA5LTI5VDEyOjAwOjAwWiIsImlkIjoiZ3JhbnRfdjJfbm9uX2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6ImYzNTZkMDU1ZTUwNzBhYTNjZjlkYTQ5MWFlYjU3OWEyOTIyNDI5NDk2NTcyYTA3NjU1ZmRlMGYzY2EwMjUyMTEiLCJzdGF0dXMiOiJhY3RpdmUifQ",
+      "why": "v2 signature is over literal UTF-8; a v1 verifier must not accept it"
+    },
+    {
+      "name": "v2_invalid_utf8_body",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnwyhudC3DvG7Dr2NvZGUt5pel5pysIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJFVVIiLCJsaW1pdCI6IjUiLCJyZW1haW5pbmciOiI1In0sImRlbGVnYXRpb25fZGVwdGgiOjAsImV4cGlyZXNfYXQiOiIyMDM2LTA5LTI5VDEyOjAwOjAwWiIsImlkIjoiZ3JhbnRfdjJfbm9uX2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6IjYwZGUzOTUzMTMzODNmNGJjZWQwMGQyNjE5NmY0YjdhZWIyNzQwOWQyOWQyMzBhOGI0NGY1MWNhNTYzZTNkZDgiLCJzdGF0dXMiOiJhY3RpdmUifQ",
+      "why": "the body is not valid UTF-8; decoders must refuse, not substitute U+FFFD"
+    },
+    {
+      "name": "unreleased_v2_full_state_signature",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnZW50LWFzY2lpIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJVU0QiLCJsaW1pdCI6IjEwLjAwIiwicmVtYWluaW5nIjoiMTAuMDAifSwiZGVsZWdhdGlvbl9kZXB0aCI6MCwiZXhwaXJlc19hdCI6IjIwMzYtMDktMjlUMTI6MDA6MDBaIiwiaWQiOiJncmFudF92Ml9hc2NpaSIsImlzc3VlZF9hdCI6IjIwMjYtMTAtMDJUMTI6MDA6MDBaIiwicGFyZW50X2dyYW50X2lkIjpudWxsLCJyYXRlIjp7Im1heCI6MCwicGVyX3NlY29uZHMiOjYwfSwic2NvcGVzIjp7ImFsbG93IjpbInBheW1lbnRzLioiXSwiZGVueSI6W119LCJzaWduYXR1cmUiOiJkNWRlMDQ1YWZlMDRmNWZhNGI4OGQ0YTNlNTBiMDQzOWNkMTgxNTJmYmIwNWJhNGU0NTdiMmE5NGNmOWIxM2ZiIiwic3RhdHVzIjoiYWN0aXZlIn0",
+      "why": "unpublished prior candidate signed mutable state; no v2 fallback"
+    },
+    {
+      "name": "v2_budget_limit_widened",
+      "token": "v2.eyJhZ2VudF9pZCI6ImFnZW50LWFzY2lpIiwiYXBwcm92YWxfcnVsZXMiOltdLCJidWRnZXQiOnsiY3VycmVuY3kiOiJVU0QiLCJsaW1pdCI6IjEwMDAiLCJyZW1haW5pbmciOiIxMC4wMCJ9LCJkZWxlZ2F0aW9uX2RlcHRoIjowLCJleHBpcmVzX2F0IjoiMjAzNi0wOS0yOVQxMjowMDowMFoiLCJpZCI6ImdyYW50X3YyX2FzY2lpIiwiaXNzdWVkX2F0IjoiMjAyNi0xMC0wMlQxMjowMDowMFoiLCJwYXJlbnRfZ3JhbnRfaWQiOm51bGwsInJhdGUiOnsibWF4IjowLCJwZXJfc2Vjb25kcyI6NjB9LCJzY29wZXMiOnsiYWxsb3ciOlsicGF5bWVudHMuKiJdLCJkZW55IjpbXX0sInNpZ25hdHVyZSI6IjFmOTEyODA4MDBlZGZjNTYwZjI3NGRjMjVhNWIzOTA0MGVjOGIxYjNkMWY2MDVlMjJjNzhhMzFlMWMxMjlhNTQiLCJzdGF0dXMiOiJhY3RpdmUifQ"
+    }
+  ]
+}

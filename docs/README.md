@@ -254,7 +254,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 ```
 
 **Receipts prove declared enforcement evidence, not the wisdom of the
-authority decision.** See [INSURER_CLARITY.md](https://github.com/Actenon/actenon-cloud/blob/main/docs/INSURER_CLARITY.md)
+authority decision.** See [INSURER_CLARITY.md](INSURER_CLARITY.md)
 for the three separate questions (execution integrity, authority-process
 integrity, business decision correctness).
 
@@ -362,9 +362,12 @@ the only entry point.
 
 | Protocol | Kernel | Permit | Cloud | Scan | SDK |
 |---|---|---|---|---|---|
+| ≥ 1.1.0, < 2 | ≥ 1.3.0, < 2 | 2.0.0 | not required | independent | 2.0.0 |
 | 1.1.0 | ≥ 1.0.0 | 1.4.0 | 0.1.0 | 0.1.3 | 1.4.0 |
 
-Protocol 1.1.0 is backward-compatible with 1.0.0 (purely additive).
+Permit 2.0.0 declares `actenon-kernel[asymmetric]>=1.3.0,<2` and `actenon-protocol>=1.1.0,<2`.
+Kernel 1.3.0 implements protocol 1.4.0's edge binding (`protocol/13-edge-binding.md`), which
+Permit 2.0.0's revocable proofs rely on. Protocol 1.1.0 is backward-compatible with 1.0.0 (purely additive).
 
 ---
 
@@ -470,8 +473,9 @@ See `actenon_permit/adapters/github.py` for the reference implementation.
 
 ## 16. Production Deployment
 
-See [PRODUCTION_INTEGRATION.md](https://github.com/Actenon/actenon-cloud/blob/main/docs/PRODUCTION_INTEGRATION.md)
-for exactly what to wire:
+The actenon-cloud production integration guide covers exactly what to wire
+(actenon-cloud is a private repository; for the kernel's own, public production
+guidance see [PRODUCTION_INTEGRATION.md](https://github.com/Actenon/actenon-kernel/blob/main/docs/PRODUCTION_INTEGRATION.md)):
 
 1. **Signing**: KMS/HSM (interface exists, wire AWS KMS / GCP KMS / Azure)
 2. **Credential master key**: Vault / Secrets Manager

@@ -13,6 +13,10 @@ on:
     - cron: "53 6 * * *"
   workflow_dispatch:
 
+# Source-candidate checks only; release_gate refuses these overrides.
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/.github/candidate-constraints.txt
+
 jobs:
   verify-claims:
     # Machine-enforce every claim the README makes about the package itself.
@@ -33,7 +37,7 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Check generated Python badge
         run: uv run python scripts/sync_badges.py --check
@@ -42,9 +46,9 @@ jobs:
         run: uv run python scripts/check_readme_installs.py
 
       - name: Check README ecosystem table in sync with ecosystem.yaml
-        run: |
-          pip install "actenon-protocol[yaml]" --quiet
-          python -m actenon_protocol.ecosystem --check README.md --repo actenon-permit
+        # Check the exact locked Protocol already installed above. The runner's
+        # system pip mishandles extras on a constrained direct Git requirement.
+        run: uv run python -m actenon_protocol.ecosystem --check README.md --repo actenon-permit
 
       - name: Verify protocol version pin
         run: |
@@ -53,10 +57,10 @@ jobs:
           with open('pyproject.toml', 'rb') as f:
               data = tomllib.load(f)
           deps = data['project']['dependencies']
-          assert any('actenon-protocol' in d and '1.1.0' in d for d in deps), (
-              f'actenon-protocol >= 1.1.0 not pinned in dependencies: {deps}'
+          assert any('actenon-protocol' in d and '1.5.0' in d for d in deps), (
+              f'actenon-protocol >= 1.5.0 not pinned in dependencies: {deps}'
           )
-          print('OK: actenon-protocol >= 1.1.0 pinned')
+          print('OK: actenon-protocol >= 1.5.0 pinned')
           "
 
       - name: Verify pytest-asyncio is a runtime dep
@@ -83,5 +87,8 @@ jobs:
         # clean venv with runtime deps only.
         run: |
           python -m venv /tmp/plain-install
+          # The bootstrapped runner pip crashes on extras plus direct Git
+          # constraints; use its supported resolver for this staging input.
+          /tmp/plain-install/bin/python -m pip install --upgrade pip
           /tmp/plain-install/bin/pip install --quiet .
           /tmp/plain-install/bin/python -m pytest -q -p no:cacheprovider

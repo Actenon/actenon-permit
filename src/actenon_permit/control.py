@@ -14,21 +14,30 @@ Endpoints:
     GET    /ledger/verify           verify the hash chain
     GET    /health                  liveness
 
-In v0 this binds to 127.0.0.1 only. There is no auth — the assumption is a
-single local user. SaaS / multi-tenant is an explicit non-goal.
+Every endpoint above except /health is the operator's: it requires
+``Authorization: Bearer <admin token>`` (constant-time compare) and refuses
+(401 missing, 403 wrong or none configured) otherwise. Agents never need it:
+the gateway routes mounted alongside (/proxy/*, /intents/*) authenticate each
+call with the agent's own grant token. Without this, an agent on the same
+port could issue itself grants, mint tokens, approve its own requests and read
+every grant's signature. The app binds to 127.0.0.1 by default.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import hmac
 import json
+import os
+import secrets
 import threading
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -109,6 +118,92 @@ class ApprovalStore:
 
 
 # ---------------------------------------------------------------------------
+# Admin token (control-plane authentication)
+# ---------------------------------------------------------------------------
+
+ADMIN_TOKEN_ENV = "ACTENON_ADMIN_TOKEN"
+ADMIN_TOKEN_FILE_ENV = "ACTENON_ADMIN_TOKEN_FILE"
+ADMIN_TOKEN_FILENAME = "admin-token"
+
+
+def default_state_dir() -> Path:
+    return Path.home() / ".actenon-permit"
+
+
+def _read_token_file(path: Path) -> str:
+    token = path.read_text(encoding="utf-8").strip()
+    if not token:
+        raise ValueError(f"admin token file is empty: {path}")
+    return token
+
+
+def load_or_create_admin_token(
+    token_file: str | Path | None = None, *, state_dir: str | Path | None = None
+) -> tuple[str, Path | None]:
+    """Resolve the control plane's admin token for a server.
+
+    Order: ``token_file`` / ``ACTENON_ADMIN_TOKEN_FILE``, then
+    ``ACTENON_ADMIN_TOKEN``, else a fresh random 32-byte token written to
+    ``<state_dir>/admin-token`` (default ``~/.actenon-permit``). The file is
+    created 0600 atomically (O_EXCL temp file + rename; never chmod after
+    writing) and rotated on every start. Returns ``(token, path_or_None)``.
+    """
+    explicit = token_file or os.environ.get(ADMIN_TOKEN_FILE_ENV, "").strip()
+    if explicit:
+        path = Path(explicit)
+        return _read_token_file(path), path
+    env_token = os.environ.get(ADMIN_TOKEN_ENV, "").strip()
+    if env_token:
+        return env_token, None
+    directory = Path(state_dir) if state_dir is not None else default_state_dir()
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    token = secrets.token_hex(32)
+    path = directory / ADMIN_TOKEN_FILENAME
+    tmp = directory / f".{ADMIN_TOKEN_FILENAME}.{secrets.token_hex(8)}"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        os.write(fd, (token + "\n").encode("ascii"))
+    finally:
+        os.close(fd)
+    os.replace(tmp, path)
+    return token, path
+
+
+def read_admin_token(
+    token_file: str | Path | None = None, *, state_dir: str | Path | None = None
+) -> str | None:
+    """Resolve the admin token for a client (same order; never generates)."""
+    explicit = token_file or os.environ.get(ADMIN_TOKEN_FILE_ENV, "").strip()
+    if explicit:
+        return _read_token_file(Path(explicit))
+    env_token = os.environ.get(ADMIN_TOKEN_ENV, "").strip()
+    if env_token:
+        return env_token
+    path = (Path(state_dir) if state_dir is not None else default_state_dir()) / ADMIN_TOKEN_FILENAME
+    return _read_token_file(path) if path.is_file() else None
+
+
+def _admin_guard(admin_token: str | None):
+    """FastAPI dependency: require ``Authorization: Bearer <admin token>``."""
+    expected = (admin_token or "").encode("utf-8")
+
+    def require_admin(authorization: str | None = Header(default=None)) -> None:
+        scheme, _, presented = (authorization or "").partition(" ")
+        if scheme.lower() != "bearer" or not presented.strip():
+            raise HTTPException(
+                status_code=401,
+                detail="admin token required (Authorization: Bearer <token>)",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        # Compare even when no token is configured, then refuse regardless.
+        matches = hmac.compare_digest(presented.strip().encode("utf-8"), expected)
+        if not expected or not matches:
+            raise HTTPException(status_code=403, detail="invalid admin token")
+
+    return require_admin
+
+
+# ---------------------------------------------------------------------------
 # Pydantic request models
 # ---------------------------------------------------------------------------
 
@@ -158,6 +253,7 @@ def create_app(
     approval_store: ApprovalStore | None = None,
     gateway: Any = None,
     wire_gateway_approvals: bool = True,
+    admin_token: str | None = None,
 ) -> FastAPI:
     """Build the FastAPI app. Defaults to a fresh SQLiteStore + Ledger.
 
@@ -173,6 +269,10 @@ def create_app(
     ``/approvals/{id}/approve`` and ``/approvals/{id}/deny`` — so
     ``permit watch`` can approve them. Pass ``wire_gateway_approvals=False``
     to keep the gateway's existing gate (e.g. AutoApproveGate for tests).
+
+    ``admin_token`` protects every control-plane route (all but /health and
+    the gateway's /proxy/* and /intents/*). With ``None`` those routes
+    refuse every request: the control plane is never open.
     """
     state = state or SQLiteStore()
     ledger = ledger or Ledger(state)
@@ -191,6 +291,7 @@ def create_app(
     app.state.ledger = ledger
     app.state.pdp = pdp
     app.state.approvals = approvals
+    admin = [Depends(_admin_guard(admin_token))]
 
     # ------------------------------------------------------------------
     # Health
@@ -202,7 +303,7 @@ def create_app(
     # ------------------------------------------------------------------
     # Grants
     # ------------------------------------------------------------------
-    @app.post("/grants", response_model=dict)
+    @app.post("/grants", response_model=dict, dependencies=admin)
     def issue_grant(req: IssueRequest) -> dict[str, Any]:
         try:
             grant = compile_policy(req.policy)
@@ -211,19 +312,19 @@ def create_app(
         state.put_grant(grant)
         return json.loads(grant.model_dump_json())
 
-    @app.get("/grants", response_model=list)
+    @app.get("/grants", response_model=list, dependencies=admin)
     def list_grants(agent_id: str | None = None) -> list[dict[str, Any]]:
         grants = state.list_grants(agent_id=agent_id)
         return [json.loads(g.model_dump_json()) for g in grants]
 
-    @app.get("/grants/{grant_id}", response_model=dict)
+    @app.get("/grants/{grant_id}", response_model=dict, dependencies=admin)
     def get_grant(grant_id: str) -> dict[str, Any]:
         g = state.get_grant(grant_id)
         if g is None:
             raise HTTPException(status_code=404, detail="grant not found")
         return json.loads(g.model_dump_json())
 
-    @app.post("/grants/{grant_id}/revoke", response_model=RevokeResponse)
+    @app.post("/grants/{grant_id}/revoke", response_model=RevokeResponse, dependencies=admin)
     def revoke_grant(grant_id: str) -> RevokeResponse:
         g = state.get_grant(grant_id)
         if g is None:
@@ -251,7 +352,7 @@ def create_app(
                 approvals.resolve(p["action_id"], "denied")
         return RevokeResponse(grant_id=grant_id, status="revoked")
 
-    @app.post("/grants/{grant_id}/attenuate", response_model=dict)
+    @app.post("/grants/{grant_id}/attenuate", response_model=dict, dependencies=admin)
     def attenuate_grant(grant_id: str, req: AttenuateRequest) -> dict[str, Any]:
         """Derive a strictly-weaker sub-grant from an existing grant.
 
@@ -301,7 +402,7 @@ def create_app(
         state.put_grant(child)
         return json.loads(child.model_dump_json())
 
-    @app.post("/grants/{grant_id}/token", response_model=dict)
+    @app.post("/grants/{grant_id}/token", response_model=dict, dependencies=admin)
     def grant_to_token_endpoint(grant_id: str) -> dict[str, str]:
         """Mint a bearer token for an existing grant.
 
@@ -322,25 +423,25 @@ def create_app(
     # ------------------------------------------------------------------
     # Approvals
     # ------------------------------------------------------------------
-    @app.get("/approvals", response_model=list)
+    @app.get("/approvals", response_model=list, dependencies=admin)
     def list_approvals() -> list[dict[str, Any]]:
         return approvals.list_pending()
 
-    @app.post("/approvals/{action_id}/approve", response_model=ApprovalResponse)
+    @app.post("/approvals/{action_id}/approve", response_model=ApprovalResponse, dependencies=admin)
     def approve(action_id: str) -> ApprovalResponse:
         if approvals.get_status(action_id) != "pending":
             raise HTTPException(status_code=404, detail="no pending approval with that id")
         approvals.resolve(action_id, "approved")
         return ApprovalResponse(action_id=action_id, decision="approved")
 
-    @app.post("/approvals/{action_id}/deny", response_model=ApprovalResponse)
+    @app.post("/approvals/{action_id}/deny", response_model=ApprovalResponse, dependencies=admin)
     def deny(action_id: str) -> ApprovalResponse:
         if approvals.get_status(action_id) not in ("pending", None):
             raise HTTPException(status_code=409, detail="already resolved")
         approvals.resolve(action_id, "denied")
         return ApprovalResponse(action_id=action_id, decision="denied")
 
-    @app.get("/approvals/stream")
+    @app.get("/approvals/stream", dependencies=admin)
     async def stream_approvals() -> StreamingResponse:
         q = approvals.subscribe()
 
@@ -362,11 +463,11 @@ def create_app(
     # ------------------------------------------------------------------
     # Ledger
     # ------------------------------------------------------------------
-    @app.get("/ledger", response_model=list)
+    @app.get("/ledger", response_model=list, dependencies=admin)
     def get_ledger(grant_id: str | None = None, limit: int = 1000) -> list[dict[str, Any]]:
         return ledger.list_entries(grant_id=grant_id, limit=limit)
 
-    @app.get("/ledger/verify", response_model=dict)
+    @app.get("/ledger/verify", response_model=dict, dependencies=admin)
     def verify_ledger() -> dict[str, bool]:
         return {"ok": ledger.verify()}
 

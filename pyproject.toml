@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "actenon-permit"
-version = "1.4.0"
+version = "2.0.0rc1"
 description = "Actenon-Permit: an open-source authority broker for AI agents. Bounded, revocable capability grants with hard runtime limits."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,8 +32,8 @@ dependencies = [
     # (shadowing this package's unified CLI, install-order dependent) and
     # shipped no `actenon.boundary` module, which the Boundary Kit
     # middleware requires.
-    "actenon-kernel[asymmetric]>=1.0.0",
-    "actenon-protocol>=1.1.0,<2",
+    "actenon-kernel[asymmetric]>=1.3.0,<2",
+    "actenon-protocol>=1.5.0,<2",
     # pytest-asyncio is a runtime dep, not a dev dep, because:
     #   1. pyproject.toml sets `asyncio_mode = "auto"` under
     #      `[tool.pytest.ini_options]`, which requires pytest-asyncio to
@@ -99,6 +99,15 @@ exclude = [
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.uv.sources]
+# PRE-RELEASE ONLY. actenon-kernel 1.3.0 (the secure kernel this release
+# requires) is not yet on PyPI, so uv resolves the exact candidate commit.
+# uv sources never reach the wheel's metadata, but this table MUST be removed
+# (and uv.lock regenerated against PyPI) once actenon-kernel 1.3.0 is
+# published and before actenon-permit 2.0.0 is released.
+actenon-kernel = { git = "https://github.com/Actenon/actenon-kernel", rev = "5ca02e10bf329bfa090530d77301686e5995de3a" }
+actenon-protocol = { git = "https://github.com/Actenon/actenon-protocol", rev = "4cbd8f04e0db331b2ffd490d50c0a7aede2d35ff" }
 
 [tool.ruff]
 line-length = 100

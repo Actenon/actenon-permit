@@ -62,13 +62,24 @@ def _http(method: str, url: str, body: Any = None, headers: dict[str, str] | Non
         raise RuntimeError(f"cannot reach gateway at {url}: {e}") from e
 
 
+def _operator_token() -> str | None:
+    """The control-plane admin token for the kill-switch step, if available."""
+    from actenon_permit.control import read_admin_token  # type: ignore[import-not-found]
+
+    return read_admin_token()
+
+
 class GatewayClient:
     """Minimal HTTP client for the gateway. Mirrors what a real agent
     host (LangChain, etc.) would build on top of fetch/urllib."""
 
-    def __init__(self, base_url: str, grant_token: str):
+    def __init__(self, base_url: str, grant_token: str, admin_token: str | None = None):
         self.base_url = base_url.rstrip("/")
         self.grant_token = grant_token
+        # Operator credential, used only for the scenario's kill-switch step.
+        # An agent never holds it: the control plane (/grants, /approvals,
+        # /ledger) refuses requests without it.
+        self.admin_token = admin_token
 
     def list_tools(self) -> list[str]:
         _, body = _http("GET", f"{self.base_url}/proxy/tools")
@@ -94,8 +105,17 @@ class GatewayClient:
             grant_id = g.id
         except Exception:
             return {}
-        _, body = _http("GET", f"{self.base_url}/grants/{grant_id}")
-        return body
+        return {"id": grant_id}
+
+    def revoke_grant(self, grant_id: str) -> int:
+        """The operator's kill switch (needs the admin token)."""
+        status, _ = _http(
+            "POST",
+            f"{self.base_url}/grants/{grant_id}/revoke",
+            body={},
+            headers={"Authorization": f"Bearer {self.admin_token or ''}"},
+        )
+        return status
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +161,7 @@ class ScriptedAgent:
         grant_id = grant.get("id")
         if grant_id:
             print(f"  step 6: >>> kill switch: revoking grant {grant_id}")
-            _http("POST", f"{self.client.base_url}/grants/{grant_id}/revoke", body={})
+            self.client.revoke_grant(grant_id)
             print()
 
         # Step 7: refund $1 — should DENY (revoked)
@@ -436,7 +456,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    client = GatewayClient(args.url, args.token)
+    client = GatewayClient(args.url, args.token, admin_token=_operator_token())
 
     # Verify the gateway is reachable.
     try:

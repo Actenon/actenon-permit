@@ -7,6 +7,7 @@ A test passes when the attack is blocked (fail closed).
 from __future__ import annotations
 
 import contextlib
+import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -121,8 +122,14 @@ class TestRevocationCascade:
         gw, ledger, pdp = _gateway_with_refund_tool(store)
         client = TestClient(
             create_app(
-                state=store, ledger=ledger, pdp=pdp, gateway=gw, wire_gateway_approvals=False
-            )
+                state=store,
+                ledger=ledger,
+                pdp=pdp,
+                gateway=gw,
+                wire_gateway_approvals=False,
+                admin_token="operator-token",
+            ),
+            headers={"Authorization": "Bearer operator-token"},
         )
         root = _grant(budget=Budget(currency="USD", limit=100, remaining=100))
         store.put_grant(root)
@@ -613,6 +620,9 @@ class TestIntentPath:
             capture_output=True,
             text=True,
             cwd=tmp_path,
+            # The PCCB is HS256 under the dev signing key; kernels that also
+            # verify the linked PCCB's signature read it from here.
+            env={**os.environ, "ACTENON_LOCAL_HMAC_SECRET": "audit-signing-key"},
         )
         assert proc.returncode == 0, proc.stdout + proc.stderr
 
@@ -843,3 +853,69 @@ class TestShortLivedProofs:
         action = Action(grant_id=grant.id, type="payment.refund", params={"amount": 1}, est_cost=1)
         _, _, pccb = pdp.decide_and_mint_pccb(grant, action)
         assert pccb.expires_at <= grant.expires_at
+
+
+class TestMcpStdio:
+    def _serve(self, lines, **kwargs):
+        import io
+        import json
+
+        from actenon_permit.gateway import mcp_serve
+
+        store = SQLiteStore()
+        gw, _, _ = _gateway_with_refund_tool(store)
+        grant = _grant()
+        store.put_grant(grant)
+        out = io.StringIO()
+        text = "\n".join(json.dumps(x) for x in lines(grant)) + "\n"
+        mcp_serve(gw, infile=io.StringIO(text), outfile=out, **kwargs)
+        return [json.loads(line) for line in out.getvalue().splitlines()]
+
+    def test_notifications_get_no_response(self, tmp_db):
+        """JSON-RPC 2.0: the server MUST NOT reply to a notification. The
+        standard MCP `notifications/initialized` got a -32601 error reply."""
+        replies = self._serve(
+            lambda g: [
+                {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+                {"jsonrpc": "2.0", "method": "notifications/initialized"},
+                {"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {}},
+                {"jsonrpc": "2.0", "id": 2, "method": "ping"},
+            ]
+        )
+        assert [r.get("id") for r in replies] == [1, 2]
+
+    def test_grant_can_be_supplied_at_launch(self, tmp_db):
+        from actenon_permit.token import grant_to_token
+
+        grant_holder = {}
+
+        def lines(g):
+            grant_holder["token"] = grant_to_token(g)
+            return [
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {"name": "refund", "arguments": {"amount": 1}},
+                }
+            ]
+
+        import io
+        import json
+
+        from actenon_permit.gateway import mcp_serve
+
+        store = SQLiteStore()
+        gw, _, _ = _gateway_with_refund_tool(store)
+        grant = _grant()
+        store.put_grant(grant)
+        call = lines(grant)[0]
+        out = io.StringIO()
+        mcp_serve(
+            gw,
+            infile=io.StringIO(json.dumps(call) + "\n"),
+            outfile=out,
+            grant_token=grant_holder["token"],
+        )
+        reply = json.loads(out.getvalue())
+        assert reply["result"]["isError"] is False, reply

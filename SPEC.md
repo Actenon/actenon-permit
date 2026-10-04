@@ -85,13 +85,26 @@ The signature is computed as:
 ```
 signature = HMAC-SHA256(
     key = ACTENON_SIGNING_KEY (UTF-8 bytes),
-    message = canonical_json(grant_without_signature_field)
+    message = canonical_json(authority_payload)
 ).hex()
 ```
 
+`authority_payload` is the grant object with three fields removed:
+
+- `signature` (the field being computed)
+- `status` (the store flips this on revoke, expiry, and exhaustion)
+- `budget.remaining` (the store decrements this on every reservation)
+
+`budget.limit`, `budget.currency`, scopes, expiry, rate, and identity stay
+in the payload. Reservation and revocation therefore leave `verify()` true.
+Widening the limit or the allow list leaves `verify()` false. A Grant with
+an empty or mismatched `signature` field fails verification. The PDP denies
+before it reserves when verification fails.
+
 Verification recomputes the HMAC and uses constant-time comparison
-(`hmac.compare_digest`). A Grant with an empty or mismatched `signature` field
-fails verification.
+(`hmac.compare_digest`). Live `status` and `budget.remaining` are enforced
+by the state store, not by the HMAC. A bearer token's copy of those two
+fields is not authoritative; the gateway reloads them from the store.
 
 The signing key is read from the `ACTENON_SIGNING_KEY` environment variable.
 If unset, the reference implementation generates an ephemeral dev key and
@@ -212,9 +225,18 @@ a `version` field.
 
 - The signing key is the root of trust. Compromise of `ACTENON_SIGNING_KEY`
   permits forging arbitrary grants. Protect it accordingly.
-- Grants are bearer tokens. Anyone holding a grant id and the agent_id can
-  present it. The v0 control plane is localhost-only; v1 must add transport
-  authentication before grants traverse a network.
+- Grants are bearer tokens: anyone holding one can present it at the
+  gateway. The control plane (`/grants`, `/approvals`, `/ledger`: issuing,
+  listing, revoking, attenuating, minting tokens, approving) requires
+  `Authorization: Bearer <admin token>` (constant-time compare; 401 without
+  it, 403 when wrong or when none is configured). `permit serve` takes the
+  token from `--admin-token-file` / `ACTENON_ADMIN_TOKEN_FILE`, then
+  `ACTENON_ADMIN_TOKEN`, else writes a fresh one to
+  `~/.actenon-permit/admin-token` (0600) and prints only that path. Agents
+  never hold it. The control plane still shares the gateway's port and
+  binds 127.0.0.1 by default; serving it on a separate interface/port is a
+  recommended hardening step not yet built in. Use TLS before any of it
+  leaves the host.
 - Revocation stops new decisions immediately, but cannot recall a PCCB
   already minted. PCCBs therefore live at most `PCCB_TTL_SECONDS` (120 s,
   `actenon_permit.kernel_bridge`) from the action's timestamp, bounded by
@@ -365,7 +387,12 @@ On DENY (or REQUIRE_APPROVAL that resolves to DENY):
 }}
 ```
 
-Missing `_meta.actenon_grant` returns a JSON-RPC error:
+The grant can instead be fixed at launch (`permit mcp-serve --grant-token`
+or `ACTENON_GRANT_TOKEN`), so standard MCP clients need no `_meta`; a
+per-call `_meta.actenon_grant` overrides it. Notifications (no `id`, e.g.
+`notifications/initialized`) never receive a response.
+
+With neither a launch grant nor `_meta.actenon_grant`, `tools/call` returns a JSON-RPC error:
 ```json
 {"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"missing _meta.actenon_grant"}}
 ```
@@ -404,6 +431,7 @@ hold more power than its parent.
 
 ```
 POST /grants/{grant_id}/attenuate
+Authorization: Bearer <admin token>
 Content-Type: application/json
 
 {
@@ -418,7 +446,12 @@ Content-Type: application/json
 }
 ```
 
+The endpoint is operator-only (admin token): a child's spend does not
+debit its parent (§13.3), so letting a holder mint children at will would
+let it multiply its budget. Holders delegate by asking the operator.
+
 Returns the freshly-signed child Grant (HTTP 200), or:
+- 401 / 403 without a valid admin token
 - 404 if the parent grant doesn't exist
 - 409 if the parent grant is not active
 - 400 if any attenuation rule is violated (e.g. widening budget)

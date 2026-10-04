@@ -33,6 +33,9 @@ from actenon_permit.control import create_app
 from actenon_permit.policy import compile_policy
 from actenon_permit.token import grant_to_token
 
+ADMIN_TOKEN = "test-admin-token"
+ADMIN_HEADERS = {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
 
 def _make_wired_app(tmp_db, monkeypatch):
     """Build a create_app'd FastAPI app with the gateway wired to the
@@ -53,7 +56,7 @@ def _make_wired_app(tmp_db, monkeypatch):
     # No AutoApproveGate — the gateway starts with no gate, and create_app
     # should wire it to the ApprovalStore via BlockingApprovalGate.
     gw = Gateway(state=store, ledger=ledger, pdp=pdp, broker=broker, tools=tools)
-    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw)
+    app = create_app(state=store, ledger=ledger, pdp=pdp, gateway=gw, admin_token=ADMIN_TOKEN)
     return app, store, gw
 
 
@@ -76,7 +79,7 @@ def test_wired_gateway_creates_pending_approval(tmp_db, monkeypatch):
     """
     app, store, _ = _make_wired_app(tmp_db, monkeypatch)
     token, _ = _issue_grant(store)
-    client = TestClient(app)
+    client = TestClient(app, headers=ADMIN_HEADERS)
 
     # Start a call that will REQUIRE_APPROVAL in a background thread (it
     # blocks until we approve or the timeout hits).
@@ -124,7 +127,7 @@ def test_wired_gateway_deny_via_approvals_endpoint(tmp_db, monkeypatch):
     return DENY."""
     app, store, _ = _make_wired_app(tmp_db, monkeypatch)
     token, _ = _issue_grant(store)
-    client = TestClient(app)
+    client = TestClient(app, headers=ADMIN_HEADERS)
 
     result_holder: dict = {}
 
@@ -167,7 +170,7 @@ def test_revoke_denies_inflight_approvals(tmp_db, monkeypatch):
     must be denied so the calling thread doesn't hang."""
     app, store, _ = _make_wired_app(tmp_db, monkeypatch)
     token, grant_id = _issue_grant(store)
-    client = TestClient(app)
+    client = TestClient(app, headers=ADMIN_HEADERS)
 
     result_holder: dict = {}
 

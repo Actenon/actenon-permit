@@ -1,0 +1,22 @@
+{
+  "comment": "Single source of truth for branch protection (pull_request) and the publish workflows' release gate (release). Validated against .github/workflows by scripts/release_gate.py validate (CI job 'Required-check names exist'). Names of unnamed matrix jobs follow GitHub's '<job id> (<values>)' convention; not yet observed on GitHub because this repository's CI workflows are disabled (OWNER-ACTIONS.md). Not required: live-compat (schedule only), lychee.",
+  "branch": "main",
+  "pull_request": [
+    "test-python (3.11)",
+    "test-python (3.12)",
+    "kernel-conformance",
+    "test-ts",
+    "Verify README claims (machine-enforced)",
+    "pyproject / tag / PyPI agree",
+    "drift-gate",
+    "Required-check names exist"
+  ],
+  "release": [
+    "test-python (3.11)",
+    "test-python (3.12)",
+    "kernel-conformance",
+    "test-ts",
+    "Verify README claims (machine-enforced)",
+    "Required-check names exist"
+  ]
+}

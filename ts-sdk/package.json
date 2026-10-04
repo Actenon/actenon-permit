@@ -1,6 +1,6 @@
 {
   "name": "@actenon/sdk",
-  "version": "1.4.0",
+  "version": "2.0.0-rc.1",
   "description": "Official TypeScript SDK for Actenon — protected execution for AI agents with discriminated result types, receipt verification, and protocol parity with the Python SDK.",
   "type": "module",
   "main": "dist/index.js",
@@ -25,7 +25,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "prepack": "bun run build",
-    "pack:test": "bun run build && npm pack --dry-run"
+    "pack:test": "bun run build && npm pack --dry-run",
+    "smoke:node": "bun run build && node scripts/node-smoke.mjs"
   },
   "keywords": [
     "ai",

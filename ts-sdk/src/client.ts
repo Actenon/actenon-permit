@@ -13,7 +13,7 @@
  *
  * const client = Actenon.cloud({
  *   baseUrl: "http://localhost:7780",
- *   grantToken: "v1.YOUR_GRANT_TOKEN",
+ *   grantToken: "v2.YOUR_GRANT_TOKEN",
  * });
  *
  * const intent = await client.authorisedExecutionIntents.create({
@@ -38,13 +38,13 @@ import type {
   IntentLifecycle,
   LocalRuntimeConfig,
   ResourceClientConfig,
-} from "./protocol";
+} from "./protocol.js";
 import {
   ActenonError,
   ExecutionFailedError,
   ExecutionRefusedError,
   OutcomeUnknownError,
-} from "./protocol";
+} from "./protocol.js";
 
 // ---------------------------------------------------------------------------
 // AuthorisedExecutionIntents API
@@ -232,7 +232,7 @@ export class CloudActenonClient extends ActenonClient {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": "@actenon/sdk-ts/1.4.0",
+      "User-Agent": "@actenon/sdk-ts/2.0.0-rc.1",
       ...(extraHeaders ?? {}),
     };
     if (this.config.grantToken && !headers["X-Actenon-Grant"]) {
