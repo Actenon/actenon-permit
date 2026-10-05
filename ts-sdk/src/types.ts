@@ -35,6 +35,8 @@ export interface Grant {
   budget: Budget;
   rate: Rate;
   approval_rules: string[];
+  /** Finite Protocol effect IDs; [] denies all, omitted/null retains legacy scope authority. */
+  approved_effect_ids?: string[] | null;
   status: GrantStatus;
   signature: string;
 }
@@ -86,6 +88,7 @@ export interface Policy {
   scopes?: { allow?: string[]; deny?: string[] };
   rate?: { max?: number; per?: string | number };
   approval?: { require_human?: string[] };
+  approved_effect_ids?: string[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +104,7 @@ export interface AttenuateRequest {
   rate_max?: number;
   rate_per_seconds?: number;
   extra_approval_rules?: string[];
+  approved_effect_ids?: string[] | null;
 }
 
 // ---------------------------------------------------------------------------

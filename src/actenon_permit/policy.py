@@ -130,6 +130,7 @@ def compile_policy(policy: dict[str, Any], *, agent_id: str | None = None) -> Gr
         budget=budget,
         rate=rate,
         approval_rules=approval_rules,
+        approved_effect_ids=policy.get("approved_effect_ids"),
         status=GrantStatus.ACTIVE,
     )
     grant.sign()

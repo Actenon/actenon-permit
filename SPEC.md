@@ -89,11 +89,15 @@ signature = HMAC-SHA256(
 ).hex()
 ```
 
-`authority_payload` is the grant object with three fields removed:
+`authority_payload` is the grant object with these live/signature fields removed:
 
 - `signature` (the field being computed)
 - `status` (the store flips this on revoke, expiry, and exhaustion)
 - `budget.remaining` (the store decrements this on every reservation)
+
+An absent or null `approved_effect_ids` is omitted from the signing projection
+to preserve existing scope-grant signatures. A finite list, including `[]`, is
+retained. Removing or changing that list invalidates its signature.
 
 `budget.limit`, `budget.currency`, scopes, expiry, rate, and identity stay
 in the payload. Reservation and revocation therefore leave `verify()` true.
@@ -541,3 +545,115 @@ profile: execution proof hashing remains the Protocol implementation.
 This section does not claim rolling monetary windows or cross-host budget
 accounting. Aggregate ancestor consumption is defined in §13.3. Public registry
 release and Airlock product budget configuration are still pending.
+
+
+## Exact effect grants (2.0 candidate addition)
+
+`approved_effect_ids` is an optional immutable finite list of Protocol effect
+identifiers. Protocol `ACTENON-EFFECT-1` defines their descriptor hashing; Permit
+does not invent a second effect identity or classify actions. A trusted resource
+adapter derives the descriptor from the actual target and consequential bytes.
+The issuer reviews that descriptor before signing its ID into the grant.
+
+- Absent/null retains legacy scope authority. It does not mean exact-payload approval.
+- `[]` approves no effects.
+- A finite list approves only those exact effects, still subject to scope, expiry,
+  live revocation, budget, ancestor constraints and atomic effect ownership.
+- IDs must be unique lowercase `effect_` plus 64 hex digits; at most 256 per grant.
+- Finite grants require the effect-aware decision/reservation path for **every**
+  action. Plain decisions, legacy reservation, caller `approved_action_id`, or
+  omitting the descriptor cannot bypass the restriction.
+
+This is an explicit contract addition. New scope-only grants retain prior signing
+bytes and omit the absent field in serialized form. Old grant signatures and
+frozen token vectors remain valid. Older implementations that do not preserve a
+finite field cannot authenticate its signature; they are not supported finite-grant
+verifiers. Python and the TypeScript token verifier share new frozen vectors.
+
+An explicit finite signed grant supplies the issuer's exact approval for matching
+human-approval rules. A scope-only grant still returns REQUIRE_APPROVAL for those
+rules on the protected effect path. The agent cannot turn a claimed action ID
+into a finite approval. Operator issuance endpoints remain admin-authenticated.
+
+Attenuation inherits the finite set by default. An unrestricted parent may issue
+a finite child. A finite parent permits only a subset, including an empty subset;
+no child can restore unrestricted authority. Store lineage validation also rejects
+hand-constructed signed children that widen an ancestor.
+
+The PDP computes the effect ID before reserving. The store validates it against
+all authenticated charged ancestors in the same transaction as the reservation.
+At the execution edge, Kernel independently derives the same descriptor and ID
+from the exact request; the store then rechecks the live signed grant and ancestry
+before its atomic dispatch claim. Merely trusting that the PDP returned ALLOW
+is insufficient. A changed body, target, operation or owner namespace requires a
+new approval. The existing effect ledger blocks duplicates across grants within
+its resource-owner namespace; proof replay protection remains required as well.
+
+Reconciliation does not broaden authority or approve a different effect. Unknown
+outcomes retain ownership and budget. Confirmed non-execution may allow a fresh
+attempt at the **same** approved effect; the old attempt/proof stays spent.
+This does not claim unlimited multi-host or universal exactly-once execution.
+
+
+## 16. Typed execution parameters (2.0 candidate correction, 2026-10-05)
+
+A proof-bearing request MUST retain JSON value types from policy evaluation
+through verification and dispatch. Accepted execution parameter values are
+null, boolean, integer, Unicode string, JSON array and string-keyed object.
+Nested values obey the same rule and Protocol's canonicalization limits.
+Floats (including negative zero/NaN/infinity), tuples and custom Python value
+classes MUST be rejected before the PDP reserves budget or ownership. No
+float-to-string or tuple-to-list coercion is permitted. Applications needing
+decimals must choose an explicit string or integer minor-unit representation
+**before** review and policy evaluation; dispatch receives that same type.
+
+This narrows the unreleased 2.0 candidate's prior convenience conversion.
+The original legacy regression source and initial full-suite failures are
+preserved in `docs/evidence/typed-request/legacy-contract-tests/`. The v1
+remote seven-step authority/budget arc remains tested with integer request
+values and gains a float-refusal/no-debit assertion. Plain `PDP.decide` budget
+accounting retains Decimal precision tests; it is not an independently
+verified protected executor. Historical released versions are not rewritten.
+
+The gateway MUST snapshot all typed parameters, including nested arrays and
+objects, before policy evaluation. The proof and real callback receive that
+snapshot, not a scalar-only projection or subsequently changed caller map.
+The GitHub adapter additionally validates its action schema, including optional
+body/labels and integer issue numbers (boolean is not integer). Unsupported
+fields are refused. Capture-only serializer tests prove request construction,
+not a GitHub provider accepting the request or a live side effect.
+
+The Boundary Kit compares mapped parameters by Protocol canonical bytes,
+never Python structural equality (`true` and `1` differ). Proof/intent tokens
+and nonempty JSON request bodies use Protocol's strict parser; duplicate
+decoded members, malformed UTF-8, floats and oversized/deep JSON are refused.
+Observe/warn mode remains observational for in-bounds requests. The 1 MiB
+framing limit returns HTTP 413 in every mode; an oversized body is not fully
+cached and a truncated body must never be forwarded to a handler. The ASGI
+server remains responsible for allocation of individual received chunks.
+Enforce mode requires the JSON body's keys to equal the complete set of body
+fields declared by target/parameter mappings. Unknown and case-variant fields
+are denied; a missing field cannot substitute for an explicitly signed null.
+A mapped target must already be a nonempty string, never a coerced integer
+or boolean. Whole mapped object/array values remain supported and are bound
+recursively. This explicitly narrows the candidate's prior open-body behavior.
+Header/query/path mappings remain the operator's responsibility and are not
+a claim of complete handler-effect discovery.
+
+Parameter mappings enforce exact declared types: `string`, `integer`,
+`boolean`, `array`, `object` and `null`. Integer excludes boolean. Unsupported
+mapping types (including `float` and `number`) are refused; generated manifests
+for float-accepting handlers require an explicit application migration to
+integer minor units or reviewed string values, not automatic coercion. The
+mapping must match the handler's schema. Resource owners remain responsible
+for transformations performed by application code, including nested schema
+coercions; middleware does not attest arbitrary downstream handler behavior.
+Target mapping `type` names the semantic resource kind, not a JSON value type.
+
+HTTP proxy, intent creation/submission and MCP ingress require bounded strict
+JSON objects before any gateway call. Malformed input never becomes `{}`.
+Known transport wrapper fields reject unknown/case-variant names. An absent
+intent-execute body or explicit `{}` is allowed; supplied overrides are not
+implemented and are refused. Application member names remain case-sensitive.
+Grant-token and control-plane wire parsing are separate compatibility surfaces
+and are not covered by this ingress correction.

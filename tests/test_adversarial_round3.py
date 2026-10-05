@@ -123,12 +123,16 @@ class TestRevokeDuringVerification:
 
 # 35. DECIMAL PRECISION ATTACK
 class TestDecimalPrecision:
-    def test_sub_cent_amount_allowed_but_negligible(self, hack):
+    def test_sub_cent_float_proof_request_denied_without_debit(self, hack):
         gw = hack["gateway"]
         token = hack["token"]
         result = gw.call_tool("refund", {"amount": 0.001}, token)
-        assert result["outcome"] == "ALLOW"
-        assert result["remaining_budget"] > 99.99
+        # 2.0 typed proof correction: fractional accounting remains supported
+        # below, but execution floats cannot be coerced to signed strings.
+        # The original expectation is frozen under docs/evidence/typed-request.
+        assert result["outcome"] == "DENY"
+        assert result["rule_matched"] == "proof:parameters"
+        assert result["remaining_budget"] == 100
 
     def test_exact_budget_exhaustion(self, hack):
         store = hack["store"]

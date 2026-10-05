@@ -1,0 +1,36 @@
+bun test v1.3.14 (0d9b296a)
+
+tests/grant-tokens.test.ts:
+(pass) grant token interop vectors > verifies v1_ascii [45.35ms]
+(pass) grant token interop vectors > verifies v1_non_ascii [6.39ms]
+(pass) grant token interop vectors > verifies v1_decimal_trailing_zero [13.57ms]
+(pass) grant token interop vectors > verifies v2_ascii [3.06ms]
+(pass) grant token interop vectors > verifies v2_non_ascii [2.86ms]
+(pass) grant token interop vectors > verifies v2_astral [1.44ms]
+(pass) grant token interop vectors > verifies v2_decimal_trailing_zero [13.18ms]
+(pass) grant token interop vectors > verifies v2_mutable_state_after_reservation [2.24ms]
+(pass) grant token interop vectors > refuses v1_ascii_agent_changed [3.92ms]
+(pass) grant token interop vectors > refuses v2_ascii_agent_changed [4.55ms]
+(pass) grant token interop vectors > refuses v3_prefix [0.62ms]
+(pass) grant token interop vectors > refuses v1_non_ascii_relabelled_v2 [1.29ms]
+(pass) grant token interop vectors > refuses v2_non_ascii_relabelled_v1 [2.34ms]
+(pass) grant token interop vectors > refuses v2_invalid_utf8_body [3.25ms]
+(pass) grant token interop vectors > refuses unreleased_v2_full_state_signature [3.34ms]
+(pass) grant token interop vectors > refuses v2_budget_limit_widened [1.61ms]
+(pass) grant token interop vectors > re-encoding a verified v2 grant yields the same v2 token [24.51ms]
+
+tests/exact-effect-tokens.test.ts:
+(pass) signed exact effect authority interop > finite [4.34ms]
+(pass) signed exact effect authority interop > empty [2.00ms]
+(pass) signed exact effect authority interop > legacy [3.49ms]
+(pass) signed exact effect authority interop > refuses removed [3.98ms]
+(pass) signed exact effect authority interop > refuses replaced [6.31ms]
+(pass) signed exact effect authority interop > refuses empty [0.90ms]
+(pass) signed exact effect authority interop > refuses signed_wildcard [0.40ms]
+(pass) signed exact effect authority interop > refuses signed_duplicate [0.05ms]
+(pass) signed exact effect authority interop > refuses signed_boolean [0.04ms]
+
+ 26 pass
+ 0 fail
+ 41 expect() calls
+Ran 26 tests across 2 files. [612.00ms]

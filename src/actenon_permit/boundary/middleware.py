@@ -38,6 +38,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from actenon_protocol.canonicalisation import canonicalize_bytes, parse_strict
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -46,6 +47,10 @@ from .manifest import BoundaryEntry, BoundaryManifest, extract_value
 from .proofs import INTENT_HEADER, canonical_parameters, decode_token, parse_audience
 
 logger = logging.getLogger(__name__)
+
+
+class BoundaryBodyTooLarge(ValueError):
+    """Framing limit: the unconsumed body must never reach a handler."""
 
 
 class BoundaryMiddleware(BaseHTTPMiddleware):
@@ -103,7 +108,21 @@ class BoundaryMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         proof_token = _extract_proof(request, boundary.proof)
-        body = await _safe_body(request)
+        malformed_body = False
+        try:
+            body = await _strict_body(request)
+        except BoundaryBodyTooLarge:
+            # Unlike an in-bounds policy refusal, an oversized body has not
+            # been fully consumed/cached. Forwarding in observe/warn would
+            # expose a truncated request, so the framing limit applies in
+            # every mode.
+            return JSONResponse(status_code=413, content={
+                "outcome": "refused", "boundary_id": boundary.id,
+                "reason": "request JSON too large", "refusal_code": "MALFORMED_REQUEST",
+            })
+        except (ValueError, UnicodeError, RecursionError):
+            body = {}
+            malformed_body = True
         headers = dict(request.headers)
         # Routing has not run yet inside middleware, so request.path_params is
         # empty here; derive them from the boundary's route pattern.
@@ -120,13 +139,30 @@ class BoundaryMiddleware(BaseHTTPMiddleware):
 
         mode = self.manifest.enforcement.mode
 
-        verification = self._verify(
-            boundary,
-            proof_token,
-            request.headers.get(INTENT_HEADER, ""),
-            target_value,
-            params,
-        )
+        body_fields = {
+            expression.split(".", 1)[1]
+            for expression in [boundary.target.from_expr, *(p.from_expr for p in boundary.parameters.values())]
+            if expression.startswith("body.")
+        }
+        if malformed_body:
+            verification = _invalid("unsupported JSON body", "MALFORMED_REQUEST")
+        elif set(body) != body_fields:
+            # A handler must not receive additional unproved fields. Requiring
+            # every mapped field also distinguishes absence from signed null.
+            verification = _invalid("request body does not match the complete boundary mapping", "PARAMETER_MISMATCH")
+        elif any(
+            not _matches_declared_type(params[name], mapping.type)
+            for name, mapping in boundary.parameters.items()
+        ):
+            verification = _invalid("request parameter does not match its declared JSON type", "PARAMETER_MISMATCH")
+        else:
+            verification = self._verify(
+                boundary,
+                proof_token,
+                request.headers.get(INTENT_HEADER, ""),
+                target_value,
+                params,
+            )
 
         if not verification["valid"]:
             refusal = _build_refusal(boundary, verification, action_hash)
@@ -212,11 +248,13 @@ class BoundaryMiddleware(BaseHTTPMiddleware):
         if intent.action.name != boundary.action:
             return _invalid("the intent's action does not match this boundary's action", "ACTION_MISMATCH")
         if boundary.target.from_expr:
-            if target_value is None or target_value == "":
+            if type(target_value) is not str or not target_value:
                 return _invalid("the request carries no target for this boundary", "TARGET_MISSING")
-            if intent.target.resource_id != str(target_value):
+            if intent.target.resource_id != target_value:
                 return _invalid("the intent's target does not match this request", "TARGET_MISMATCH")
-        if dict(intent.action.parameters) != canonical_parameters(params):
+        # Python structural equality treats True == 1, including nested
+        # containers. The portable canonical bytes retain JSON type identity.
+        if canonicalize_bytes(dict(intent.action.parameters)) != canonicalize_bytes(canonical_parameters(params)):
             return _invalid("the intent's parameters do not match this request", "PARAMETER_MISMATCH")
 
         kernel_api = _kernel_boundary_api()
@@ -316,6 +354,15 @@ def _invalid(reason: str, code: str) -> dict[str, Any]:
     return {"valid": False, "reason": reason, "refusal_code": code}
 
 
+def _matches_declared_type(value: Any, declared: str) -> bool:
+    # Exact types prevent ordinary framework coercion (true -> 1, "1" -> 1)
+    # between signed JSON and a handler matching this manifest. A manifest
+    # cannot attest that arbitrary application code preserves these values.
+    types = {"string": str, "integer": int, "boolean": bool, "array": list, "object": dict, "null": type(None)}
+    expected = types.get(declared)
+    return expected is not None and type(value) is expected
+
+
 def _kernel_boundary_api() -> tuple[Any, Any] | None:
     """The kernel's (BoundaryVerifier, BoundaryVerificationRequest) if that
     kernel binds proofs to Action Intents, else None."""
@@ -350,17 +397,34 @@ def _extract_proof(request: Request, proof_config) -> str:
     return ""
 
 
-async def _safe_body(request: Request) -> dict:
-    """Safely extract the JSON object body, returning {} on failure."""
+async def _strict_body(request: Request) -> dict:
+    """Reject malformed/ambiguous JSON before a protected handler sees it."""
+    from .._request_json import MAX_REQUEST_BYTES
+
+    original_stream = request.stream
+
+    async def bounded_stream():
+        retained = 0
+        async for chunk in original_stream():
+            retained += len(chunk)
+            if retained > MAX_REQUEST_BYTES:
+                raise BoundaryBodyTooLarge("request JSON too large")
+            yield chunk
+
+    # Let Starlette's ordinary body() populate its cache so downstream
+    # handlers receive exactly the verified bytes. Never cache an oversized
+    # request; the dispatch guard refuses it without forwarding a suffix.
+    request.stream = bounded_stream
     try:
         body_bytes = await request.body()
-        if body_bytes:
-            parsed = json.loads(body_bytes)
-            if isinstance(parsed, dict):
-                return parsed
-    except Exception:
-        pass
-    return {}
+    finally:
+        request.stream = original_stream
+    if not body_bytes:
+        return {}
+    parsed = parse_strict(body_bytes.decode("utf-8", errors="strict"))
+    if not isinstance(parsed, dict):
+        raise ValueError("request body must be a JSON object")
+    return parsed
 
 
 def _extract_params(boundary, body, headers, path_params, query) -> dict[str, Any]:

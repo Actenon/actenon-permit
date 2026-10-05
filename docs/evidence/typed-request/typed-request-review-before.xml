@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="5" time="0.499" timestamp="2026-10-05T11:00:39.104758+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="typed-request-review-regressions" name="test_boundary_unknown_body_does_not_reach_handler[extra0]" time="0.043" /><testcase classname="typed-request-review-regressions" name="test_boundary_unknown_body_does_not_reach_handler[extra1]" time="0.003" /><testcase classname="typed-request-review-regressions" name="test_proxy_invalid_raw_request_does_not_dispatch[{&quot;x&quot;:\xff}]" time="0.033"><failure message="AssertionError: {'status': 200, 'dispatched_params': [{}]}&#10;assert (200 in (400, 403))&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tmp_path = PosixPath('/private/var/folders/tz/y04t4d0900xdbmz96jp608180000gn/T/pytest-of-ross/pytest-413/test_proxy_invalid_raw_request0')
+raw = b'{"x":\xff}'
+
+    @pytest.mark.parametrize("raw", [b'{"x":\xff}', b'{"x":1,"x":2}'])
+    def test_proxy_invalid_raw_request_does_not_dispatch(tmp_path, raw):
+        from actenon_permit._proxy_routes import mount
+    
+        store = SQLiteStore(str(tmp_path / "state.db"))
+        try:
+            ledger, called = Ledger(store), []
+            pdp = PDP(store, ledger)
+            grant = Grant(
+                agent_id="review", expires_at=datetime.now(UTC) + timedelta(minutes=5),
+                scopes=Scopes(allow=["test.typed"]), budget=Budget(limit=10, remaining=10),
+            ).sign()
+            store.put_grant(grant)
+            registry = ToolRegistry()
+            registry.register("typed", action_type="test.typed", real_call=lambda **p: called.append(p))
+            gateway = Gateway(state=store, ledger=ledger, pdp=pdp, broker=Broker(pdp), tools=registry)
+            app = FastAPI()
+            mount(app, gateway)
+            response = TestClient(app).post("/proxy/typed", content=raw, headers={
+                "x-actenon-grant": grant_to_token(grant), "content-type": "application/json",
+            })
+&gt;           assert response.status_code in (400, 403) and called == [], {
+                "status": response.status_code, "dispatched_params": called,
+            }
+E           AssertionError: {'status': 200, 'dispatched_params': [{}]}
+E           assert (200 in (400, 403))
+E            +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+../typed-request-review-regressions.py:98: AssertionError</failure></testcase><testcase classname="typed-request-review-regressions" name="test_proxy_invalid_raw_request_does_not_dispatch[{&quot;x&quot;:1,&quot;x&quot;:2}]" time="0.016"><failure message="AssertionError: {'status': 200, 'dispatched_params': [{'x': 2}]}&#10;assert (200 in (400, 403))&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tmp_path = PosixPath('/private/var/folders/tz/y04t4d0900xdbmz96jp608180000gn/T/pytest-of-ross/pytest-413/test_proxy_invalid_raw_request1')
+raw = b'{"x":1,"x":2}'
+
+    @pytest.mark.parametrize("raw", [b'{"x":\xff}', b'{"x":1,"x":2}'])
+    def test_proxy_invalid_raw_request_does_not_dispatch(tmp_path, raw):
+        from actenon_permit._proxy_routes import mount
+    
+        store = SQLiteStore(str(tmp_path / "state.db"))
+        try:
+            ledger, called = Ledger(store), []
+            pdp = PDP(store, ledger)
+            grant = Grant(
+                agent_id="review", expires_at=datetime.now(UTC) + timedelta(minutes=5),
+                scopes=Scopes(allow=["test.typed"]), budget=Budget(limit=10, remaining=10),
+            ).sign()
+            store.put_grant(grant)
+            registry = ToolRegistry()
+            registry.register("typed", action_type="test.typed", real_call=lambda **p: called.append(p))
+            gateway = Gateway(state=store, ledger=ledger, pdp=pdp, broker=Broker(pdp), tools=registry)
+            app = FastAPI()
+            mount(app, gateway)
+            response = TestClient(app).post("/proxy/typed", content=raw, headers={
+                "x-actenon-grant": grant_to_token(grant), "content-type": "application/json",
+            })
+&gt;           assert response.status_code in (400, 403) and called == [], {
+                "status": response.status_code, "dispatched_params": called,
+            }
+E           AssertionError: {'status': 200, 'dispatched_params': [{'x': 2}]}
+E           assert (200 in (400, 403))
+E            +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+../typed-request-review-regressions.py:98: AssertionError</failure></testcase><testcase classname="typed-request-review-regressions" name="test_validation_applies_to_detached_snapshot" time="0.001" /></testsuite></testsuites>

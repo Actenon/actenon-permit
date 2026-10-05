@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="12" skipped="0" tests="13" time="1.470" timestamp="2026-10-05T10:30:12.664944+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_exact_effect_grants" name="test_another_effect_is_refused_without_budget_debit[body]" time="0.086"><failure message="AssertionError: A finite signed grant authorized X-prime&#10;assert not True">tests/test_exact_effect_grants.py:67: in test_another_effect_is_refused_without_budget_debit
+    assert not reserve(store, grant, changed)[0], "A finite signed grant authorized X-prime"
+E   AssertionError: A finite signed grant authorized X-prime
+E   assert not True</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_another_effect_is_refused_without_budget_debit[method]" time="0.021"><failure message="AssertionError: A finite signed grant authorized X-prime&#10;assert not True">tests/test_exact_effect_grants.py:67: in test_another_effect_is_refused_without_budget_debit
+    assert not reserve(store, grant, changed)[0], "A finite signed grant authorized X-prime"
+E   AssertionError: A finite signed grant authorized X-prime
+E   assert not True</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_another_effect_is_refused_without_budget_debit[target]" time="0.015"><failure message="AssertionError: A finite signed grant authorized X-prime&#10;assert not True">tests/test_exact_effect_grants.py:67: in test_another_effect_is_refused_without_budget_debit
+    assert not reserve(store, grant, changed)[0], "A finite signed grant authorized X-prime"
+E   AssertionError: A finite signed grant authorized X-prime
+E   assert not True</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_another_effect_is_refused_without_budget_debit[namespace]" time="0.013"><failure message="AssertionError: A finite signed grant authorized X-prime&#10;assert not True">tests/test_exact_effect_grants.py:67: in test_another_effect_is_refused_without_budget_debit
+    assert not reserve(store, grant, changed)[0], "A finite signed grant authorized X-prime"
+E   AssertionError: A finite signed grant authorized X-prime
+E   assert not True</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_another_effect_is_refused_without_budget_debit[action]" time="0.017"><failure message="AssertionError: A finite signed grant authorized X-prime&#10;assert not True">tests/test_exact_effect_grants.py:67: in test_another_effect_is_refused_without_budget_debit
+    assert not reserve(store, grant, changed)[0], "A finite signed grant authorized X-prime"
+E   AssertionError: A finite signed grant authorized X-prime
+E   assert not True</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_exact_effect_is_reserved_and_claimed_once" time="0.012" /><testcase classname="tests.test_exact_effect_grants" name="test_legacy_reservation_cannot_skip_exact_effect_authority" time="0.013"><failure message="assert not True">tests/test_exact_effect_grants.py:85: in test_legacy_reservation_cannot_skip_exact_effect_authority
+    assert not store.reserve(grant.id, "legacy", 1, 0, 60)[0]
+E   assert not True</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_plain_pdp_cannot_bypass_constraint_with_approved_action_id" time="0.012"><failure message="AssertionError: assert &lt;DecisionOutc...LLOW: 'ALLOW'&gt; == &lt;DecisionOutcome.DENY: 'DENY'&gt;&#10;  &#10;  - DENY&#10;  + ALLOW">tests/test_exact_effect_grants.py:95: in test_plain_pdp_cannot_bypass_constraint_with_approved_action_id
+    assert decision.outcome == DecisionOutcome.DENY
+E   AssertionError: assert &lt;DecisionOutc...LLOW: 'ALLOW'&gt; == &lt;DecisionOutcome.DENY: 'DENY'&gt;
+E     
+E     - DENY
+E     + ALLOW</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_empty_finite_set_denies_every_effect" time="0.010"><failure message="assert not True">tests/test_exact_effect_grants.py:103: in test_empty_finite_set_denies_every_effect
+    assert not reserve(store, empty)[0]
+E   assert not True</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_effect_set_is_signed_and_survives_token_roundtrip" time="0.008"><failure message="AttributeError: 'Grant' object has no attribute 'approved_effect_ids'">tests/test_exact_effect_grants.py:111: in test_effect_set_is_signed_and_survives_token_roundtrip
+    assert decoded.approved_effect_ids == [APPROVED]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/pydantic/main.py:1042: in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E   AttributeError: 'Grant' object has no attribute 'approved_effect_ids'</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_dispatch_rechecks_current_signed_finite_constraint" time="0.010"><failure message="ValueError: &quot;Grant&quot; object has no field &quot;approved_effect_ids&quot;">tests/test_exact_effect_grants.py:121: in test_dispatch_rechecks_current_signed_finite_constraint
+    narrower.approved_effect_ids = []
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/pydantic/main.py:1048: in __setattr__
+    elif (setattr_handler := self._setattr_handler(name, value)) is not None:
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/pydantic/main.py:1095: in _setattr_handler
+    raise ValueError(f'"{cls.__name__}" object has no field "{name}"')
+E   ValueError: "Grant" object has no field "approved_effect_ids"</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_attenuation_preserves_or_narrows_the_finite_set" time="0.022"><failure message="AttributeError: 'Grant' object has no attribute 'approved_effect_ids'">tests/test_exact_effect_grants.py:133: in test_attenuation_preserves_or_narrows_the_finite_set
+    assert child.approved_effect_ids == [APPROVED]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.12/site-packages/pydantic/main.py:1042: in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E   AttributeError: 'Grant' object has no attribute 'approved_effect_ids'</failure></testcase><testcase classname="tests.test_exact_effect_grants" name="test_hand_signed_child_cannot_widen_finite_parent" time="0.045"><failure message="assert not True">tests/test_exact_effect_grants.py:146: in test_hand_signed_child_cannot_widen_finite_parent
+    assert not reserve(store, child)[0]
+E   assert not True</failure></testcase></testsuite></testsuites>

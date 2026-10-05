@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from ._request_json import InvalidRequestJSON, read_request_object
 from .gateway import Gateway
 
 
@@ -35,13 +36,11 @@ def mount(app, gateway: Gateway) -> None:
                 content={"outcome": "DENY", "reason": "missing X-Actenon-Grant header"},
             )
         try:
-            body = await request.json()
-        except Exception:
-            body = {}
-        if not isinstance(body, dict):
+            body = await read_request_object(request)
+        except InvalidRequestJSON:
             return JSONResponse(
                 status_code=400,
-                content={"outcome": "DENY", "reason": "request body must be a JSON object"},
+                content={"outcome": "DENY", "reason": "unsupported request JSON object"},
             )
         result = gateway.call_tool(tool_name, body, grant_token)
         status = {"ALLOW": 200, "DENY": 403, "REQUIRE_APPROVAL": 202}.get(result["outcome"], 500)

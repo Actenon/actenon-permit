@@ -1,0 +1,49 @@
+[actenon-permit] WARNING: ACTENON_SIGNING_KEY is not set and no persisted key was found. Using an EPHEMERAL dev key — grants will NOT validate after this process exits. Run `permit init-key` to persist a stable local key, or set ACTENON_SIGNING_KEY in production.
+/Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/src/actenon_permit/ed25519_signer.py:306: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  return build_local_proof_signer()
+
+============================================================================
+  Actenon-Permit v1 GATEWAY demo — refund-bot via out-of-process PEP
+============================================================================
+
+  issued grant: id=grant_9c978559282b480f
+  agent:        refund-bot
+  budget:       USD 50 (remaining 50)
+  scopes.allow: ['payment.refund', 'email.send']
+  scopes.deny:  ['payment.charge', 'shell.*']
+  approval:     ['email.send']
+  grant token:  v2.eyJhZ2VudF9pZCI6InJlZnVuZC1ib3QiLCJhcHByb3Zhb... (signed, bearer)
+
+  gateway listening at http://127.0.0.1:55027 (out-of-process PEP)
+  agent process will call: POST http://127.0.0.1:55027/proxy/<tool> with X-Actenon-Grant header
+
+  step 1: refund($20)                  -> [ALLOW]    budget 50 -> 30 (re_mock_6859797)
+  step 2: refund($25)                  -> [ALLOW]    budget 30 -> 5 (re_mock_0296553)
+  step 3: refund($20)                  -> [DENY]     would exceed USD 50 budget   (budget: only $5 left of $50)
+  step 4: send_email(...)              -> [ALLOW]    approval accepted by the demo gate (msg_mock_6430411)
+  step 5: charge($100)                 -> [DENY]     scope denied: payment.charge   (simulated injection: payment.charge denied)
+
+  >>> kill switch: `permit revoke refund-bot` — grant REVOKED
+
+  step 7: refund($1)                   -> [DENY]     grant status is revoked   (grant REVOKED)
+
+  ledger (last 8 entries):
+    ALLOW              payment.refund         reason=allowed  hash=be32f6a428e6...
+    ALLOW              payment.refund         reason=allowed  hash=7ec16699a3b2...
+    DENY               payment.refund         reason=would exceed USD 50 budget  hash=d015b3c18397...
+    REQUIRE_APPROVAL   email.send             reason=approval required: email.send  hash=a453b3faed7d...
+    ALLOW              email.send             reason=allowed  hash=160dd6854e83...
+    DENY               payment.charge         reason=scope denied: payment.charge  hash=d796c5438335...
+    DENY               payment.refund         reason=grant status is revoked  hash=4152b62b41e0...
+
+  ledger chain intact: True
+
+  local HTTP gateway fixture:
+    each request crossed the local HTTP policy/proof boundary.
+    providers and credentials are test fixtures; the gateway runs
+    in this process. This does not demonstrate process containment.
+
+============================================================================
+  v1 gateway demo complete.
+============================================================================
+

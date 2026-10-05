@@ -117,7 +117,14 @@ class EffectLedgerMixin:
                 if grant.expires_at <= datetime.now(UTC):
                     raise StateError("effect grant is expired")
                 ok, reason, snapshot = self._reserve_in_transaction(
-                    cur, grant_id, action_id, dec_amount, rate_max, rate_per_seconds, time.time()
+                    cur,
+                    grant_id,
+                    action_id,
+                    dec_amount,
+                    rate_max,
+                    rate_per_seconds,
+                    time.time(),
+                    effect_id=effect_id,
                 )
                 if not ok:
                     cur.execute("ROLLBACK")
@@ -208,6 +215,8 @@ class EffectLedgerMixin:
                     "SELECT grant_id FROM reservation_budget_owners WHERE action_id = ?", (row[2],)
                 ).fetchall()
                 lineage = self._budget_lineage(cur, grant_id, dispatch=True)
+                if any(not owner.permits_effect(row[1]) for owner in lineage):
+                    raise StateError("effect is no longer explicitly approved by its authority")
                 if {owner[0] for owner in owners} != {owner.id for owner in lineage}:
                     raise StateError("effect charged budget lineage does not match its authority")
                 debt = cur.execute(
