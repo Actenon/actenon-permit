@@ -47,6 +47,10 @@ def store(tmp_path):
 
 
 def _grant(store, allow, parent=None) -> Grant:
+    if parent:
+        grant = parent.attenuate(agent_id="agent-1", scopes_allow=allow)
+        store.put_grant(grant)
+        return grant
     grant = Grant(
         agent_id="agent-1",
         expires_at=datetime.now(UTC) + timedelta(minutes=10),
@@ -132,7 +136,7 @@ def test_revoked_ancestor_cascades_to_a_delegated_proof(issuer, store, tmp_path)
     from actenon_permit.revocation import StoreRevocationChecker
 
     parent = _grant(store, ["payments.*"])
-    child = _grant(store, ["payments.refund"], parent=parent)
+    child = _grant(store, ["payments.*"], parent=parent)
     intent, pccb = _mint(store, child)
     store.set_status(parent.id, GrantStatus.REVOKED)
     calls: list[int] = []

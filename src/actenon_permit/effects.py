@@ -21,7 +21,7 @@ from actenon_protocol.effects import EFFECT_PROFILE, effect_identity, validate_e
 from actenon_protocol.types.effects import EffectReference
 
 from .budget import from_units, units
-from .model import Grant, GrantStatus
+from .model import Grant
 
 
 class EffectLedgerMixin:
@@ -184,11 +184,7 @@ class EffectLedgerMixin:
         grant = Grant.model_validate_json(row[0])
         if grant.agent_id != principal or not grant.verify():
             raise StateError("effect grant does not match the authenticated principal")
-        if (
-            grant.status not in {GrantStatus.ACTIVE, GrantStatus.EXHAUSTED}
-            or self._revoked_ancestor(cur, grant.parent_grant_id, grant.id) is not None
-        ):
-            raise StateError("effect grant or ancestor is not active")
+        self._budget_lineage(cur, grant_id, dispatch=True)
         return grant
 
     def claim_effect(self, *, reference, grant_id, principal, action_hash) -> bool:
@@ -208,6 +204,20 @@ class EffectLedgerMixin:
                 grant = self._effect_grant(cur, grant_id, principal)
                 if grant.expires_at <= datetime.now(UTC):
                     raise StateError("effect grant expired before dispatch")
+                owners = cur.execute(
+                    "SELECT grant_id FROM reservation_budget_owners WHERE action_id = ?", (row[2],)
+                ).fetchall()
+                lineage = self._budget_lineage(cur, grant_id, dispatch=True)
+                if {owner[0] for owner in owners} != {owner.id for owner in lineage}:
+                    raise StateError("effect charged budget lineage does not match its authority")
+                debt = cur.execute(
+                    """SELECT d.amount_units FROM budget_overruns d
+                       JOIN reservation_budget_owners o ON o.grant_id = d.grant_id
+                       WHERE o.action_id = ?""",
+                    (row[2],),
+                ).fetchall()
+                if any(from_units(item[0]) > 0 for item in debt):
+                    raise StateError("budget owner overrun remains unsettled before dispatch")
                 if row[8] != "RESERVED":
                     cur.execute("ROLLBACK")
                     return False

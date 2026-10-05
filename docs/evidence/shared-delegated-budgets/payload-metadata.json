@@ -1,0 +1,6 @@
+{
+  "wheel": "actenon_permit-2.0.0rc1-py3-none-any.whl",
+  "sha256": "d44baf25d97004886003b7bda5feb70f3c55e63d2b82deacbd18333c1c08e8af",
+  "new_module_present": true,
+  "scope": "Wheel payload smoke with existing pinned engine dependencies; not full clean product installation"
+}

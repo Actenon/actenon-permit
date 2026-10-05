@@ -1,0 +1,21 @@
+/Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/actenon/demo/local_proof.py:93: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  signer = build_local_proof_signer()
+/Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/actenon/conformance/test_canonicalization_strict_conformance.py:95: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  signer = _security_signer()
+/Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/actenon/conformance/test_canonicalization_strict_conformance.py:265: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  signer=_security_signer(),
+/Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/actenon/conformance/test_outcome_attestation_conformance.py:16: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  signer=build_local_proof_signer(),
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/unittest/case.py:589: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  if method() is not None:
+/Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/actenon/conformance/test_replay_conformance.py:16: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  kernel, writer, payload, context = build_replay_kernel(tempdir)
+/Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/actenon/conformance/test_verifier_sdk_conformance.py:44: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  self.signer = build_local_proof_signer()
+/Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/actenon/demo/portable_local_proof.py:69: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+  signer = build_local_proof_signer()
+Conformance version: 1.1.0
+Conformance tests passed.
+Ran 53 test(s).
+Skipped: 0.
+Mark eligibility: Actenon Verified (Conformance 1.1.0)
