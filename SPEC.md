@@ -550,7 +550,7 @@ release and Airlock product budget configuration are still pending.
 ## Exact effect grants (2.0 candidate addition)
 
 `approved_effect_ids` is an optional immutable finite list of Protocol effect
-identifiers. Protocol `actenon-effect/1` defines their descriptor hashing; Permit
+identifiers. Protocol `ACTENON-EFFECT-1` defines their descriptor hashing; Permit
 does not invent a second effect identity or classify actions. A trusted resource
 adapter derives the descriptor from the actual target and consequential bytes.
 The issuer reviews that descriptor before signing its ID into the grant.
