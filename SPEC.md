@@ -446,9 +446,9 @@ Content-Type: application/json
 }
 ```
 
-The endpoint is operator-only (admin token): a child's spend does not
-debit its parent (§13.3), so letting a holder mint children at will would
-let it multiply its budget. Holders delegate by asking the operator.
+The endpoint is operator-only (admin token). Holders delegate by asking the
+operator; creating children does not grant control-plane authority. Child
+spending shares the ancestors' live ceilings (§13.3).
 
 Returns the freshly-signed child Grant (HTTP 200), or:
 - 401 / 403 without a valid admin token
@@ -470,15 +470,30 @@ Returns the freshly-signed child Grant (HTTP 200), or:
 
 ### 13.3 Budget semantics
 
-Attenuation creates an INDEPENDENT child grant with its own budget. The
-parent is NOT debited at attenuation time — the parent pre-allocates by
-trusting the child with a smaller budget. In a real multi-agent system, the
-parent orchestrator would set its own budget remaining to
-`(limit - sum_of_child_allocations)` at orchestration time; that's a
-deployment concern, not a protocol concern.
+**2.0 candidate contract change:** a child ceiling now shares the parent's
+authority. Earlier versions created independent child budgets and required
+operator orchestration to prevent aggregate amplification. That behavior is
+preserved in historical evidence but is not the 2.0 spending contract.
 
-The child's spend does NOT debit the parent. The child can never exceed its
-own (smaller) limit.
+Creating a child does not debit any balance. Every subsequent reservation
+atomically debits the leaf and every authenticated ancestor in the same SQLite
+write transaction, including their aggregate rate limits. Two children cannot
+each spend 30 against a parent ceiling of 50. Missing, cyclic, invalid, expired,
+revoked or widened lineage fails closed. The depth bound for store traversal is
+64 grants; the PDP's configured delegation limit still applies independently.
+
+The reservation freezes its charged owners. Actual-cost settlement and
+NOT_EXECUTED refunds update those same owners atomically and at most once;
+overruns create durable debt. AMBIGUOUS retains every hold. Refunding a revoked
+owner does not revive its authority. Legacy reserve/commit/release and the
+effect-aware path use the same accounting, rather than separate budget rules.
+
+On migration, retained legacy held/committed costs are charged to ancestors once.
+Historical parent debits cannot always be inferred; the migration deliberately
+narrows authority and can overcount old manually allocated spending. It never
+forgives retained cost or debt. Invalid/missing retained lineage refuses setup
+for operator repair. Back up the store before migrating; review narrowed
+balances. This is a SQLite shared-store guarantee, not a cross-host guarantee.
 
 ### 13.4 Wire format for handing the sub-grant to a child process
 
@@ -523,7 +538,6 @@ hashing. Null-version legacy and v2 candidate entries retain their own verifier;
 unknown versions are refused. This is audit formatting, not a new action-hash
 profile: execution proof hashing remains the Protocol implementation.
 
-This section does not claim rolling windows or aggregate parent consumption.
-Those remain separate required programme work; the current delegation behavior
-elsewhere in this document has not yet been replaced. Public registry release
-and Airlock product budget configuration are also pending.
+This section does not claim rolling monetary windows or cross-host budget
+accounting. Aggregate ancestor consumption is defined in §13.3. Public registry
+release and Airlock product budget configuration are still pending.

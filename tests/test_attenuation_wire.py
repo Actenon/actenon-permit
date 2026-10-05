@@ -132,17 +132,10 @@ def test_attenuate_rejects_revoked_parent(tmp_db, monkeypatch):
 
 def test_child_token_is_usable_and_bound_by_parent_limits(tmp_db, monkeypatch):
     """A child grant's token must work at the gateway, and the child must be
-    bound by its own (smaller) budget — not the parent's.
+    bound by both its own ceiling and the shared parent ceiling.
 
-    Note on UCAN-style attenuation semantics: attenuation creates an
-    INDEPENDENT child grant with its own budget. The parent is NOT debited
-    at attenuation time (the parent pre-allocates by trusting the child
-    with a smaller budget). This means the parent's remaining is unchanged
-    after attenuation — what matters is that the child can never exceed
-    its own (smaller) limit, and the child's spend does NOT debit the
-    parent. In a real multi-agent system, the parent would set its own
-    budget remaining to (limit - sum_of_child_allocations) at orchestration
-    time; that's a deployment concern, not a protocol concern.
+    The 2.0 candidate changes independent-child spending to atomic shared
+    consumption. Issuance itself still leaves the parent's balance unchanged.
     """
     app, store, gw = _make_app_and_store(tmp_db, monkeypatch)
     parent = _issue_parent(store)
@@ -155,6 +148,7 @@ def test_child_token_is_usable_and_bound_by_parent_limits(tmp_db, monkeypatch):
     )
     assert resp.status_code == 200
     child = resp.json()
+    assert store.get_grant(parent.id).budget.remaining == 100
 
     # Mint a token for the child.
     from actenon_permit.model import Grant
@@ -172,7 +166,6 @@ def test_child_token_is_usable_and_bound_by_parent_limits(tmp_db, monkeypatch):
     assert r2["outcome"] == "DENY"
     assert "budget" in r2["reason"]
 
-    # The parent's remaining is unchanged — attenuation creates an
-    # independent child budget, it does not debit the parent.
+    # Spending, unlike issuance, charges both ceilings in the same transaction.
     parent_live = store.get_grant(parent.id)
-    assert parent_live.budget.remaining == 100.0
+    assert parent_live.budget.remaining == 85.0

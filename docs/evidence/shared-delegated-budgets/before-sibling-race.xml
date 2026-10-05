@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="1.418" timestamp="2026-10-05T09:30:26.480591+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_aggregate_delegated_budgets" name="test_siblings_cannot_amplify_a_parent_budget" time="0.051"><failure message="AssertionError: Two child grants spent 60 against a shared parent limit of 50&#10;assert not True">tests/test_aggregate_delegated_budgets.py:56: in test_siblings_cannot_amplify_a_parent_budget
+    assert not second[0], "Two child grants spent 60 against a shared parent limit of 50"
+E   AssertionError: Two child grants spent 60 against a shared parent limit of 50
+E   assert not True</failure></testcase><testcase classname="tests.test_aggregate_delegated_budgets" name="test_independent_clients_atomically_share_the_ancestor_budget" time="0.029"><failure message="AssertionError: Independent clients both spent an ancestor's remaining authority&#10;assert 2 == 1&#10; +  where 2 = sum([True, True])">tests/test_aggregate_delegated_budgets.py:76: in test_independent_clients_atomically_share_the_ancestor_budget
+    assert sum(results) == 1, "Independent clients both spent an ancestor's remaining authority"
+E   AssertionError: Independent clients both spent an ancestor's remaining authority
+E   assert 2 == 1
+E    +  where 2 = sum([True, True])</failure></testcase></testsuite></testsuites>
