@@ -54,20 +54,20 @@ clean-wheel result, live GitHub test or complete amended-goal PASS.
 
 ## Preserved evidence
 
-- [Five-case review before](../../work/typed-request-review-before.xml)
+- [Five-case review before](typed-request-review-before.xml)
   and [after](permit-review-regressions-after.xml). The before run occurred
   after the root had already repaired three review cases: two proxy cases
   still failed, three passed. It must not be described as five new failures.
-- [Raw ingress initial before](../../work/raw-request-ingress-before.xml):
-  35 failed / 30 passed; [expanded final corpus before](../../work/raw-request-ingress-final-corpus-before.xml):
+- [Raw ingress initial before](../raw-request-ingress/raw-request-ingress-before.xml):
+  35 failed / 30 passed; [expanded final corpus before](../raw-request-ingress/raw-request-ingress-final-corpus-before.xml):
   53 failed / 30 passed.
-- [Pinned dependency integration after](../../work/raw-request-ingress-after-pinned.xml):
+- [Pinned dependency integration after](../raw-request-ingress/raw-request-ingress-after-pinned.xml):
   229 passed with installed Kernel `66052b20941f908634c9fbac24f1ae7cead78e46`
   and Protocol `8e5bc9e342f694767508bae9a392749c6a8df2cc`.
-- [Declared types before](../../work/boundary-declared-types-before.xml):
+- [Declared types before](boundary-declared-types-before.xml):
   10 failed / 5 passed.
-- [Bounded body before](../../work/boundary-bounded-body-before.xml):
-  3 failed / 3 passed; [focused integrated after](../../work/boundary-bounded-body-after.xml):
+- [Bounded body before](boundary-bounded-body-before.xml):
+  3 failed / 3 passed; [focused integrated after](boundary-bounded-body-after.xml):
   151 passed plus one old test asserting 403 for oversized JSON. The root
   subsequently corrected that expected framing status to 413. The final
   complete suite is owned and recorded by the root, not inferred here.
