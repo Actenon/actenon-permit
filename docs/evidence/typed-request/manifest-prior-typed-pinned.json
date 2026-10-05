@@ -1,0 +1,29 @@
+{
+  "observed_at": "2026-10-05T10:05:42.450117+00:00",
+  "base": "b820b128c1166993c416c8c4e61d41c78bf90809",
+  "branch": "fix/typed-proof-request",
+  "environment": "macOS Python3.12.13",
+  "expected": "Only unchanged typed JSON request reaches dispatch; unsupported/changed request denied before side effect",
+  "observed": "771 passed, one existing live-provider skip against pinned installed dependencies; 76 focused typed/boundary cases passed",
+  "live_github_mutation": false,
+  "public_artifact_install": false,
+  "independently_reproduced": false,
+  "commands": [
+    "PYTHONPATH=src:../actenon-protocol-effects/python ../actenon-permit-effects/.venv/bin/python -m pytest tests -q"
+  ],
+  "raw_evidence": [
+    "typed-boundary-before.log",
+    "typed-gateway-before.log",
+    "typed-integrated-after.log",
+    "typed-request-after.log",
+    "typed-request-before-corrected-harness.log",
+    "typed-request-before.log",
+    "typed-request-full-candidate.log",
+    "typed-request-full-initial.log"
+  ],
+  "dependencies": {
+    "kernel": "4bae9252666a71361be4374316dd151b924815a8",
+    "protocol": "8e5bc9e342f694767508bae9a392749c6a8df2cc"
+  },
+  "remaining": "Raw proxy/intent/MCP repair under independent review; wholeproduct/F installation not passed"
+}

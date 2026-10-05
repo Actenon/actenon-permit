@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="4" time="0.463" timestamp="2026-10-05T10:54:32.142409+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_typed_proof_request" name="test_gateway_proves_every_parameter_it_dispatches[value0]" time="0.023"><failure message="AssertionError: Gateway dropped nested authority before dispatch&#10;assert [{}] == [{'value': ['bug']}]&#10;  &#10;  At index 0 diff: {} != {'value': ['bug']}&#10;  Use -v to get more diff">tests/test_typed_proof_request.py:181: in test_gateway_proves_every_parameter_it_dispatches
+    assert proven == called == [{"value": value}], "Gateway dropped nested authority before dispatch"
+E   AssertionError: Gateway dropped nested authority before dispatch
+E   assert [{}] == [{'value': ['bug']}]
+E     
+E     At index 0 diff: {} != {'value': ['bug']}
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_gateway_proves_every_parameter_it_dispatches[value1]" time="0.008"><failure message="AssertionError: Gateway dropped nested authority before dispatch&#10;assert [{}] == [{'value': {'...6703205376]}}]&#10;  &#10;  At index 0 diff: {} != {'value': {'nested': ['雪', 1267650600228229401496703205376]}}&#10;  Use -v to get more diff">tests/test_typed_proof_request.py:181: in test_gateway_proves_every_parameter_it_dispatches
+    assert proven == called == [{"value": value}], "Gateway dropped nested authority before dispatch"
+E   AssertionError: Gateway dropped nested authority before dispatch
+E   assert [{}] == [{'value': {'...6703205376]}}]
+E     
+E     At index 0 diff: {} != {'value': {'nested': ['雪', 1267650600228229401496703205376]}}
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_gateway_proves_every_parameter_it_dispatches[value2]" time="0.007"><failure message="AssertionError: assert 'ALLOW' == 'DENY'&#10;  &#10;  - DENY&#10;  + ALLOW">tests/test_typed_proof_request.py:177: in test_gateway_proves_every_parameter_it_dispatches
+    assert result["outcome"] == "DENY"
+E   AssertionError: assert 'ALLOW' == 'DENY'
+E     
+E     - DENY
+E     + ALLOW</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_gateway_proves_every_parameter_it_dispatches[value3]" time="0.008"><failure message="AssertionError: assert 'ALLOW' == 'DENY'&#10;  &#10;  - DENY&#10;  + ALLOW">tests/test_typed_proof_request.py:177: in test_gateway_proves_every_parameter_it_dispatches
+    assert result["outcome"] == "DENY"
+E   AssertionError: assert 'ALLOW' == 'DENY'
+E     
+E     - DENY
+E     + ALLOW</failure></testcase></testsuite></testsuites>

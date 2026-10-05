@@ -159,7 +159,7 @@ def run_gateway_demo(*, auto_approve: bool = False) -> list[dict[str, Any]]:
         reg.set_grant_token(token)
 
         @remote_guard("payment.refund", cost_from="amount", registry=reg)
-        def refund(amount: float, reason: str = "customer_request") -> dict:
+        def refund(amount: int, reason: str = "customer_request") -> dict:
             """Issue a refund. (Body is ignored — real impl lives in the gateway.)"""
             ...
 
@@ -169,7 +169,7 @@ def run_gateway_demo(*, auto_approve: bool = False) -> list[dict[str, Any]]:
             ...
 
         @remote_guard("payment.charge", cost_from="amount", registry=reg)
-        def charge(amount: float, description: str = "") -> dict:
+        def charge(amount: int, description: str = "") -> dict:
             """Charge a card. (Body is ignored — real impl lives in the gateway.)"""
             ...
 
@@ -181,21 +181,21 @@ def run_gateway_demo(*, auto_approve: bool = False) -> list[dict[str, Any]]:
 
         # --- Step 1: refund $20 -> ALLOW (50 -> 30) ---
         try:
-            r = refund(amount=20.0, reason="customer_request")
+            r = refund(amount=20, reason="customer_request")
             _record(1, "refund($20)", "ALLOW", f"budget 50 -> 30 ({r['id']})")
         except RemoteGuardDenied as e:
             _record(1, "refund($20)", "DENY", str(e))
 
         # --- Step 2: refund $25 -> ALLOW (30 -> 5) ---
         try:
-            r = refund(amount=25.0, reason="fraud_hold")
+            r = refund(amount=25, reason="fraud_hold")
             _record(2, "refund($25)", "ALLOW", f"budget 30 -> 5 ({r['id']})")
         except RemoteGuardDenied as e:
             _record(2, "refund($25)", "DENY", str(e))
 
         # --- Step 3: refund $20 -> DENY (only $5 left) ---
         try:
-            refund(amount=20.0, reason="customer_request")
+            refund(amount=20, reason="customer_request")
             _record(3, "refund($20)", "ALLOW", "UNEXPECTED — should have been denied")
         except RemoteGuardDenied as e:
             _record(3, "refund($20)", "DENY", str(e), extra="budget: only $5 left of $50")
@@ -203,13 +203,13 @@ def run_gateway_demo(*, auto_approve: bool = False) -> list[dict[str, Any]]:
         # --- Step 4: send_email -> REQUIRE_APPROVAL -> (auto-approve) -> ALLOW ---
         try:
             r = send_email(to="ops@example.com", subject="refund processed", body="hi")
-            _record(4, "send_email(...)", "ALLOW", f"approved by human ({r['id']})")
+            _record(4, "send_email(...)", "ALLOW", f"approval accepted by the demo gate ({r['id']})")
         except RemoteGuardDenied as e:
             _record(4, "send_email(...)", "DENY", str(e))
 
         # --- Step 5: charge $100 -> DENY (scope: payment.charge denied) ---
         try:
-            charge(amount=100.0, description="exfiltrate")
+            charge(amount=100, description="exfiltrate")
             _record(5, "charge($100)", "ALLOW", "UNEXPECTED — should have been denied")
         except RemoteGuardDenied as e:
             _record(5, "charge($100)", "DENY", str(e), extra="simulated injection: payment.charge denied")
@@ -222,7 +222,7 @@ def run_gateway_demo(*, auto_approve: bool = False) -> list[dict[str, Any]]:
 
         # --- Step 7: refund $1 -> DENY (grant REVOKED) ---
         try:
-            refund(amount=1.0, reason="last_try")
+            refund(amount=1, reason="last_try")
             _record(7, "refund($1)", "ALLOW", "UNEXPECTED — should have been denied")
         except RemoteGuardDenied as e:
             _record(7, "refund($1)", "DENY", str(e), extra="grant REVOKED")
@@ -239,13 +239,10 @@ def run_gateway_demo(*, auto_approve: bool = False) -> list[dict[str, Any]]:
         ok = ledger.verify()
         print(f"  ledger chain intact: {ok}")
         print()
-        print("  v1 trust boundary proof:")
-        print("    the agent process only imported `pep_client` (the remote PEP).")
-        print("    it never imported the mock providers or the broker. it has no")
-        print("    way to call `mock_stripe_charge` directly — even with arbitrary")
-        print("    code exec, the secret `sk_mock_***` is not in its memory.")
-        print("    every call crossed the HTTP boundary to the gateway, which")
-        print("    enforced decide() and swapped the grant for the real credential.")
+        print("  local HTTP gateway fixture:")
+        print("    each request crossed the local HTTP policy/proof boundary.")
+        print("    providers and credentials are test fixtures; the gateway runs")
+        print("    in this process. This does not demonstrate process containment.")
         print()
         print("=" * 76)
         print("  v1 gateway demo complete.")

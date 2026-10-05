@@ -58,3 +58,17 @@ def test_demo_ledger_intact(fresh_env):
     store = get_default_store()
     ledger = Ledger(store)
     assert ledger.verify() is True
+
+
+def test_gateway_demo_retains_seven_step_authority_arc(fresh_env):
+    from actenon_permit._demo_gateway import run_gateway_demo
+
+    results = run_gateway_demo(auto_approve=True)
+    assert [(r["step"], r["outcome"]) for r in results] == [
+        (1, "ALLOW"), (2, "ALLOW"), (3, "DENY"),
+        (4, "ALLOW"), (5, "DENY"), (7, "DENY"),
+    ]
+    by_step = {r["step"]: r for r in results}
+    assert "budget" in by_step[3]["reason"]
+    assert "scope" in by_step[5]["reason"]
+    assert "revoked" in by_step[7]["reason"]

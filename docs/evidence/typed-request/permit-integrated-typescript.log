@@ -1,0 +1,84 @@
+bun test v1.3.14 (0d9b296a)
+
+tests/canonical.test.ts:
+(pass) canonicalizeJson parity with Python > escapes non-ASCII and sorts keys by code point [4.04ms]
+(pass) canonicalizeJson parity with Python > rejects lone high surrogate [1.79ms]
+(pass) canonicalizeJson parity with Python > rejects lone low surrogate [0.02ms]
+(pass) canonicalizeJson parity with Python > rejects reversed surrogate pair [0.01ms]
+(pass) canonicalizeJson parity with Python > rejects lone surrogate key [0.01ms]
+(pass) canonicalizeJson parity with Python > rejects float [0.04ms]
+(pass) canonicalizeJson parity with Python > rejects negative zero
+(pass) canonicalizeJson parity with Python > rejects unsafe integer 2^53 [0.01ms]
+(pass) canonicalizeJson parity with Python > rejects unsafe number 1e21 [0.01ms]
+(pass) canonicalizeJson parity with Python > rejects unsafe integer via JSON.parse [0.04ms]
+(pass) canonicalizeJson parity with Python > rejects NaN
+(pass) canonicalizeJson parity with Python > rejects Date [0.02ms]
+(pass) canonicalizeJson parity with Python > rejects Map [0.01ms]
+(pass) canonicalizeJson parity with Python > rejects Set
+(pass) canonicalizeJson parity with Python > rejects undefined value
+(pass) canonicalizeJson parity with Python > rejects bigint
+
+tests/sdk-prompt12.test.ts:
+(pass) protocol types > BrokeredResult has mode='brokered' [0.04ms]
+(pass) protocol types > ResourceOwnedResult has mode='resource_owned' [0.02ms]
+(pass) protocol types > ExecutionResult is a discriminated union [0.03ms]
+(pass) protocol types > IntentLifecycle includes all 14 states [0.02ms]
+(pass) type safety > callers must narrow on mode before accessing mode-specific fields [0.04ms]
+(pass) crypto > canonicalizeJson sorts keys + removes whitespace [0.05ms]
+(pass) crypto > verifyResourceReceipt accepts a valid signature [4.02ms]
+(pass) crypto > verifyResourceReceipt rejects a forged signature [1.42ms]
+(pass) crypto > verifyResourceReceipt rejects unknown key id [0.02ms]
+(pass) client > Actenon.cloud() returns CloudActenonClient with correct capabilities [1.81ms]
+(pass) client > Actenon.cloud() without grantToken reports supportsBrokered=false [0.03ms]
+(pass) client > Actenon.local() returns LocalActenonClient [0.07ms]
+(pass) client > LocalActenonClient.registerCredential throws in browser env [0.19ms]
+(pass) client > mapResponseToResult raises ExecutionRefusedError on DENY without state [0.13ms]
+(pass) client > mapResponseToResult raises OutcomeUnknownError [0.05ms]
+(pass) exceptions > OutcomeUnknownError is retryable [0.01ms]
+(pass) exceptions > ExecutionRefusedError is not retryable [0.01ms]
+(pass) exceptions > all exceptions inherit from ActenonError [0.02ms]
+(pass) package smoke > all public names are exported [0.24ms]
+
+tests/grant-tokens.test.ts:
+(pass) grant token interop vectors > verifies v1_ascii [9.80ms]
+(pass) grant token interop vectors > verifies v1_non_ascii [2.83ms]
+(pass) grant token interop vectors > verifies v1_decimal_trailing_zero [0.82ms]
+(pass) grant token interop vectors > verifies v2_ascii [2.72ms]
+(pass) grant token interop vectors > verifies v2_non_ascii [0.69ms]
+(pass) grant token interop vectors > verifies v2_astral [0.47ms]
+(pass) grant token interop vectors > verifies v2_decimal_trailing_zero [0.55ms]
+(pass) grant token interop vectors > verifies v2_mutable_state_after_reservation [0.91ms]
+(pass) grant token interop vectors > refuses v1_ascii_agent_changed [2.20ms]
+(pass) grant token interop vectors > refuses v2_ascii_agent_changed [1.06ms]
+(pass) grant token interop vectors > refuses v3_prefix [0.02ms]
+(pass) grant token interop vectors > refuses v1_non_ascii_relabelled_v2 [0.31ms]
+(pass) grant token interop vectors > refuses v2_non_ascii_relabelled_v1 [3.72ms]
+(pass) grant token interop vectors > refuses v2_invalid_utf8_body [0.33ms]
+(pass) grant token interop vectors > refuses unreleased_v2_full_state_signature [1.93ms]
+(pass) grant token interop vectors > refuses v2_budget_limit_widened [0.37ms]
+(pass) grant token interop vectors > re-encoding a verified v2 grant yields the same v2 token [6.00ms]
+
+tests/exact-effect-tokens.test.ts:
+(pass) signed exact effect authority interop > finite [3.98ms]
+(pass) signed exact effect authority interop > empty [1.67ms]
+(pass) signed exact effect authority interop > legacy [2.57ms]
+(pass) signed exact effect authority interop > refuses removed [2.12ms]
+(pass) signed exact effect authority interop > refuses replaced [0.51ms]
+(pass) signed exact effect authority interop > refuses empty [1.02ms]
+(pass) signed exact effect authority interop > refuses signed_wildcard [0.03ms]
+(pass) signed exact effect authority interop > refuses signed_duplicate [0.02ms]
+(pass) signed exact effect authority interop > refuses signed_boolean [0.01ms]
+
+tests/sdk.test.ts:
+(pass) token encode/decode > round-trips a grant through the wire format [0.27ms]
+(pass) token encode/decode > cryptographic verification passes for a correctly-signed token [3.42ms]
+(pass) token encode/decode > rejects a token with the wrong signature [2.92ms]
+(pass) control plane + gateway end-to-end > issues a grant, mints a token, calls refund (ALLOW), then over-budget (DENY) [1000.32ms]
+(pass) control plane + gateway end-to-end > attenuates a parent grant to a weaker child [581.84ms]
+(pass) control plane + gateway end-to-end > ledger verifies as intact after a series of calls [618.05ms]
+(pass) control plane requires the admin token > refuses a client without it (an agent) and accepts the operator [524.46ms]
+
+ 68 pass
+ 0 fail
+ 117 expect() calls
+Ran 68 tests across 5 files. [2.94s]

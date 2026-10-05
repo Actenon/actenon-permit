@@ -1,0 +1,57 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 27 items / 23 deselected / 4 selected
+
+tests/test_typed_proof_request.py FFFF                                   [100%]
+
+=================================== FAILURES ===================================
+__________ test_gateway_proves_every_parameter_it_dispatches[value0] ___________
+tests/test_typed_proof_request.py:181: in test_gateway_proves_every_parameter_it_dispatches
+    assert proven == called == [{"value": value}], "Gateway dropped nested authority before dispatch"
+E   AssertionError: Gateway dropped nested authority before dispatch
+E   assert [{}] == [{'value': ['bug']}]
+E     
+E     At index 0 diff: {} != {'value': ['bug']}
+E     Use -v to get more diff
+__________ test_gateway_proves_every_parameter_it_dispatches[value1] ___________
+tests/test_typed_proof_request.py:181: in test_gateway_proves_every_parameter_it_dispatches
+    assert proven == called == [{"value": value}], "Gateway dropped nested authority before dispatch"
+E   AssertionError: Gateway dropped nested authority before dispatch
+E   assert [{}] == [{'value': {'...6703205376]}}]
+E     
+E     At index 0 diff: {} != {'value': {'nested': ['雪', 1267650600228229401496703205376]}}
+E     Use -v to get more diff
+__________ test_gateway_proves_every_parameter_it_dispatches[value2] ___________
+tests/test_typed_proof_request.py:177: in test_gateway_proves_every_parameter_it_dispatches
+    assert result["outcome"] == "DENY"
+E   AssertionError: assert 'ALLOW' == 'DENY'
+E     
+E     - DENY
+E     + ALLOW
+__________ test_gateway_proves_every_parameter_it_dispatches[value3] ___________
+tests/test_typed_proof_request.py:177: in test_gateway_proves_every_parameter_it_dispatches
+    assert result["outcome"] == "DENY"
+E   AssertionError: assert 'ALLOW' == 'DENY'
+E     
+E     - DENY
+E     + ALLOW
+=============================== warnings summary ===============================
+tests/test_typed_proof_request.py::test_gateway_proves_every_parameter_it_dispatches[value0]
+tests/test_typed_proof_request.py::test_gateway_proves_every_parameter_it_dispatches[value1]
+tests/test_typed_proof_request.py::test_gateway_proves_every_parameter_it_dispatches[value2]
+tests/test_typed_proof_request.py::test_gateway_proves_every_parameter_it_dispatches[value3]
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/src/actenon_permit/ed25519_signer.py:294: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer(secret=secret)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/outputs/amended-north-star/typed-gateway-before.xml -
+=========================== short test summary info ============================
+FAILED tests/test_typed_proof_request.py::test_gateway_proves_every_parameter_it_dispatches[value0]
+FAILED tests/test_typed_proof_request.py::test_gateway_proves_every_parameter_it_dispatches[value1]
+FAILED tests/test_typed_proof_request.py::test_gateway_proves_every_parameter_it_dispatches[value2]
+FAILED tests/test_typed_proof_request.py::test_gateway_proves_every_parameter_it_dispatches[value3]
+================= 4 failed, 23 deselected, 4 warnings in 0.47s =================

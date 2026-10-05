@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="9" skipped="0" tests="10" time="0.718" timestamp="2026-10-05T10:58:14.609213+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_boundary_kit" name="test_middleware_refuses_unsupported_raw_json[malformed-utf8]" time="0.086" /><testcase classname="tests.test_boundary_kit" name="test_middleware_refuses_unsupported_raw_json[deep-json]" time="0.010"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:326: in test_middleware_refuses_unsupported_raw_json
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_refuses_unsupported_raw_json[oversized-json]" time="0.010"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:326: in test_middleware_refuses_unsupported_raw_json
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_refuses_unsupported_raw_json[negative-zero-float]" time="0.007"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:326: in test_middleware_refuses_unsupported_raw_json
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{&quot;parameters&quot;:{&quot;amount&quot;:999,&quot;amount&quot;:100}}]" time="0.001"><failure message="Failed: DID NOT RAISE ValueError">tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{&quot;parameters&quot;:{&quot;amount&quot;:999,&quot;amoun\\u0074&quot;:100}}]" time="0.001"><failure message="Failed: DID NOT RAISE ValueError">tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{&quot;parameters&quot;:{&quot;amount&quot;:1.0}}]" time="0.000"><failure message="Failed: DID NOT RAISE ValueError">tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{&quot;parameters&quot;:{&quot;amount&quot;:999,&quot;amount&quot;:100}}]" time="0.001"><failure message="Failed: DID NOT RAISE ValueError">tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{&quot;parameters&quot;:{&quot;amount&quot;:999,&quot;amoun\\u0074&quot;:100}}]" time="0.000"><failure message="Failed: DID NOT RAISE ValueError">tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{&quot;parameters&quot;:{&quot;amount&quot;:1.0}}]" time="0.001"><failure message="Failed: DID NOT RAISE ValueError">tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError</failure></testcase></testsuite></testsuites>

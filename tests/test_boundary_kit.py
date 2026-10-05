@@ -289,6 +289,85 @@ def test_middleware_replay_refused(app_with_middleware, issue_proof):
     assert "replay" in resp2.json()["reason"].lower()
 
 
+@pytest.mark.parametrize("signed,actual", [(1, True), (True, 1), ({"nested": [1]}, {"nested": [True]})])
+def test_middleware_preserves_parameter_types(app_with_middleware, issue_proof, signed, actual):
+    client = TestClient(app_with_middleware)
+    response = client.post(
+        "/refunds",
+        json={"payment_intent_id": "pi_123", "amount": actual, "reason": "customer"},
+        headers=issue_proof("pi_123", signed, "customer"),
+    )
+    assert response.status_code == 403, "Python equality collapsed a boolean/integer at the sink"
+
+
+@pytest.mark.parametrize("raw", [
+    b'{"payment_intent_id":"pi_123","amount":999,"amount":100,"reason":"customer"}',
+    b'{"payment_intent_id":"pi_123","amount":999,"amoun\\u0074":100,"reason":"customer"}',
+])
+def test_middleware_refuses_duplicate_body_members(app_with_middleware, issue_proof, raw):
+    response = TestClient(app_with_middleware).post(
+        "/refunds", content=raw,
+        headers={**issue_proof("pi_123", 100, "customer"), "Content-Type": "application/json"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("extra", [{"Amount": 999}, {"transfer_all": True}])
+def test_middleware_refuses_unbound_body_fields(app_with_middleware, issue_proof, extra):
+    response = TestClient(app_with_middleware).post(
+        "/refunds", json={"payment_intent_id": "pi_123", "amount": 100, "reason": "customer", **extra},
+        headers=issue_proof("pi_123", 100, "customer"),
+    )
+    assert response.status_code == 403
+
+
+def test_middleware_does_not_coerce_numeric_target_to_string(app_with_middleware, issue_proof):
+    response = TestClient(app_with_middleware).post(
+        "/refunds", json={"payment_intent_id": 123, "amount": 100, "reason": "customer"},
+        headers=issue_proof("123", 100, "customer"),
+    )
+    assert response.status_code == 403
+
+
+def test_middleware_missing_field_is_not_signed_null(app_with_middleware, issue_proof):
+    response = TestClient(app_with_middleware).post(
+        "/refunds", json={"payment_intent_id": "pi_123", "amount": 100},
+        headers=issue_proof("pi_123", 100, None),
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("raw", [
+    b'{"payment_intent_id":"pi_123","amount":100,"reason":"customer","extra":"\xff"}',
+    b'{"payment_intent_id":"pi_123","amount":100,"reason":"customer","extra":' + b'[' * 33 + b'0' + b']' * 33 + b'}',
+    b'{"payment_intent_id":"pi_123","amount":100,"reason":"customer","extra":"' + b'x' * 1_048_576 + b'"}',
+    b'{"payment_intent_id":"pi_123","amount":100,"reason":"customer","extra":-0.0}',
+], ids=["malformed-utf8", "deep-json", "oversized-json", "negative-zero-float"])
+def test_middleware_refuses_unsupported_raw_json(app_with_middleware, issue_proof, raw):
+    response = TestClient(app_with_middleware).post(
+        "/refunds", content=raw,
+        headers={**issue_proof("pi_123", 100, "customer"), "Content-Type": "application/json"},
+    )
+    # Over-limit framing is refused before parsing, including observe/warn.
+    assert response.status_code == (413 if len(raw) > 1_048_576 else 403)
+
+
+@pytest.mark.parametrize("raw", [
+    '{"parameters":{"amount":999,"amount":100}}',
+    '{"parameters":{"amount":999,"amoun\\u0074":100}}',
+    '{"parameters":{"amount":1.0}}',
+])
+@pytest.mark.parametrize("encoded", [False, True])
+def test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json(raw, encoded):
+    import base64
+
+    from actenon_permit.boundary.proofs import decode_token
+
+    token = "v1." + base64.urlsafe_b64encode(raw.encode()).rstrip(b"=").decode() if encoded else raw
+    with pytest.raises(ValueError):
+        decode_token(token)
+
+
 # ---------------------------------------------------------------------------
 # 5. Middleware: observe mode
 # ---------------------------------------------------------------------------

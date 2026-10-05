@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 28 items / 27 deselected / 1 selected
+
+tests/test_typed_proof_request.py F                                      [100%]
+
+=================================== FAILURES ===================================
+___________ test_typed_snapshot_is_owned_before_normative_validation ___________
+tests/test_typed_proof_request.py:227: in test_typed_snapshot_is_owned_before_normative_validation
+    assert snapshot == {"value": ["reviewed"]}
+E   AssertionError: assert {'value': ['r...'unreviewed']} == {'value': ['reviewed']}
+E     
+E     Differing items:
+E     {'value': ['reviewed', 'unreviewed']} != {'value': ['reviewed']}
+E     Use -v to get more diff
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/outputs/amended-north-star/typed-snapshot-before.xml -
+=========================== short test summary info ============================
+FAILED tests/test_typed_proof_request.py::test_typed_snapshot_is_owned_before_normative_validation
+======================= 1 failed, 27 deselected in 0.31s =======================

@@ -606,7 +606,30 @@ class PDP:
         This method is the concrete implementation of ARCHITECTURE.md §3:
         permit issues real kernel PCCBs, not parallel HMAC grants.
         """
-        from .kernel_bridge import KernelBridgeError, build_action_hash_input, proof_capability
+        from .kernel_bridge import (
+            KernelBridgeError,
+            _canonicalize_params,
+            build_action_hash_input,
+            proof_capability,
+        )
+
+        # Validate once before policy evaluation or budget/effect reservation.
+        # Use a detached typed snapshot for the decision and proof. The edge
+        # independently validates the actual attempted request with the same
+        # rules; unsupported representations never receive authority.
+        try:
+            action = action.model_copy(update={"params": _canonicalize_params(action.params)})
+        except KernelBridgeError:
+            return (
+                Decision(
+                    outcome=DecisionOutcome.DENY,
+                    reason="unsupported proof parameter representation — failing closed",
+                    rule_matched="proof:parameters",
+                    failure_code=FailureCode.ENGINE_ERROR,
+                ),
+                None,
+                None,
+            )
 
         if grant.verify():
             # Refuse an unmintable capability before decide() reserves budget.

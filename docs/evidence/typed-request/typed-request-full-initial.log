@@ -1,0 +1,159 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 747 items
+
+tests/test_2_0_edge_authority.py ..............                          [  1%]
+tests/test_adversarial.py .............................................. [  8%]
+.                                                                        [  8%]
+tests/test_adversarial_round2.py ..............................          [ 12%]
+tests/test_adversarial_round3.py .....F................                  [ 15%]
+tests/test_aggregate_delegated_budgets.py .....................          [ 17%]
+tests/test_airlock_provenance.py ...........                             [ 19%]
+tests/test_approval_wiring.py ...                                        [ 19%]
+tests/test_attenuation_wire.py .....                                     [ 20%]
+tests/test_audit_attacks.py ............................................ [ 26%]
+........                                                                 [ 27%]
+tests/test_authority_independence.py ..................                  [ 29%]
+tests/test_boundary_kit.py .............................                 [ 33%]
+tests/test_broker_security.py .................                          [ 36%]
+tests/test_budget_migration.py ..                                        [ 36%]
+tests/test_budget_precision.py ............                              [ 37%]
+tests/test_canonicalisation.py ...........                               [ 39%]
+tests/test_control_plane_auth.py ...............................         [ 43%]
+tests/test_cross_repo_conformance.py ...                                 [ 43%]
+tests/test_demo.py ...                                                   [ 44%]
+tests/test_ed25519_signing.py ........                                   [ 45%]
+tests/test_effect_kernel_integration.py ......                           [ 46%]
+tests/test_effect_ledger.py ........................................     [ 51%]
+tests/test_exact_effect_grants.py ........................               [ 54%]
+tests/test_execution_modes.py ............                               [ 56%]
+tests/test_failure_taxonomy.py ....................                      [ 59%]
+tests/test_gateway.py ...............                                    [ 61%]
+tests/test_gateway_execution_modes.py ..........                         [ 62%]
+tests/test_grant_import_identity.py .............                        [ 64%]
+tests/test_grant_token_vectors.py .................                      [ 66%]
+tests/test_hero_path_e2e.py ....                                         [ 66%]
+tests/test_intent.py ..............................                      [ 70%]
+tests/test_intent_http.py .............                                  [ 72%]
+tests/test_intent_submit_http.py .........                               [ 73%]
+tests/test_ledger.py ........                                            [ 74%]
+tests/test_ledger_migration.py ...                                       [ 75%]
+tests/test_nits.py ...........                                           [ 76%]
+tests/test_payments_adapter.py ...........................               [ 80%]
+tests/test_pdp.py ..............                                         [ 82%]
+tests/test_phase1_spine.py .......                                       [ 83%]
+tests/test_protocol_drift.py ............                                [ 84%]
+tests/test_readme_snippets.py .                                          [ 85%]
+tests/test_real_agent.py ....s                                           [ 85%]
+tests/test_release_inputs.py ...                                         [ 86%]
+tests/test_remote_pep.py F..                                             [ 86%]
+tests/test_reservation_settlement.py .......................             [ 89%]
+tests/test_scope_deny.py ...                                             [ 89%]
+tests/test_sdk.py ..................................                     [ 94%]
+tests/test_state.py ..                                                   [ 94%]
+tests/test_state_cold_start.py ....                                      [ 95%]
+tests/test_stranger_fixes.py ....                                        [ 95%]
+tests/test_token.py ........                                             [ 96%]
+tests/test_typed_proof_request.py .......................                [100%]
+
+=================================== FAILURES ===================================
+_______ TestDecimalPrecision.test_sub_cent_amount_allowed_but_negligible _______
+tests/test_adversarial_round3.py:130: in test_sub_cent_amount_allowed_but_negligible
+    assert result["outcome"] == "ALLOW"
+E   AssertionError: assert 'DENY' == 'ALLOW'
+E     
+E     - ALLOW
+E     + DENY
+_____________________ test_remote_pep_seven_step_sequence ______________________
+tests/test_remote_pep.py:121: in test_remote_pep_seven_step_sequence
+    r1 = refund(amount=20.0, reason="customer")
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/actenon_permit/pep_client.py:165: in wrapper
+    raise RemoteGuardDenied(
+E   actenon_permit.pep_client.RemoteGuardDenied: unsupported proof parameter representation — failing closed
+=============================== warnings summary ===============================
+../actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_2_0_edge_authority.py::test_development_intent_keeps_local_signing
+tests/test_approval_wiring.py::test_wired_gateway_creates_pending_approval
+tests/test_attenuation_wire.py::test_child_token_is_usable_and_bound_by_parent_limits
+tests/test_audit_attacks.py::TestRevocationCascade::test_http_revoke_reaches_grandchildren
+tests/test_audit_attacks.py::TestRevocationCascade::test_kill_switch_by_agent_reaches_delegated_children
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/src/actenon_permit/ed25519_signer.py:306: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer()
+
+tests/test_airlock_provenance.py: 1 warning
+tests/test_audit_attacks.py: 8 warnings
+tests/test_authority_independence.py: 6 warnings
+tests/test_control_plane_auth.py: 1 warning
+tests/test_cross_repo_conformance.py: 2 warnings
+tests/test_ed25519_signing.py: 1 warning
+tests/test_effect_ledger.py: 1 warning
+tests/test_gateway.py: 5 warnings
+tests/test_gateway_execution_modes.py: 3 warnings
+tests/test_hero_path_e2e.py: 2 warnings
+tests/test_intent_http.py: 1 warning
+tests/test_phase1_spine.py: 6 warnings
+tests/test_real_agent.py: 2 warnings
+tests/test_scope_deny.py: 1 warning
+tests/test_sdk.py: 6 warnings
+tests/test_typed_proof_request.py: 8 warnings
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/src/actenon_permit/ed25519_signer.py:294: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer(secret=secret)
+
+tests/test_authority_independence.py::TestExternalSigning::test_external_signing_secret
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/tests/test_authority_independence.py:191: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    signer=build_local_proof_signer(secret="external-supplied-secret-key"),
+
+tests/test_cross_repo_conformance.py::test_permit_and_cloud_produce_identical_action_hashes
+tests/test_cross_repo_conformance.py::test_cloud_pccb_verifies_with_kernel_verifier
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-cloud/app/services/ed25519_signer.py:284: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer(secret=secret)
+
+tests/test_cross_repo_conformance.py::test_permit_pccb_verifies_with_kernel_verifier
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/tests/test_cross_repo_conformance.py:182: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    signer = build_local_proof_signer(secret="cross-repo-conformance-key")
+
+tests/test_cross_repo_conformance.py::test_cloud_pccb_verifies_with_kernel_verifier
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/tests/test_cross_repo_conformance.py:209: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    signer = build_local_proof_signer(secret="cross-repo-conformance-key")
+
+tests/test_phase1_spine.py::test_permit_mints_real_kernel_pccb
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/tests/test_phase1_spine.py:85: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    signer = build_local_proof_signer(secret="phase1-gate-test-key")
+
+tests/test_phase1_spine.py::test_cross_signer_rejected
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/tests/test_phase1_spine.py:195: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    wrong_signer = build_local_proof_signer(secret="wrong-key")
+
+tests/test_sdk.py::test_local_config_auto_generates_dev_key
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/tests/test_sdk.py:171: UserWarning: Actenon generated a dev signing key at /private/var/folders/tz/y04t4d0900xdbmz96jp608180000gn/T/pytest-of-ross/pytest-404/test_local_config_auto_generat0/.actenon-permit/dev-signing-key. This key is development-only and MUST NOT be used in production. Set ACTENON_SIGNING_KEY or pass signing_key= for production.
+    cfg = LocalRuntimeConfig()
+
+tests/test_sdk.py::test_local_client_creates_and_executes_intent
+tests/test_sdk.py::test_local_client_out_of_scope_refused
+tests/test_sdk.py::test_local_client_mutated_params_refused
+tests/test_sdk.py::test_local_client_replay_refused
+tests/test_sdk.py::test_local_client_credential_never_leaks
+tests/test_sdk.py::test_local_client_capabilities
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/tests/test_sdk.py:56: UserWarning: register_credential('GITHUB_TOKEN', ...) is development-only. The credential is stored in process memory and will be refused in production_mode. For production, use EnvironmentSecretProvider or CloudManagedRefProvider.
+    c.register_credential("GITHUB_TOKEN", "ghp_SDK_TEST_NOT_REAL_0123456789abcdef")
+
+tests/test_sdk.py::test_async_local_client_creates_and_executes
+tests/test_sdk.py::test_async_client_execute_refused
+tests/test_sdk.py::test_async_client_credential_never_leaks
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/src/actenon_permit/sdk/async_client.py:110: UserWarning: register_credential('GITHUB_TOKEN', ...) is development-only. The credential is stored in process memory and will be refused in production_mode. For production, use EnvironmentSecretProvider or CloudManagedRefProvider.
+    self._sync.register_credential(ref, value, **kwargs)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/outputs/amended-north-star/typed-request-full-initial.xml -
+=========================== short test summary info ============================
+FAILED tests/test_adversarial_round3.py::TestDecimalPrecision::test_sub_cent_amount_allowed_but_negligible
+FAILED tests/test_remote_pep.py::test_remote_pep_seven_step_sequence - acteno...
+============ 2 failed, 744 passed, 1 skipped, 77 warnings in 25.63s ============

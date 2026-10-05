@@ -1,0 +1,149 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 23 items
+
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py FFFF [ 17%]
+FFFFFFF.......FFFFF                                                      [100%]
+
+=================================== FAILURES ===================================
+________ test_string_proof_cannot_authorize_numeric_actual_github_body _________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:83: in test_string_proof_cannot_authorize_numeric_actual_github_body
+    assert requests == [], (
+E   AssertionError: A proof binding a string body reached the actual GitHub serializer with a float: [{'url': 'https://api.github.com/repos/disposable/example/issues', 'body': {'title': 'typed request', 'body': 1.0}}]. This is captured transport, not evidence of a live provider side effect.
+E   assert [{'url': 'htt...'body': 1.0}}] == []
+E     
+E     Left contains one more item: {'url': 'https://api.github.com/repos/disposable/example/issues', 'body': {'title': 'typed request', 'body': 1.0}}
+E     Use -v to get more diff
+_______ test_unsupported_parameters_refused_before_policy_or_debit[1.0] ________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (<DecisionOut...ble': True}})) == (<DecisionOut...>, None, None)
+E     
+E     At index 0 diff: <DecisionOutcome.ALLOW: 'ALLOW'> != <DecisionOutcome.DENY: 'DENY'>
+E     Use -v to get more diff
+_______ test_unsupported_parameters_refused_before_policy_or_debit[-0.0] _______
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (<DecisionOut...ble': True}})) == (<DecisionOut...>, None, None)
+E     
+E     At index 0 diff: <DecisionOutcome.ALLOW: 'ALLOW'> != <DecisionOutcome.DENY: 'DENY'>
+E     Use -v to get more diff
+_______ test_unsupported_parameters_refused_before_policy_or_debit[nan] ________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (<DecisionOut...ble': True}})) == (<DecisionOut...>, None, None)
+E     
+E     At index 0 diff: <DecisionOutcome.ALLOW: 'ALLOW'> != <DecisionOutcome.DENY: 'DENY'>
+E     Use -v to get more diff
+_______ test_unsupported_parameters_refused_before_policy_or_debit[inf] ________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (<DecisionOut...ble': True}})) == (<DecisionOut...>, None, None)
+E     
+E     At index 0 diff: <DecisionOutcome.ALLOW: 'ALLOW'> != <DecisionOutcome.DENY: 'DENY'>
+E     Use -v to get more diff
+______ test_unsupported_parameters_refused_before_policy_or_debit[value4] ______
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (<DecisionOut...ble': True}})) == (<DecisionOut...>, None, None)
+E     
+E     At index 0 diff: <DecisionOutcome.ALLOW: 'ALLOW'> != <DecisionOutcome.DENY: 'DENY'>
+E     Use -v to get more diff
+______ test_unsupported_parameters_refused_before_policy_or_debit[value5] ______
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (<DecisionOut...ble': True}})) == (<DecisionOut...>, None, None)
+E     
+E     At index 0 diff: <DecisionOutcome.ALLOW: 'ALLOW'> != <DecisionOutcome.DENY: 'DENY'>
+E     Use -v to get more diff
+______ test_unsupported_parameters_refused_before_policy_or_debit[value6] ______
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (<DecisionOut...ble': True}})) == (<DecisionOut...>, None, None)
+E     
+E     At index 0 diff: <DecisionOutcome.ALLOW: 'ALLOW'> != <DecisionOutcome.DENY: 'DENY'>
+E     Use -v to get more diff
+____________ test_direct_bridge_cannot_bypass_typed_validation[1.0] ____________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:111: in test_direct_bridge_cannot_bypass_typed_validation
+    with pytest.raises(KernelBridgeError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE KernelBridgeError
+__________ test_direct_bridge_cannot_bypass_typed_validation[value1] ___________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:111: in test_direct_bridge_cannot_bypass_typed_validation
+    with pytest.raises(KernelBridgeError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE KernelBridgeError
+__________ test_direct_bridge_cannot_bypass_typed_validation[value2] ___________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:111: in test_direct_bridge_cannot_bypass_typed_validation
+    with pytest.raises(KernelBridgeError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE KernelBridgeError
+__________ test_github_adapter_rejects_wrong_optional_types[body-1.0] __________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:148: in test_github_adapter_rejects_wrong_optional_types
+    assert not GitHubAdapter().validate_params("github.issue.create", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'body': 1.0})
+E    +      where validate_params = <actenon_permit.adapters.github.GitHubAdapter object at 0x10c396b10>.validate_params
+E    +        where <actenon_permit.adapters.github.GitHubAdapter object at 0x10c396b10> = GitHubAdapter()
+________ test_github_adapter_rejects_wrong_optional_types[body-value1] _________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:148: in test_github_adapter_rejects_wrong_optional_types
+    assert not GitHubAdapter().validate_params("github.issue.create", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'body': ['nested']})
+E    +      where validate_params = <actenon_permit.adapters.github.GitHubAdapter object at 0x10c394ad0>.validate_params
+E    +        where <actenon_permit.adapters.github.GitHubAdapter object at 0x10c394ad0> = GitHubAdapter()
+_______ test_github_adapter_rejects_wrong_optional_types[labels-value2] ________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:148: in test_github_adapter_rejects_wrong_optional_types
+    assert not GitHubAdapter().validate_params("github.issue.create", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'labels': [1]})
+E    +      where validate_params = <actenon_permit.adapters.github.GitHubAdapter object at 0x10c350230>.validate_params
+E    +        where <actenon_permit.adapters.github.GitHubAdapter object at 0x10c350230> = GitHubAdapter()
+_______ test_github_adapter_rejects_wrong_optional_types[labels-value3] ________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:148: in test_github_adapter_rejects_wrong_optional_types
+    assert not GitHubAdapter().validate_params("github.issue.create", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'labels': [{'name': 'bug'}]})
+E    +      where validate_params = <actenon_permit.adapters.github.GitHubAdapter object at 0x10c351fa0>.validate_params
+E    +        where <actenon_permit.adapters.github.GitHubAdapter object at 0x10c351fa0> = GitHubAdapter()
+__________________ test_github_issue_number_cannot_be_boolean __________________
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:153: in test_github_issue_number_cannot_be_boolean
+    assert not GitHubAdapter().validate_params("github.issue.comment", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.comment', {'owner': 'disposable', 'repo': 'example', 'body': 'test', 'issue_number': True})
+E    +      where validate_params = <actenon_permit.adapters.github.GitHubAdapter object at 0x10c350ef0>.validate_params
+E    +        where <actenon_permit.adapters.github.GitHubAdapter object at 0x10c350ef0> = GitHubAdapter()
+=============================== warnings summary ===============================
+tests/test_typed_proof_request.py: 15 warnings
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/src/actenon_permit/ed25519_signer.py:294: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer(secret=secret)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/outputs/amended-north-star/typed-request-before-corrected-harness.xml -
+=========================== short test summary info ============================
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_string_proof_cannot_authorize_numeric_actual_github_body
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_unsupported_parameters_refused_before_policy_or_debit[1.0]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_unsupported_parameters_refused_before_policy_or_debit[-0.0]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_unsupported_parameters_refused_before_policy_or_debit[nan]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_unsupported_parameters_refused_before_policy_or_debit[inf]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_unsupported_parameters_refused_before_policy_or_debit[value4]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_unsupported_parameters_refused_before_policy_or_debit[value5]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_unsupported_parameters_refused_before_policy_or_debit[value6]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_direct_bridge_cannot_bypass_typed_validation[1.0]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_direct_bridge_cannot_bypass_typed_validation[value1]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_direct_bridge_cannot_bypass_typed_validation[value2]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_github_adapter_rejects_wrong_optional_types[body-1.0]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_github_adapter_rejects_wrong_optional_types[body-value1]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_github_adapter_rejects_wrong_optional_types[labels-value2]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_github_adapter_rejects_wrong_optional_types[labels-value3]
+FAILED work/actenon-permit-typed-request/tests/test_typed_proof_request.py::test_github_issue_number_cannot_be_boolean
+================== 16 failed, 7 passed, 15 warnings in 0.67s ===================

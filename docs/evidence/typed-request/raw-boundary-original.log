@@ -1,0 +1,74 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 44 items / 34 deselected / 10 selected
+
+tests/test_boundary_kit.py .FFFFFFFFF                                    [100%]
+
+=================================== FAILURES ===================================
+___________ test_middleware_refuses_unsupported_raw_json[deep-json] ____________
+tests/test_boundary_kit.py:326: in test_middleware_refuses_unsupported_raw_json
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = <Response [200 OK]>.status_code
+_________ test_middleware_refuses_unsupported_raw_json[oversized-json] _________
+tests/test_boundary_kit.py:326: in test_middleware_refuses_unsupported_raw_json
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = <Response [200 OK]>.status_code
+______ test_middleware_refuses_unsupported_raw_json[negative-zero-float] _______
+tests/test_boundary_kit.py:326: in test_middleware_refuses_unsupported_raw_json
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = <Response [200 OK]>.status_code
+_ test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{"parameters":{"amount":999,"amount":100}}] _
+tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError
+_ test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{"parameters":{"amount":999,"amoun\\u0074":100}}] _
+tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError
+_ test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{"parameters":{"amount":1.0}}] _
+tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError
+_ test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{"parameters":{"amount":999,"amount":100}}] _
+tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError
+_ test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{"parameters":{"amount":999,"amoun\\u0074":100}}] _
+tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError
+_ test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{"parameters":{"amount":1.0}}] _
+tests/test_boundary_kit.py:341: in test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json
+    with pytest.raises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE ValueError
+=============================== warnings summary ===============================
+../actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/outputs/amended-north-star/raw-boundary-original.xml -
+=========================== short test summary info ============================
+FAILED tests/test_boundary_kit.py::test_middleware_refuses_unsupported_raw_json[deep-json]
+FAILED tests/test_boundary_kit.py::test_middleware_refuses_unsupported_raw_json[oversized-json]
+FAILED tests/test_boundary_kit.py::test_middleware_refuses_unsupported_raw_json[negative-zero-float]
+FAILED tests/test_boundary_kit.py::test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{"parameters":{"amount":999,"amount":100}}]
+FAILED tests/test_boundary_kit.py::test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{"parameters":{"amount":999,"amoun\\u0074":100}}]
+FAILED tests/test_boundary_kit.py::test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[False-{"parameters":{"amount":1.0}}]
+FAILED tests/test_boundary_kit.py::test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{"parameters":{"amount":999,"amount":100}}]
+FAILED tests/test_boundary_kit.py::test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{"parameters":{"amount":999,"amoun\\u0074":100}}]
+FAILED tests/test_boundary_kit.py::test_proof_and_intent_token_decoder_refuses_ambiguous_raw_json[True-{"parameters":{"amount":1.0}}]
+============ 9 failed, 1 passed, 34 deselected, 1 warning in 0.72s =============

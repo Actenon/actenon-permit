@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="18" skipped="0" tests="23" time="0.770" timestamp="2026-10-05T10:49:51.589481+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_typed_proof_request" name="test_string_proof_cannot_authorize_numeric_actual_github_body" time="0.021"><failure message="actenon_permit.adapters.ProviderPartialResponseError: provider 'github' returned a partial response for 'github.issue.create': missing ['node_id']">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:82: in test_string_proof_cannot_authorize_numeric_actual_github_body
+    execute(adapter, attempted)
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:64: in execute
+    return adapter.execute(
+work/actenon-permit-typed-request/src/actenon_permit/adapters/github.py:240: in execute
+    response = self.map_response(action, raw)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+work/actenon-permit-typed-request/src/actenon_permit/adapters/github.py:264: in map_response
+    raise ProviderPartialResponseError(
+E   actenon_permit.adapters.ProviderPartialResponseError: provider 'github' returned a partial response for 'github.issue.create': missing ['node_id']</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_unsupported_parameters_refused_before_policy_or_debit[1.0]" time="0.009"><failure message="AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)&#10;  &#10;  At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;&#10;  Use -v to get more diff">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)
+E     
+E     At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_unsupported_parameters_refused_before_policy_or_debit[-0.0]" time="0.006"><failure message="AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)&#10;  &#10;  At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;&#10;  Use -v to get more diff">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)
+E     
+E     At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_unsupported_parameters_refused_before_policy_or_debit[nan]" time="0.006"><failure message="AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)&#10;  &#10;  At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;&#10;  Use -v to get more diff">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)
+E     
+E     At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_unsupported_parameters_refused_before_policy_or_debit[inf]" time="0.007"><failure message="AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)&#10;  &#10;  At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;&#10;  Use -v to get more diff">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)
+E     
+E     At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_unsupported_parameters_refused_before_policy_or_debit[value4]" time="0.009"><failure message="AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)&#10;  &#10;  At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;&#10;  Use -v to get more diff">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)
+E     
+E     At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_unsupported_parameters_refused_before_policy_or_debit[value5]" time="0.006"><failure message="AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)&#10;  &#10;  At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;&#10;  Use -v to get more diff">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)
+E     
+E     At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_unsupported_parameters_refused_before_policy_or_debit[value6]" time="0.009"><failure message="AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)&#10;  &#10;  At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;&#10;  Use -v to get more diff">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:102: in test_unsupported_parameters_refused_before_policy_or_debit
+    assert (decision.outcome, intent, proof) == (DecisionOutcome.DENY, None, None)
+E   AssertionError: assert (&lt;DecisionOut...ble': True}})) == (&lt;DecisionOut...&gt;, None, None)
+E     
+E     At index 0 diff: &lt;DecisionOutcome.ALLOW: 'ALLOW'&gt; != &lt;DecisionOutcome.DENY: 'DENY'&gt;
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_direct_bridge_cannot_bypass_typed_validation[1.0]" time="0.007"><failure message="Failed: DID NOT RAISE KernelBridgeError">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:111: in test_direct_bridge_cannot_bypass_typed_validation
+    with pytest.raises(KernelBridgeError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE KernelBridgeError</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_direct_bridge_cannot_bypass_typed_validation[value1]" time="0.008"><failure message="Failed: DID NOT RAISE KernelBridgeError">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:111: in test_direct_bridge_cannot_bypass_typed_validation
+    with pytest.raises(KernelBridgeError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE KernelBridgeError</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_direct_bridge_cannot_bypass_typed_validation[value2]" time="0.009"><failure message="Failed: DID NOT RAISE KernelBridgeError">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:111: in test_direct_bridge_cannot_bypass_typed_validation
+    with pytest.raises(KernelBridgeError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE KernelBridgeError</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_supported_parameters_are_typed_and_unchanged[1.0]" time="0.034" /><testcase classname="tests.test_typed_proof_request" name="test_supported_parameters_are_typed_and_unchanged[True]" time="0.015" /><testcase classname="tests.test_typed_proof_request" name="test_supported_parameters_are_typed_and_unchanged[1]" time="0.014" /><testcase classname="tests.test_typed_proof_request" name="test_supported_parameters_are_typed_and_unchanged[value3]" time="0.009" /><testcase classname="tests.test_typed_proof_request" name="test_supported_parameters_are_typed_and_unchanged[value4]" time="0.010" /><testcase classname="tests.test_typed_proof_request" name="test_boolean_and_integer_have_different_proof_hashes" time="0.014"><failure message="AttributeError: 'NoneType' object has no attribute 'action_hash'">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:131: in test_boolean_and_integer_have_different_proof_hashes
+    assert first.action_hash.value != second.action_hash.value
+                                      ^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'action_hash'</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_valid_github_body_matches_verified_typed_request" time="0.026"><failure message="actenon_permit.adapters.ProviderPartialResponseError: provider 'github' returned a partial response for 'github.issue.create': missing ['node_id']">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:141: in test_valid_github_body_matches_verified_typed_request
+    execute(adapter, action)
+work/actenon-permit-typed-request/tests/test_typed_proof_request.py:64: in execute
+    return adapter.execute(
+work/actenon-permit-typed-request/src/actenon_permit/adapters/github.py:240: in execute
+    response = self.map_response(action, raw)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+work/actenon-permit-typed-request/src/actenon_permit/adapters/github.py:264: in map_response
+    raise ProviderPartialResponseError(
+E   actenon_permit.adapters.ProviderPartialResponseError: provider 'github' returned a partial response for 'github.issue.create': missing ['node_id']</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_github_adapter_rejects_wrong_optional_types[body-1.0]" time="0.001"><failure message="AssertionError: assert not True&#10; +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok&#10; +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'body': 1.0})&#10; +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c223800&gt;.validate_params&#10; +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c223800&gt; = GitHubAdapter()">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:148: in test_github_adapter_rejects_wrong_optional_types
+    assert not GitHubAdapter().validate_params("github.issue.create", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'body': 1.0})
+E    +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c223800&gt;.validate_params
+E    +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c223800&gt; = GitHubAdapter()</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_github_adapter_rejects_wrong_optional_types[body-value1]" time="0.001"><failure message="AssertionError: assert not True&#10; +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok&#10; +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'body': ['nested']})&#10; +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21f9b0&gt;.validate_params&#10; +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21f9b0&gt; = GitHubAdapter()">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:148: in test_github_adapter_rejects_wrong_optional_types
+    assert not GitHubAdapter().validate_params("github.issue.create", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'body': ['nested']})
+E    +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21f9b0&gt;.validate_params
+E    +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21f9b0&gt; = GitHubAdapter()</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_github_adapter_rejects_wrong_optional_types[labels-value2]" time="0.000"><failure message="AssertionError: assert not True&#10; +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok&#10; +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'labels': [1]})&#10; +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21d340&gt;.validate_params&#10; +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21d340&gt; = GitHubAdapter()">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:148: in test_github_adapter_rejects_wrong_optional_types
+    assert not GitHubAdapter().validate_params("github.issue.create", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'labels': [1]})
+E    +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21d340&gt;.validate_params
+E    +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21d340&gt; = GitHubAdapter()</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_github_adapter_rejects_wrong_optional_types[labels-value3]" time="0.000"><failure message="AssertionError: assert not True&#10; +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok&#10; +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'labels': [{'name': 'bug'}]})&#10; +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21ce30&gt;.validate_params&#10; +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21ce30&gt; = GitHubAdapter()">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:148: in test_github_adapter_rejects_wrong_optional_types
+    assert not GitHubAdapter().validate_params("github.issue.create", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.create', {'owner': 'disposable', 'repo': 'example', 'title': 'test', 'labels': [{'name': 'bug'}]})
+E    +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21ce30&gt;.validate_params
+E    +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c21ce30&gt; = GitHubAdapter()</failure></testcase><testcase classname="tests.test_typed_proof_request" name="test_github_issue_number_cannot_be_boolean" time="0.000"><failure message="AssertionError: assert not True&#10; +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok&#10; +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.comment', {'owner': 'disposable', 'repo': 'example', 'body': 'test', 'issue_number': True})&#10; +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c31cc80&gt;.validate_params&#10; +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c31cc80&gt; = GitHubAdapter()">work/actenon-permit-typed-request/tests/test_typed_proof_request.py:153: in test_github_issue_number_cannot_be_boolean
+    assert not GitHubAdapter().validate_params("github.issue.comment", params).ok
+E   AssertionError: assert not True
+E    +  where True = ValidationResult(ok=True, unknown_fields=[], errors=[]).ok
+E    +    where ValidationResult(ok=True, unknown_fields=[], errors=[]) = validate_params('github.issue.comment', {'owner': 'disposable', 'repo': 'example', 'body': 'test', 'issue_number': True})
+E    +      where validate_params = &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c31cc80&gt;.validate_params
+E    +        where &lt;actenon_permit.adapters.github.GitHubAdapter object at 0x10c31cc80&gt; = GitHubAdapter()</failure></testcase></testsuite></testsuites>

@@ -1,0 +1,32 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 6 items
+
+tests/test_boundary_bounded_body.py FFF...                               [100%]
+
+=================================== FAILURES ===================================
+_ test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail[enforce] _
+tests/test_boundary_bounded_body.py:84: in test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail
+    assert count == 17, "must stop on first chunk beyond 1 MiB, not buffer the entire body"
+E   AssertionError: must stop on first chunk beyond 1 MiB, not buffer the entire body
+E   assert 32 == 17
+_ test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail[observe] _
+tests/test_boundary_bounded_body.py:82: in test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail
+    assert status in (403, 413)
+E   assert 200 in (403, 413)
+_ test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail[warn] _
+tests/test_boundary_bounded_body.py:82: in test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail
+    assert status in (403, 413)
+E   assert 200 in (403, 413)
+------------------------------ Captured log call -------------------------------
+WARNING  actenon_permit.boundary.middleware:middleware.py:170 boundary.warn_refuse
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/boundary-bounded-body-before.xml -
+=========================== short test summary info ============================
+FAILED tests/test_boundary_bounded_body.py::test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail[enforce]
+FAILED tests/test_boundary_bounded_body.py::test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail[observe]
+FAILED tests/test_boundary_bounded_body.py::test_oversized_body_stops_consumption_without_forwarding_prefix_or_tail[warn]
+========================= 3 failed, 3 passed in 0.52s ==========================

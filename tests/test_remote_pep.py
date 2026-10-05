@@ -104,7 +104,7 @@ def test_remote_pep_seven_step_sequence(gateway_server):
     reg.set_grant_token(token)
 
     @remote_guard("payment.refund", cost_from="amount", registry=reg)
-    def refund(amount: float, reason: str = "customer_request") -> dict:
+    def refund(amount: int, reason: str = "customer_request") -> dict:
         ...
 
     @remote_guard("email.send", registry=reg)
@@ -112,24 +112,27 @@ def test_remote_pep_seven_step_sequence(gateway_server):
         ...
 
     @remote_guard("payment.charge", cost_from="amount", registry=reg)
-    def charge(amount: float, description: str = "") -> dict:
+    def charge(amount: int, description: str = "") -> dict:
         ...
 
     outcomes: list[str] = []
 
     # 1. refund $20 -> ALLOW
-    r1 = refund(amount=20.0, reason="customer")
+    # Typed proof parameters use JSON integers (or explicit strings); budget
+    # accounting still uses Decimal. All seven authority/budget assertions are
+    # retained. Original float-input test is frozen in evidence/typed-request.
+    r1 = refund(amount=20, reason="customer")
     outcomes.append("ALLOW")
     assert r1["amount"] == 20
 
     # 2. refund $25 -> ALLOW
-    r2 = refund(amount=25.0, reason="fraud")
+    r2 = refund(amount=25, reason="fraud")
     outcomes.append("ALLOW")
     assert r2["amount"] == 25
 
     # 3. refund $20 -> DENY (budget)
     with pytest.raises(RemoteGuardDenied) as exc:
-        refund(amount=20.0)
+        refund(amount=20)
     outcomes.append("DENY")
     assert "budget" in str(exc.value)
 
@@ -140,7 +143,7 @@ def test_remote_pep_seven_step_sequence(gateway_server):
 
     # 5. charge $100 -> DENY (scope)
     with pytest.raises(RemoteGuardDenied) as exc:
-        charge(amount=100.0)
+        charge(amount=100)
     outcomes.append("DENY")
     assert "scope" in str(exc.value)
 
@@ -149,11 +152,26 @@ def test_remote_pep_seven_step_sequence(gateway_server):
 
     # 7. refund $1 -> DENY (revoked)
     with pytest.raises(RemoteGuardDenied) as exc:
-        refund(amount=1.0)
+        refund(amount=1)
     outcomes.append("DENY")
     assert "revoked" in str(exc.value)
 
     assert outcomes == ["ALLOW", "ALLOW", "DENY", "ALLOW", "DENY", "DENY"]
+
+
+def test_remote_pep_float_refused_without_debit(gateway_server):
+    token, grant_id = _issue_grant(gateway_server["store"])
+    registry = RemoteGuardRegistry(gateway_url=gateway_server["url"])
+    registry.set_grant_token(token)
+
+    @remote_guard("payment.refund", cost_from="amount", registry=registry)
+    def refund(amount: float) -> dict:
+        ...
+
+    # The strict HTTP decoder now refuses the representation before the PDP.
+    with pytest.raises(RemoteGuardDenied, match="unsupported request JSON object"):
+        refund(amount=20.0)
+    assert gateway_server["store"].get_grant(grant_id).budget.remaining == 50
 
 
 def test_remote_pep_no_grant_token_raises(gateway_server):
@@ -174,10 +192,10 @@ def test_remote_pep_unknown_tool_denied(gateway_server):
     reg.set_grant_token(token)
 
     @remote_guard("payment.refund", registry=reg)  # type: ignore[arg-type]
-    def nope(amount: float) -> dict:
+    def nope(amount: int) -> dict:
         # The decorator names the tool after the function — so this maps to
         # /proxy/nope, which the gateway doesn't know.
         ...
 
     with pytest.raises(RemoteGuardDenied, match="unknown tool"):
-        nope(amount=10.0)
+        nope(amount=10)

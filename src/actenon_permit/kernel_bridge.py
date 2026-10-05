@@ -76,28 +76,36 @@ def proof_capability(grant: Grant, action: Action) -> str:
 
 
 def _canonicalize_value(v: Any) -> Any:
-    """Convert a value to a kernel-canonicalizable form.
+    """Copy a typed JSON value without changing its semantic type.
 
-    The kernel's ``actenon-jcs-sha256-v1`` canonicalization rejects floats
-    (float serialization is ambiguous). Permit uses floats for money. We
-    convert floats to strings with a stable representation (``repr(float)``
-    gives a round-trippable form) so the hash is deterministic and the edge
-    verification matches.
+    Proof parameters are JSON values, not Python coercions. In particular,
+    1.0 must never become "1.0" and a tuple must not silently become a list.
+    Decimal budget accounting is separate from execution parameters.
     """
-    if isinstance(v, float):
-        # Use repr() for round-trip safety; for whole numbers this gives
-        # '20.0', for fractional '20.5'. Stable across processes.
-        return repr(v)
-    if isinstance(v, dict):
+    if v is None or type(v) in (str, int, bool):
+        return v
+    if type(v) is dict:
+        if any(type(k) is not str for k in v):
+            raise KernelBridgeError("proof parameters require string object keys")
         return {k: _canonicalize_value(val) for k, val in v.items()}
-    if isinstance(v, (list, tuple)):
+    if type(v) is list:
         return [_canonicalize_value(item) for item in v]
-    return v
+    raise KernelBridgeError("unsupported proof parameter type: " + type(v).__name__)
 
 
 def _canonicalize_params(params: dict[str, Any]) -> dict[str, Any]:
-    """Canonicalize all parameter values for kernel hashing."""
-    return {k: _canonicalize_value(v) for k, v in params.items()}
+    """Validate before policy and copy without an authority/dispatch coercion."""
+    from actenon_protocol.canonicalisation import canonicalize_bytes
+
+    try:
+        snapshot = _canonicalize_value(params)
+        # Normative limits/Unicode/integer encoding belong to Protocol.
+        # Validate the owned snapshot, not caller memory that could change
+        # between validation and copying.
+        canonicalize_bytes(snapshot)
+        return snapshot
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise KernelBridgeError("unsupported proof parameter representation") from exc
 
 
 def _permit_action_to_kernel_intent(

@@ -39,6 +39,7 @@ from actenon.models.contracts import (
 from actenon.models.runtime import DynamicContextInput, PolicyDecision, RuleEvaluation
 from actenon.proof.service import PCCBMinter, PCCBVerifier
 from actenon.proof.signers.base import b64url_decode
+from actenon_protocol.canonicalisation import parse_strict
 
 from ..kernel_bridge import _canonicalize_params
 
@@ -66,15 +67,17 @@ def decode_token(token: str) -> dict[str, Any]:
             ).decode("utf-8")
         except (binascii.Error, UnicodeError) as exc:
             raise ValueError("token is neither JSON nor base64url-encoded JSON") from exc
-    payload = json.loads(text)
+    payload = parse_strict(text)
     if not isinstance(payload, dict):
         raise ValueError("token must decode to a JSON object")
     return payload
 
 
 def canonical_parameters(params: Mapping[str, Any]) -> dict[str, Any]:
-    """The parameter form bound into intents (floats as repr strings), so a
-    request's extracted values compare equal to what the issuer minted."""
+    """Validate the typed JSON values actually bound into the proof.
+
+    No float-to-string or tuple-to-list coercion at the execution boundary.
+    """
     return _canonicalize_params(dict(params))
 
 
