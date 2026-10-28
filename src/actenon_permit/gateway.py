@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import sys
 import threading
 import uuid
@@ -38,7 +39,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .broker import Broker, CredentialMissing, extract_cost
-from .enforce import ApprovalGate, AutoApproveGate
+from .enforce import ApprovalGate, AutoApproveGate, DenyUnconfiguredApprovalGate
 from .ledger import Ledger
 from .model import Action, CostError, Decision, DecisionOutcome, Grant, GrantStatus, estimate_cost
 from .pdp import PDP
@@ -229,9 +230,17 @@ class Gateway:
         self.pdp = pdp or PDP(self.state, self.ledger)
         self.broker = broker or Broker(self.pdp)
         self.tools = tools or ToolRegistry()
-        # Default to auto-approve for tests; production callers should set a
-        # BlockingApprovalGate wired to the control plane's ApprovalStore.
-        self.approval_gate: ApprovalGate = approval_gate or AutoApproveGate()
+        # Fail closed when no approval gate is configured; refuse AutoApproveGate
+        # in production mode.
+        resolved_gate: ApprovalGate = approval_gate or DenyUnconfiguredApprovalGate()
+        if (
+            getattr(self.broker, "production_mode", False)
+            or os.environ.get("ACTENON_ENV", "").strip().lower() == "production"
+        ) and isinstance(resolved_gate, AutoApproveGate):
+            raise ValueError(
+                "AutoApproveGate is forbidden in production mode; configure a BlockingApprovalGate or human approval store."
+            )
+        self.approval_gate: ApprovalGate = resolved_gate
         # v1.2 (Prompt 9): brokered execution coordinator for adapter-backed tools.
         # Constructed lazily from self.broker if not provided.
         self.brokered_coordinator = brokered_coordinator
@@ -469,14 +478,20 @@ class Gateway:
                 pccb_id=getattr(pccb, "pccb_id", None),
             )
         except Exception as e:
-            if decision.outcome == DecisionOutcome.ALLOW and action.est_cost:
-                with contextlib.suppress(Exception):
-                    self.state.release(grant.id, action.action_id, action.est_cost)
+            # Post-dispatch crash: never release the budget reservation because
+            # the provider side effect may already have landed.
+            live = self.state.get_grant(grant.id) or grant
             return {
                 "intent": intent.to_dict(),
                 "outcome": "DENY",
+                "execution_mode": intent.requested_execution_mode,
+                "execution_state": "outcome_unknown",
+                "finality": "non_final",
+                "reconciliation_status": "pending",
+                "provider_execution_observed": False,
                 "reason": f"intent execution error: {type(e).__name__}: {e}",
                 "rule_matched": "intent:execution_error",
+                "remaining_budget": float(live.budget.remaining),
             }
 
         # Map the result state to outcome.
@@ -877,18 +892,21 @@ class Gateway:
                     pccb_id=getattr(pccb, "pccb_id", None) if pccb else None,
                 )
             except Exception as e:
-                # Coordinator crash (should not happen — it wraps adapter
-                # errors). Release the reservation and fail closed.
-                if action.est_cost:
-                    with contextlib.suppress(Exception):
-                        self.state.release(grant.id, action.action_id, action.est_cost)
+                # Unexpected coordinator crash after ALLOW: do NOT release the
+                # budget reservation because the provider call may have landed.
+                live = self.state.get_grant(grant.id) or grant
                 return {
                     "outcome": "DENY",
                     "reason": f"coordinator error: {type(e).__name__}: {e}",
                     "rule_matched": "coordinator:crash",
                     "action_id": action.action_id,
                     "grant_id": grant.id,
-                    "remaining_budget": float(grant.budget.remaining),
+                    "remaining_budget": float(live.budget.remaining),
+                    "execution_mode": "brokered",
+                    "execution_state": "outcome_unknown",
+                    "finality": "non_final",
+                    "reconciliation_status": "pending",
+                    "provider_execution_observed": False,
                 }
 
             # Map the ModeAwareExecutionResult to the gateway response.
@@ -947,18 +965,21 @@ class Gateway:
                 "remaining_budget": float(grant.budget.remaining),
             }
         except Exception as e:
-            # The real call raised. Reconcile cost as 0 (nothing happened
-            # in the real world) and surface the error as a DENY.
-            if action.est_cost:
-                with contextlib.suppress(Exception):
-                    self.state.release(grant.id, action.action_id, action.est_cost)
+            # The real call raised after dispatch started. Never automatically
+            # release or refund the budget reservation on an uncertain outcome;
+            # hold the reservation for out-of-band reconciliation.
+            live = self.state.get_grant(grant.id) or grant
             return {
                 "outcome": "DENY",
                 "reason": f"tool execution error: {type(e).__name__}: {e}",
                 "rule_matched": "broker:execution_error",
                 "action_id": action.action_id,
                 "grant_id": grant.id,
-                "remaining_budget": float(grant.budget.remaining),
+                "remaining_budget": float(live.budget.remaining),
+                "execution_state": "outcome_unknown",
+                "finality": "non_final",
+                "reconciliation_status": "pending",
+                "provider_execution_observed": False,
             }
 
         # Reload grant to get the post-commit remaining.

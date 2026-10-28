@@ -41,7 +41,10 @@ from .adapters import (
     AdapterError,
     InvalidParametersError,
     ProviderAdapter,
+    ProviderPartialResponseError,
     ProviderResponse,
+    ProviderTimeoutError,
+    ReconciliationConflictError,
     UnsupportedActionError,
 )
 from .credentials import (
@@ -272,6 +275,16 @@ class Broker:
         except InvalidParametersError as e:
             raise BrokerExecutionError(
                 _scrub_text(str(e), secret_value), rule="broker:invalid_parameters"
+            ) from e
+        except (
+            ReconciliationConflictError,
+            ProviderTimeoutError,
+            ProviderPartialResponseError,
+        ) as e:
+            raise BrokerExecutionError(
+                _scrub_text(str(e), secret_value),
+                retryable=e.retryable,
+                rule=f"adapter:{adapter.provider_id}:outcome_unknown",
             ) from e
         except AdapterError as e:
             raise BrokerExecutionError(

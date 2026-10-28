@@ -69,6 +69,7 @@ from .credentials import (
 from .enforce import (
     AutoApproveGate,
     BlockingApprovalGate,
+    DenyUnconfiguredApprovalGate,
     GuardRegistry,
     StdinApprovalGate,
     guard,
@@ -197,6 +198,7 @@ __all__ = [
     "GuardRegistry",
     "AutoApproveGate",
     "BlockingApprovalGate",
+    "DenyUnconfiguredApprovalGate",
     "StdinApprovalGate",
     # policy
     "compile_policy",
