@@ -302,11 +302,34 @@ class ProviderAdapter(abc.ABC):
 __all__ = [
     "AdapterError",
     "InvalidParametersError",
+    "MCPDynamicAdapter",
+    "OpenAPIDynamicAdapter",
+    "OpenAPIOperationSpec",
+    "OriginRedirectError",
     "ProviderAdapter",
     "ProviderPartialResponseError",
     "ProviderResponse",
     "ProviderTimeoutError",
     "ReconciliationConflictError",
+    "SSRFBlockedError",
+    "UniversalOpenAPIAdapter",
     "UnsupportedActionError",
     "ValidationResult",
+    "WitnessSpec",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name in {
+        "MCPDynamicAdapter",
+        "OpenAPIDynamicAdapter",
+        "OpenAPIOperationSpec",
+        "OriginRedirectError",
+        "SSRFBlockedError",
+        "UniversalOpenAPIAdapter",
+        "WitnessSpec",
+    }:
+        from . import openapi
+
+        return getattr(openapi, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

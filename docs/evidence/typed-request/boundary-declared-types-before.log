@@ -1,0 +1,90 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 15 items
+
+tests/test_boundary_declared_types.py FFFFFFFFFF.....                    [100%]
+
+=================================== FAILURES ===================================
+_ test_signed_value_of_wrong_declared_type_never_reaches_handler[integer-int-True] _
+tests/test_boundary_declared_types.py:66: in test_signed_value_of_wrong_declared_type_never_reaches_handler
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'signed_value': True, 'status': 200, 'dispatched': [{'value': 1, 'python_type': 'int'}]}
+E   assert (200 == 403)
+E    +  where 200 = <Response [200 OK]>.status_code
+_ test_signed_value_of_wrong_declared_type_never_reaches_handler[integer-int-100] _
+tests/test_boundary_declared_types.py:66: in test_signed_value_of_wrong_declared_type_never_reaches_handler
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'signed_value': '100', 'status': 200, 'dispatched': [{'value': 100, 'python_type': 'int'}]}
+E   assert (200 == 403)
+E    +  where 200 = <Response [200 OK]>.status_code
+_ test_signed_value_of_wrong_declared_type_never_reaches_handler[boolean-bool-1] _
+tests/test_boundary_declared_types.py:66: in test_signed_value_of_wrong_declared_type_never_reaches_handler
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'signed_value': 1, 'status': 200, 'dispatched': [{'value': True, 'python_type': 'bool'}]}
+E   assert (200 == 403)
+E    +  where 200 = <Response [200 OK]>.status_code
+_ test_signed_value_of_wrong_declared_type_never_reaches_handler[boolean-bool-true] _
+tests/test_boundary_declared_types.py:66: in test_signed_value_of_wrong_declared_type_never_reaches_handler
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'signed_value': 'true', 'status': 200, 'dispatched': [{'value': True, 'python_type': 'bool'}]}
+E   assert (200 == 403)
+E    +  where 200 = <Response [200 OK]>.status_code
+_ test_signed_value_of_wrong_declared_type_never_reaches_handler[string-str-100] _
+tests/test_boundary_declared_types.py:66: in test_signed_value_of_wrong_declared_type_never_reaches_handler
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'signed_value': 100, 'status': 422, 'dispatched': []}
+E   assert (422 == 403)
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+_ test_signed_value_of_wrong_declared_type_never_reaches_handler[array-list-value5] _
+tests/test_boundary_declared_types.py:66: in test_signed_value_of_wrong_declared_type_never_reaches_handler
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'signed_value': {'x': 1}, 'status': 422, 'dispatched': []}
+E   assert (422 == 403)
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+_ test_signed_value_of_wrong_declared_type_never_reaches_handler[object-dict-value6] _
+tests/test_boundary_declared_types.py:66: in test_signed_value_of_wrong_declared_type_never_reaches_handler
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'signed_value': [1], 'status': 422, 'dispatched': []}
+E   assert (422 == 403)
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+________ test_unsupported_declared_type_is_not_silently_ignored[float] _________
+tests/test_boundary_declared_types.py:74: in test_unsupported_declared_type_is_not_silently_ignored
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'declared': 'float', 'signed_value': 1, 'status': 200, 'dispatched': [{'value': 1.0, 'python_type': 'float'}]}
+E   assert (200 == 403)
+E    +  where 200 = <Response [200 OK]>.status_code
+________ test_unsupported_declared_type_is_not_silently_ignored[number] ________
+tests/test_boundary_declared_types.py:74: in test_unsupported_declared_type_is_not_silently_ignored
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'declared': 'number', 'signed_value': 1, 'status': 200, 'dispatched': [{'value': 1.0, 'python_type': 'float'}]}
+E   assert (200 == 403)
+E    +  where 200 = <Response [200 OK]>.status_code
+_______ test_unsupported_declared_type_is_not_silently_ignored[unknown] ________
+tests/test_boundary_declared_types.py:74: in test_unsupported_declared_type_is_not_silently_ignored
+    assert response.status_code == 403 and dispatched == [], {
+E   AssertionError: {'declared': 'unknown', 'signed_value': 1, 'status': 200, 'dispatched': [{'value': 1.0, 'python_type': 'float'}]}
+E   assert (200 == 403)
+E    +  where 200 = <Response [200 OK]>.status_code
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/boundary-declared-types-before.xml -
+=========================== short test summary info ============================
+FAILED tests/test_boundary_declared_types.py::test_signed_value_of_wrong_declared_type_never_reaches_handler[integer-int-True]
+FAILED tests/test_boundary_declared_types.py::test_signed_value_of_wrong_declared_type_never_reaches_handler[integer-int-100]
+FAILED tests/test_boundary_declared_types.py::test_signed_value_of_wrong_declared_type_never_reaches_handler[boolean-bool-1]
+FAILED tests/test_boundary_declared_types.py::test_signed_value_of_wrong_declared_type_never_reaches_handler[boolean-bool-true]
+FAILED tests/test_boundary_declared_types.py::test_signed_value_of_wrong_declared_type_never_reaches_handler[string-str-100]
+FAILED tests/test_boundary_declared_types.py::test_signed_value_of_wrong_declared_type_never_reaches_handler[array-list-value5]
+FAILED tests/test_boundary_declared_types.py::test_signed_value_of_wrong_declared_type_never_reaches_handler[object-dict-value6]
+FAILED tests/test_boundary_declared_types.py::test_unsupported_declared_type_is_not_silently_ignored[float]
+FAILED tests/test_boundary_declared_types.py::test_unsupported_declared_type_is_not_silently_ignored[number]
+FAILED tests/test_boundary_declared_types.py::test_unsupported_declared_type_is_not_silently_ignored[unknown]
+=================== 10 failed, 5 passed, 1 warning in 0.58s ====================

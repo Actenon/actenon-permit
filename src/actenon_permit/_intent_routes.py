@@ -26,6 +26,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from ._request_json import InvalidRequestJSON, read_request_object
 from .gateway import Gateway
 
 
@@ -35,16 +36,11 @@ def mount(app, gateway: Gateway) -> None:
     @app.post("/intents")
     async def create_intent(request: Request) -> JSONResponse:
         try:
-            body = await request.json()
-        except Exception:
+            body = await read_request_object(request)
+        except InvalidRequestJSON:
             return JSONResponse(
                 status_code=400,
-                content={"error": "request body must be valid JSON"},
-            )
-        if not isinstance(body, dict):
-            return JSONResponse(
-                status_code=400,
-                content={"error": "request body must be a JSON object"},
+                content={"error": "unsupported request JSON object"},
             )
 
         # Required fields.
@@ -57,12 +53,28 @@ def mount(app, gateway: Gateway) -> None:
             "requester_subject",
             "requester_agent_id",
         )
+        allowed = set(required) | {
+            "requester_tenant_id", "idempotency_key", "expiry_seconds", "metadata",
+        }
+        if set(body) - allowed:
+            return JSONResponse(status_code=400, content={"error": "unknown intent field"})
         for field in required:
             if field not in body:
                 return JSONResponse(
                     status_code=422,
                     content={"error": f"missing required field: {field}"},
                 )
+        if (
+            any(not isinstance(body[field], str) for field in required if field != "action_params")
+            or not isinstance(body["action_params"], dict)
+            or any(
+                body.get(field) is not None and not isinstance(body[field], str)
+                for field in ("requester_tenant_id", "idempotency_key")
+            )
+            or ("expiry_seconds" in body and type(body["expiry_seconds"]) is not int)
+            or (body.get("metadata") is not None and not isinstance(body["metadata"], dict))
+        ):
+            return JSONResponse(status_code=422, content={"error": "invalid intent field type"})
 
         try:
             intent = gateway.create_intent(
@@ -113,14 +125,14 @@ def mount(app, gateway: Gateway) -> None:
                     "reason": "missing X-Actenon-Grant header",
                 },
             )
-        # Optional body overrides (e.g. idempotency_key). Currently unused
-        # but reserved for future use.
+        # No execution overrides are implemented. Preserve an absent body,
+        # but never accept malformed or silently ignored supplied fields.
         try:
-            body = await request.json()
-        except Exception:
-            body = {}
-        if not isinstance(body, dict):
-            body = {}
+            body = await read_request_object(request, allow_empty=True)
+        except InvalidRequestJSON:
+            return JSONResponse(status_code=400, content={"outcome": "DENY", "reason": "unsupported request JSON object"})
+        if body:
+            return JSONResponse(status_code=400, content={"outcome": "DENY", "reason": "execution overrides are not supported"})
 
         result = gateway.execute_intent(intent_id, grant_token=grant_token)
         outcome = result.get("outcome", "DENY")
@@ -146,17 +158,14 @@ def mount(app, gateway: Gateway) -> None:
         registered, returns DENY with rule_matched='intent:no_resource_client'.
         """
         try:
-            body = await request.json()
-        except Exception:
+            body = await read_request_object(request)
+        except InvalidRequestJSON:
             return JSONResponse(
                 status_code=400,
-                content={"error": "request body must be valid JSON"},
+                content={"error": "unsupported request JSON object"},
             )
-        if not isinstance(body, dict):
-            return JSONResponse(
-                status_code=400,
-                content={"error": "request body must be a JSON object"},
-            )
+        if set(body) - {"proof"}:
+            return JSONResponse(status_code=400, content={"error": "unknown submission field"})
         proof = body.get("proof")
         if not isinstance(proof, dict):
             return JSONResponse(

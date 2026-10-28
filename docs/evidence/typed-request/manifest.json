@@ -1,0 +1,105 @@
+{
+  "schema": "actenon/typed-request-candidate-evidence/v2",
+  "recorded_at": "2026-10-05T10:23:29.384118+00:00",
+  "base_commit": "b820b128c1166993c416c8c4e61d41c78bf90809",
+  "dependencies": {
+    "kernel": "66052b20941f908634c9fbac24f1ae7cead78e46",
+    "protocol": "8e5bc9e342f694767508bae9a392749c6a8df2cc"
+  },
+  "environment": {
+    "platform": "macOS arm64",
+    "python": "3.12.13",
+    "installation": "Permit editable checkout; Kernel and Protocol installed from exact candidates"
+  },
+  "expected": "Unsupported or changed typed requests do not reach protected dispatch or debit; valid requests and existing authority/budget/replay obligations still pass",
+  "observed": {
+    "python": {
+      "passed": 876,
+      "skipped": 1,
+      "failed": 0,
+      "unexpected_skips": 0
+    },
+    "typescript": {
+      "passed": 68,
+      "failed": 0
+    },
+    "kernel_conformance": {
+      "passed": 53,
+      "skipped": 0
+    },
+    "demo": "v0 and gateway seven-step authority/budget arc passed"
+  },
+  "commands": [
+    ".venv/bin/python -m pytest -q --junitxml=permit-integrated-final-reviewed.xml",
+    ".venv/bin/ruff check .",
+    ".venv/bin/python scripts/assert_no_unexpected_skips.py permit-integrated-final-reviewed.xml",
+    ".venv/bin/python scripts/release_gate.py validate",
+    "UV_CACHE_DIR=../uv-cache uv lock --check",
+    "cd /tmp && <candidate-python> -m actenon.cli conformance run --require-complete",
+    "cd ts-sdk && bun run typecheck && bun test",
+    "permit demo --mode gateway --auto-approve",
+    "permit demo --auto-approve"
+  ],
+  "expected_skip": "Existing external z-ai live model test; no new skip introduced",
+  "historical_failure_note": "Raw initial harness defects, strict-profile migration failures and independent review counterexamples remain preserved. See README; no historical failures rewritten as passes.",
+  "live_provider_effect_verified": false,
+  "public_registry_install": false,
+  "independently_reproduced": false,
+  "limits": [
+    "Boundary manifest must match actual handler schema; arbitrary downstream transformations are not attested",
+    "Boundary replay is process-local; protected effect executor is separate",
+    "Grant-token and control-plane ingress excluded from raw request repair",
+    "Provider state, useful external agent, whole-product containment and outside reproduction remain independent gates"
+  ],
+  "source_sha256": {
+    "src/actenon_permit/__init__.py": "484dcf7ab6ac7ff84380a20ba89111503e157fc9d579c0475c35664919d898db",
+    "src/actenon_permit/__main__.py": "c9d773c8f41ec00d8f0e268e8e386e25982cf7f020553f7f9c9c7b680b45ffec",
+    "src/actenon_permit/_demo.py": "09bb215dd95f205954dabb4123905c7cb3cd73846442928d083c21d9d0d65db8",
+    "src/actenon_permit/_demo_gateway.py": "218b093b5defe64bfeab8fa9a40e8c41f0ec8a3a8503c6eb98e965e2be492751",
+    "src/actenon_permit/_iam_stub.py": "20eb91b2407f8efde9997fa22e02e91a6833a088fdaac5b45b50f60c5fe4998e",
+    "src/actenon_permit/_intent_routes.py": "afccaa722683d325ffff706a950277311b637877fd576cf21ccdc40e914f3d27",
+    "src/actenon_permit/_mock_providers.py": "be7aefb4ea7e9b5a2ca7592af8c91c49279d533fe61bdea3747f9588e2389dc0",
+    "src/actenon_permit/_net.py": "f27b7d2c95ca7d12fd814bddd9df9bb99908ef053dac5a9dab3895646f071ee6",
+    "src/actenon_permit/_proxy_routes.py": "571b096d94c1601f632df42db3efef6a199be05ad6da766cdb1a2422ca220a22",
+    "src/actenon_permit/_request_json.py": "bb2fb9a7cbc8100fa060bc379a497d4123b1d7eb4a669edde44a553a2f025ab0",
+    "src/actenon_permit/adapters/__init__.py": "a868327b9b0b5033a1b8a5f8bacbf7dcf7412dbb924f4314b8a7449da44f2f6e",
+    "src/actenon_permit/adapters/github.py": "097aadc3bbe58e8c71e4e520db0f5f19b94320c3a8f3eaad839b7cf2f75adecb",
+    "src/actenon_permit/adapters/payments.py": "ee73e0b89722bc36c20a6a1c55758a05cbd11d51573348578f6bba7e82793c19",
+    "src/actenon_permit/adapters/stripe.py": "03297556c80b28a41b6d7a120cd7b277751e6e290ad4e5909fc4101ee21fb11d",
+    "src/actenon_permit/boundary/__init__.py": "5313056cd4d15f448e56de91bf336d375ef7f4c7a535997517881056b409069f",
+    "src/actenon_permit/boundary/manifest.py": "5522774398c23c384097e0792d27ef0016a99a9d79d4bcd41a795201a21568e3",
+    "src/actenon_permit/boundary/middleware.py": "ea13810f8b812ff5b69ef801c708c4372a6412cc7d16c6a8b55cdb8b6320ab1a",
+    "src/actenon_permit/boundary/proofs.py": "c6f6f57005eb470f1b694fcca993198e13944386986b677634e0a8be4e8e92b4",
+    "src/actenon_permit/boundary/selftest.py": "877957d5c2cb57e05240e3ef530db756c89b1ea0547098a02de191bd1da04399",
+    "src/actenon_permit/broker.py": "f9b864bdc23a3c374a5523445082b310eaa530500a56e7a1fd2f85faab016468",
+    "src/actenon_permit/budget.py": "a29ba4ed2086442d6c1343ec22aa8db00b74315984dfc0ba97d639b1550b8d99",
+    "src/actenon_permit/cli.py": "5d3d80386522015e357af25f5eea11fdbb792286b620919512bfd5a291cc41a7",
+    "src/actenon_permit/control.py": "d7bd8703142592bfbb7f601d96dea2f9b143627bd312d4a1e05e6fe501136eb9",
+    "src/actenon_permit/credentials.py": "41ce0dc708ffeb6e2f7b33b09e627f7ea4527a53fdf4e79fd1fe5ab3de18864a",
+    "src/actenon_permit/delegated_budget.py": "bb990d687e10aa72ff12c56d09e50e1e4fd6658062615b695ac48cfd30473ccb",
+    "src/actenon_permit/ed25519_signer.py": "2820a422e6c5fa1468c8a5eb9a2b9b7e70ed98bade14e630b6c6d0f47b094523",
+    "src/actenon_permit/effects.py": "a40ab4f1738831ae94c8bfe36d72e6b03343b2b869da22e1fc6a5d56b05fd549",
+    "src/actenon_permit/enforce.py": "ef5ea6940e51575673a8258f7d981eca6a7f06ad692ce469c07eb0e735b616a6",
+    "src/actenon_permit/execution_modes.py": "cd4bb2da8777381d1a0964add4690f022c2d621bf0de1bc62045f26c4a94e39c",
+    "src/actenon_permit/gateway.py": "039765ab82eac7241710af2dee229f18f15ecfa0aa8022b2bfd6a59ca02a8c27",
+    "src/actenon_permit/intent.py": "9388824620ea9ac38550c5a281cf39d5ce00a27c51ae62802339a89f3a1e4a9b",
+    "src/actenon_permit/kernel_bridge.py": "1a93a9888d2bba819c8aad55bbf3f3726503cd414c1a84b8d0b797ab0acdb35a",
+    "src/actenon_permit/ledger.py": "0b9092dfea0882a0da2def334f583403710fae821011fde4c6621e8ec9e72ed2",
+    "src/actenon_permit/model.py": "62e518eba932abfc1e62ee1b61ad6a69ede5ca759bb419b4bea7acd7f0f32f6e",
+    "src/actenon_permit/pdp.py": "d5133737490d647a08112489d6e52acf0241177316427c329f849fabc29940d5",
+    "src/actenon_permit/pep_client.py": "5b5c6b6a50f839f55b6b1d7fa70e8fb01a4a095f6108927fb3570c2451c8c819",
+    "src/actenon_permit/policy.py": "de50af5516a657f16210e9ea19f95617be42553c47fdc5878b8dcf49ad6c368f",
+    "src/actenon_permit/revocation.py": "11776ca237755d8d728f555098e131351c14baea19b8aaa45e1ff5b291fb3f19",
+    "src/actenon_permit/sdk/__init__.py": "6434a1952a2e17c4eee38ef63ad478b6f8d825dfab17e28c270132d3ae3d7dd0",
+    "src/actenon_permit/sdk/async_client.py": "3bf702e28e8fe98a4b34dd65d5ddad9089a811cf3e554e9929a62e39b05becd9",
+    "src/actenon_permit/sdk/client.py": "cc61bec1c24a70114aafa76417e91d36e98abf4d523005f58ce012b2ee49d222",
+    "src/actenon_permit/sdk/config.py": "81ff77e8d8c2e70392c2ba5dbe663d05421a8b30a8e642636d2ef3b0df886ae4",
+    "src/actenon_permit/sdk/exceptions.py": "d6793e1bcc983cb3562c15639a9406c14c4d3cd1b23db9648819fcf86d0f6b9b",
+    "src/actenon_permit/sdk/models.py": "d17b8fffdd6285557617231d72e9ab13ddd2b8f8e99781d49d4650ae55c632b5",
+    "src/actenon_permit/sdk/receipt.py": "f85a92c6ec9084c7f9184044c26beb070f6725476ba1aafe6a64b95fa747fac3",
+    "src/actenon_permit/sdk/retry.py": "ad087d94b3303fae85eee94427fac7fcc8c77ca16a2270c31e946983022727b3",
+    "src/actenon_permit/state.py": "08ffd47184fb03684fa8ad326454dd5db5a541286a52604c5bbc3e60bd2b881b",
+    "src/actenon_permit/token.py": "86355f004317febe5c3cb6d0f13f25eb66ca8c6a0b4a3961e2bc45a1234c7976",
+    "src/actenon_permit/unified_cli.py": "11abe319ca68eb6724c47c7794980b10262c348f762c31e3f430fff569362968"
+  }
+}

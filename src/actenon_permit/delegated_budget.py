@@ -72,6 +72,11 @@ class DelegatedBudgetMixin:
                     or parent.rate.max > 0
                     and (child.rate.max == 0 or child.rate.max > parent.rate.max)
                     or child.rate.per_seconds < parent.rate.per_seconds
+                    or parent.approved_effect_ids is not None
+                    and (
+                        child.approved_effect_ids is None
+                        or not set(child.approved_effect_ids).issubset(parent.approved_effect_ids)
+                    )
                 ):
                     raise StateError("delegated authority widens its parent constraints")
         if owners[-1].delegation_depth != 0:

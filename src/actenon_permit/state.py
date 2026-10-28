@@ -371,7 +371,16 @@ class SQLiteStore(DelegatedBudgetMixin, EffectLedgerMixin, StateStore):
                 raise
 
     def _reserve_in_transaction(
-        self, cur, grant_id, action_id, dec_amount, rate_max, rate_per_seconds, now_ts
+        self,
+        cur,
+        grant_id,
+        action_id,
+        dec_amount,
+        rate_max,
+        rate_per_seconds,
+        now_ts,
+        *,
+        effect_id=None,
     ):
         if dec_amount < 0:
             return False, "negative amounts are not allowed — this is a budget bypass attempt", {}
@@ -380,6 +389,10 @@ class SQLiteStore(DelegatedBudgetMixin, EffectLedgerMixin, StateStore):
         except StateError as exc:
             return False, str(exc), {}
         for owner in owners:
+            if not owner.permits_effect(effect_id):
+                return False, "effect is not explicitly approved by its authority", {}
+            if owner.approved_effect_ids is not None and not owner.verify():
+                return False, "finite effect authority signature is invalid", {}
             overrun = cur.execute(
                 "SELECT amount_units FROM budget_overruns WHERE grant_id = ?", (owner.id,)
             ).fetchone()

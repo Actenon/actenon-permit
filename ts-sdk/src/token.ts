@@ -110,6 +110,12 @@ function parsePayload(encoded: string): Grant {
   if (!grant.id || typeof grant.signature !== "string" || !grant.signature) {
     throw new TokenError("invalid grant payload: missing id or signature");
   }
+  const effects = grant.approved_effect_ids;
+  if (effects != null && (!Array.isArray(effects) || effects.length > 256 ||
+      effects.some(id => typeof id !== "string" || !/^effect_[0-9a-f]{64}$/.test(id)) ||
+      new Set(effects).size !== effects.length)) {
+    throw new TokenError("approved_effect_ids must be unique Protocol effect IDs");
+  }
   return grant;
 }
 
@@ -134,6 +140,7 @@ export async function verifyGrantToken(token: string, signingKey: string): Promi
   try {
     if (version === "v2") {
       const { status: _status, budget, ...authority } = rest;
+      if (authority.approved_effect_ids == null) delete authority.approved_effect_ids;
       const { remaining: _remaining, ...budgetAuthority } = budget;
       signed = canonicalizeStrictJson({ ...authority, budget: budgetAuthority });
     } else {

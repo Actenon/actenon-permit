@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.306" timestamp="2026-10-05T10:58:14.609192+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_typed_proof_request" name="test_typed_snapshot_is_owned_before_normative_validation" time="0.001"><failure message="AssertionError: assert {'value': ['r...'unreviewed']} == {'value': ['reviewed']}&#10;  &#10;  Differing items:&#10;  {'value': ['reviewed', 'unreviewed']} != {'value': ['reviewed']}&#10;  Use -v to get more diff">tests/test_typed_proof_request.py:227: in test_typed_snapshot_is_owned_before_normative_validation
+    assert snapshot == {"value": ["reviewed"]}
+E   AssertionError: assert {'value': ['r...'unreviewed']} == {'value': ['reviewed']}
+E     
+E     Differing items:
+E     {'value': ['reviewed', 'unreviewed']} != {'value': ['reviewed']}
+E     Use -v to get more diff</failure></testcase></testsuite></testsuites>

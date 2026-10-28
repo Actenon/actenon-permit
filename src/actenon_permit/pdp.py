@@ -137,6 +137,7 @@ def _build_authority_boundary(grant: Grant, action: Action) -> dict[str, Any]:
             "expires_at": grant.expires_at.isoformat(),
             "rate_max": grant.rate.max,
             "rate_per_seconds": grant.rate.per_seconds,
+            "approved_effect_ids": grant.approved_effect_ids,
         },
     }
 
@@ -230,6 +231,43 @@ class PDP:
                 authority_boundary=_build_authority_boundary(grant, action),
             )
             return d
+
+        # A finite grant is exact issuer approval, never an agent-provided
+        # action-id shortcut. Derive identity from the trusted adapter's
+        # descriptor; the store repeats this check for every live ancestor.
+        exact_effect_approved = False
+        if grant.approved_effect_ids is not None:
+            from actenon_protocol.effects import effect_identity
+
+            effect_id = (
+                effect_identity(_effect_reservation["descriptor"])
+                if _effect_reservation is not None
+                else None
+            )
+            if not grant.permits_effect(effect_id):
+                d = Decision(
+                    outcome=DecisionOutcome.DENY,
+                    reason="effect is not explicitly approved by its authority",
+                    rule_matched="effect:approval",
+                    failure_code=FailureCode.OUT_OF_SCOPE,
+                )
+                self.ledger.append(
+                    action_id=action.action_id,
+                    grant_id=grant.id,
+                    ts=action.ts,
+                    action_type=action.type,
+                    target=action.target,
+                    params=action.params,
+                    est_cost=action.est_cost,
+                    outcome=d.outcome.value,
+                    reason=d.reason,
+                    rule_matched=d.rule_matched,
+                    state_delta={},
+                    failure_code=d.failure_code,
+                    authority_boundary=_build_authority_boundary(grant, action),
+                )
+                return d
+            exact_effect_approved = True
 
         # 1. status check
         if grant.status != GrantStatus.ACTIVE:
@@ -373,10 +411,10 @@ class PDP:
                 return d
 
         # Protected effects never use the legacy caller's action-id approval
-        # shortcut. Exact signed single-use approval is a separate contract.
-        # Until supplied, a matching human rule remains REQUIRE_APPROVAL;
+        # shortcut. A finite signed grant supplies exact effect approval.
+        # Without it, a matching human rule remains REQUIRE_APPROVAL;
         # neither an effect nor budget is reserved for a waiting request.
-        if _effect_reservation is not None:
+        if _effect_reservation is not None and not exact_effect_approved:
             for rule in grant.approval_rules:
                 if _approval_rule_matches(rule, action):
                     d = Decision(
@@ -469,7 +507,7 @@ class PDP:
         # which is what the PEP sets after the human approves — otherwise the
         # re-run would just return REQUIRE_APPROVAL again.
         approved_action_id = ctx.get("approved_action_id") if ctx else None
-        skip_approval = approved_action_id == action.action_id
+        skip_approval = exact_effect_approved or approved_action_id == action.action_id
 
         if not skip_approval:
             for rule in grant.approval_rules:
@@ -568,7 +606,30 @@ class PDP:
         This method is the concrete implementation of ARCHITECTURE.md §3:
         permit issues real kernel PCCBs, not parallel HMAC grants.
         """
-        from .kernel_bridge import KernelBridgeError, build_action_hash_input, proof_capability
+        from .kernel_bridge import (
+            KernelBridgeError,
+            _canonicalize_params,
+            build_action_hash_input,
+            proof_capability,
+        )
+
+        # Validate once before policy evaluation or budget/effect reservation.
+        # Use a detached typed snapshot for the decision and proof. The edge
+        # independently validates the actual attempted request with the same
+        # rules; unsupported representations never receive authority.
+        try:
+            action = action.model_copy(update={"params": _canonicalize_params(action.params)})
+        except KernelBridgeError:
+            return (
+                Decision(
+                    outcome=DecisionOutcome.DENY,
+                    reason="unsupported proof parameter representation — failing closed",
+                    rule_matched="proof:parameters",
+                    failure_code=FailureCode.ENGINE_ERROR,
+                ),
+                None,
+                None,
+            )
 
         if grant.verify():
             # Refuse an unmintable capability before decide() reserves budget.

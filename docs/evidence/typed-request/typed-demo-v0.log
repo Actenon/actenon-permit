@@ -1,0 +1,45 @@
+[actenon-permit] WARNING: ACTENON_SIGNING_KEY is not set and no persisted key was found. Using an EPHEMERAL dev key — grants will NOT validate after this process exits. Run `permit init-key` to persist a stable local key, or set ACTENON_SIGNING_KEY in production.
+
+========================================================================
+  Actenon-Permit demo — refund-bot (scripted agent, no LLM, no network)
+========================================================================
+
+  issued grant: id=grant_1fd7df5547db4375
+  agent:        refund-bot
+  budget:       USD 50 (remaining 50)
+  scopes.allow: ['payment.refund', 'email.send']
+  scopes.deny:  ['payment.charge', 'shell.*']
+  approval:     ['email.send']
+
+  approval mode: AUTO (CI)
+
+  step 1: refund($20)                  -> [ALLOW]    budget 50 -> 30 (re_mock_6705265)
+  step 2: refund($25)                  -> [ALLOW]    budget 30 -> 5 (re_mock_1188086)
+  step 3: refund($20)                  -> [DENY]     would exceed USD 50 budget   (budget: only $5 left of $50)
+  step 4: send_email(...)              -> [ALLOW]    approved by human (msg_mock_3388781)
+  step 5: charge($100)                 -> [DENY]     scope denied: payment.charge   (simulated injection: payment.charge denied)
+
+  >>> kill switch: `permit revoke refund-bot` — grant REVOKED
+
+  step 7: refund($1)                   -> [DENY]     grant status is revoked   (grant REVOKED)
+
+  ledger (last 8 entries):
+    ALLOW              payment.refund         reason=allowed  hash=e691db51e2ef...
+    ALLOW              payment.refund         reason=allowed  hash=8d2979d4888e...
+    DENY               payment.refund         reason=would exceed USD 50 budget  hash=e2772fa79301...
+    REQUIRE_APPROVAL   email.send             reason=approval required: email.send  hash=9d1c3cf85baf...
+    ALLOW              email.send             reason=allowed  hash=8346c8e892ac...
+    DENY               payment.charge         reason=scope denied: payment.charge  hash=6bd97759e6ff...
+    DENY               payment.refund         reason=grant status is revoked  hash=ff7e8f4269fc...
+
+  ledger chain intact: True
+
+  proof the agent never held the real key:
+    the call signature the agent used was `refund(amount=20)` — no `secret` arg.
+    the broker resolved MOCK_STRIPE_KEY=sk_mock_*** internally and passed it
+    only to the mock provider. the agent only saw the allow/deny result.
+
+========================================================================
+  demo complete.
+========================================================================
+

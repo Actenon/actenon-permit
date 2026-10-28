@@ -1,0 +1,290 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-raw-ingress
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 65 items
+
+tests/test_raw_request_ingress.py FFFFFFFFFF..............FFFFFFFFFFFF.. [ 58%]
+............FFFFFFFFFF.FFF.                                              [100%]
+
+=================================== FAILURES ===================================
+______ test_raw_http_refused_before_gateway[/proxy/typed-malformed-utf8] _______
+tests/test_raw_request_ingress.py:75: in test_raw_http_refused_before_gateway
+    assert response.status_code in (400, 403, 422), response.text
+E   AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_3c06dec8a7b04d85","grant_id":"grant_e7ee791999ec4e61","remaining_budget":10.0}
+E   assert 200 in (400, 403, 422)
+E    +  where 200 = <Response [200 OK]>.status_code
+_________ test_raw_http_refused_before_gateway[/proxy/typed-duplicate] _________
+tests/test_raw_request_ingress.py:75: in test_raw_http_refused_before_gateway
+    assert response.status_code in (400, 403, 422), response.text
+E   AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_8bd8bf23f1ed4367","grant_id":"grant_1c70e618ca4948e6","remaining_budget":10.0}
+E   assert 200 in (400, 403, 422)
+E    +  where 200 = <Response [200 OK]>.status_code
+_____ test_raw_http_refused_before_gateway[/proxy/typed-escaped-duplicate] _____
+tests/test_raw_request_ingress.py:75: in test_raw_http_refused_before_gateway
+    assert response.status_code in (400, 403, 422), response.text
+E   AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_edc200b68322465c","grant_id":"grant_884a03b1e5b446aa","remaining_budget":10.0}
+E   assert 200 in (400, 403, 422)
+E    +  where 200 = <Response [200 OK]>.status_code
+___________ test_raw_http_refused_before_gateway[/proxy/typed-float] ___________
+tests/test_raw_request_ingress.py:75: in test_raw_http_refused_before_gateway
+    assert response.status_code in (400, 403, 422), response.text
+E   AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_6e2fbbe791de4e90","grant_id":"grant_d0b3b5c951ab4e83","remaining_budget":10.0}
+E   assert 200 in (400, 403, 422)
+E    +  where 200 = <Response [200 OK]>.status_code
+____ test_raw_http_refused_before_gateway[/proxy/typed-negative-float-zero] ____
+tests/test_raw_request_ingress.py:75: in test_raw_http_refused_before_gateway
+    assert response.status_code in (400, 403, 422), response.text
+E   AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_29693b1cc53e45ba","grant_id":"grant_97ebc7654542453e","remaining_budget":10.0}
+E   assert 200 in (400, 403, 422)
+E    +  where 200 = <Response [200 OK]>.status_code
+____________ test_raw_http_refused_before_gateway[/proxy/typed-nan] ____________
+tests/test_raw_request_ingress.py:75: in test_raw_http_refused_before_gateway
+    assert response.status_code in (400, 403, 422), response.text
+E   AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_f52daabc8bf14ebf","grant_id":"grant_cbf45b4b0e374f5c","remaining_budget":10.0}
+E   assert 200 in (400, 403, 422)
+E    +  where 200 = <Response [200 OK]>.status_code
+_________ test_raw_http_refused_before_gateway[/proxy/typed-surrogate] _________
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['call_tool']
+E   assert ['call_tool'] == []
+E     
+E     Left contains one more item: 'call_tool'
+E     Use -v to get more diff
+___________ test_raw_http_refused_before_gateway[/proxy/typed-deep] ____________
+tests/test_raw_request_ingress.py:75: in test_raw_http_refused_before_gateway
+    assert response.status_code in (400, 403, 422), response.text
+E   AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_7b0841847707471c","grant_id":"grant_f9a77354d85248b3","remaining_budget":10.0}
+E   assert 200 in (400, 403, 422)
+E    +  where 200 = <Response [200 OK]>.status_code
+_________ test_raw_http_refused_before_gateway[/proxy/typed-oversized] _________
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['call_tool']
+E   assert ['call_tool'] == []
+E     
+E     Left contains one more item: 'call_tool'
+E     Use -v to get more diff
+______ test_raw_http_refused_before_gateway[/proxy/typed-malformed-json] _______
+tests/test_raw_request_ingress.py:75: in test_raw_http_refused_before_gateway
+    assert response.status_code in (400, 403, 422), response.text
+E   AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_9cc6c2dbd2c740cb","grant_id":"grant_5ebe6de0eaed4048","remaining_budget":10.0}
+E   assert 200 in (400, 403, 422)
+E    +  where 200 = <Response [200 OK]>.status_code
+_ test_raw_http_refused_before_gateway[/intents/absent/execute-malformed-utf8] _
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+___ test_raw_http_refused_before_gateway[/intents/absent/execute-duplicate] ____
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+_ test_raw_http_refused_before_gateway[/intents/absent/execute-escaped-duplicate] _
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+_____ test_raw_http_refused_before_gateway[/intents/absent/execute-float] ______
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+_ test_raw_http_refused_before_gateway[/intents/absent/execute-negative-float-zero] _
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+______ test_raw_http_refused_before_gateway[/intents/absent/execute-nan] _______
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+___ test_raw_http_refused_before_gateway[/intents/absent/execute-surrogate] ____
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+______ test_raw_http_refused_before_gateway[/intents/absent/execute-deep] ______
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+___ test_raw_http_refused_before_gateway[/intents/absent/execute-oversized] ____
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+_ test_raw_http_refused_before_gateway[/intents/absent/execute-malformed-json] _
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+_____ test_raw_http_refused_before_gateway[/intents/absent/execute-array] ______
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+______ test_raw_http_refused_before_gateway[/intents/absent/execute-null] ______
+tests/test_raw_request_ingress.py:76: in test_raw_http_refused_before_gateway
+    assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E   AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E   assert ['execute_intent'] == []
+E     
+E     Left contains one more item: 'execute_intent'
+E     Use -v to get more diff
+______________ test_execute_body_cannot_smuggle_unused_overrides _______________
+tests/test_raw_request_ingress.py:99: in test_execute_body_cannot_smuggle_unused_overrides
+    assert response.status_code == 400
+E   assert 403 == 400
+E    +  where 403 = <Response [403 Forbidden]>.status_code
+____________ test_raw_mcp_refused_without_dispatch[malformed-utf8] _____________
+tests/test_raw_request_ingress.py:109: in test_raw_mcp_refused_without_dispatch
+    mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+src/actenon_permit/gateway.py:1046: in mcp_serve
+    req = json.loads(line)
+          ^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/json/__init__.py:341: in loads
+    s = s.decode(detect_encoding(s), 'surrogatepass')
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 88: invalid start byte
+_______________ test_raw_mcp_refused_without_dispatch[duplicate] _______________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+___________ test_raw_mcp_refused_without_dispatch[escaped-duplicate] ___________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+_________________ test_raw_mcp_refused_without_dispatch[float] _________________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+__________ test_raw_mcp_refused_without_dispatch[negative-float-zero] __________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+__________________ test_raw_mcp_refused_without_dispatch[nan] __________________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+_______________ test_raw_mcp_refused_without_dispatch[surrogate] _______________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: engine error, failing closed: Cano...ings must not contain unpaired UTF-16 surrogates (found U+D800); they cannot be encoded as UTF-8'}], 'isError': True}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: engine error, failing closed: Canon...rings must not contain unpaired UTF-16 surrogates (found U+D800); they cannot be encoded as UTF-8'}], 'isError': True}}
+_________________ test_raw_mcp_refused_without_dispatch[deep] __________________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+_______________ test_raw_mcp_refused_without_dispatch[oversized] _______________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: PCCB emission failed — failing closed'}], 'isError': True}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: PCCB emission failed — failing closed'}], 'isError': True}}
+_________________ test_raw_mcp_refused_without_dispatch[array] _________________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+_________________ test_raw_mcp_refused_without_dispatch[null] __________________
+tests/test_raw_request_ingress.py:112: in test_raw_mcp_refused_without_dispatch
+    assert "error" in responses[0], responses
+E   AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E   assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+___________ test_mcp_oversized_frame_drains_without_executing_suffix ___________
+tests/test_raw_request_ingress.py:124: in test_mcp_oversized_frame_drains_without_executing_suffix
+    assert len(responses) == 2
+E   AssertionError: assert 1 == 2
+E    +  where 1 = len([{'jsonrpc': '2.0', 'id': 2, 'result': {}}])
+=============================== warnings summary ===============================
+../actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_raw_request_ingress.py: 20 warnings
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-raw-ingress/src/actenon_permit/ed25519_signer.py:294: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer(secret=secret)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/raw-request-ingress-before.xml -
+=========================== short test summary info ============================
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-malformed-utf8]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-duplicate]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-escaped-duplicate]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-float]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-negative-float-zero]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-nan]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-surrogate]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-deep]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-oversized]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/proxy/typed-malformed-json]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-malformed-utf8]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-duplicate]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-escaped-duplicate]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-float]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-negative-float-zero]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-nan]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-surrogate]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-deep]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-oversized]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-malformed-json]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-array]
+FAILED tests/test_raw_request_ingress.py::test_raw_http_refused_before_gateway[/intents/absent/execute-null]
+FAILED tests/test_raw_request_ingress.py::test_execute_body_cannot_smuggle_unused_overrides
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[malformed-utf8]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[duplicate]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[escaped-duplicate]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[float]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[negative-float-zero]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[nan]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[surrogate]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[deep]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[oversized]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[array]
+FAILED tests/test_raw_request_ingress.py::test_raw_mcp_refused_without_dispatch[null]
+FAILED tests/test_raw_request_ingress.py::test_mcp_oversized_frame_drains_without_executing_suffix
+================== 35 failed, 30 passed, 21 warnings in 3.05s ==================

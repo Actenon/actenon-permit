@@ -1,0 +1,85 @@
+..FF.                                                                    [100%]
+=================================== FAILURES ===================================
+_________ test_proxy_invalid_raw_request_does_not_dispatch[{"x":\xff}] _________
+
+tmp_path = PosixPath('/private/var/folders/tz/y04t4d0900xdbmz96jp608180000gn/T/pytest-of-ross/pytest-413/test_proxy_invalid_raw_request0')
+raw = b'{"x":\xff}'
+
+    @pytest.mark.parametrize("raw", [b'{"x":\xff}', b'{"x":1,"x":2}'])
+    def test_proxy_invalid_raw_request_does_not_dispatch(tmp_path, raw):
+        from actenon_permit._proxy_routes import mount
+    
+        store = SQLiteStore(str(tmp_path / "state.db"))
+        try:
+            ledger, called = Ledger(store), []
+            pdp = PDP(store, ledger)
+            grant = Grant(
+                agent_id="review", expires_at=datetime.now(UTC) + timedelta(minutes=5),
+                scopes=Scopes(allow=["test.typed"]), budget=Budget(limit=10, remaining=10),
+            ).sign()
+            store.put_grant(grant)
+            registry = ToolRegistry()
+            registry.register("typed", action_type="test.typed", real_call=lambda **p: called.append(p))
+            gateway = Gateway(state=store, ledger=ledger, pdp=pdp, broker=Broker(pdp), tools=registry)
+            app = FastAPI()
+            mount(app, gateway)
+            response = TestClient(app).post("/proxy/typed", content=raw, headers={
+                "x-actenon-grant": grant_to_token(grant), "content-type": "application/json",
+            })
+>           assert response.status_code in (400, 403) and called == [], {
+                "status": response.status_code, "dispatched_params": called,
+            }
+E           AssertionError: {'status': 200, 'dispatched_params': [{}]}
+E           assert (200 in (400, 403))
+E            +  where 200 = <Response [200 OK]>.status_code
+
+../typed-request-review-regressions.py:98: AssertionError
+_______ test_proxy_invalid_raw_request_does_not_dispatch[{"x":1,"x":2}] ________
+
+tmp_path = PosixPath('/private/var/folders/tz/y04t4d0900xdbmz96jp608180000gn/T/pytest-of-ross/pytest-413/test_proxy_invalid_raw_request1')
+raw = b'{"x":1,"x":2}'
+
+    @pytest.mark.parametrize("raw", [b'{"x":\xff}', b'{"x":1,"x":2}'])
+    def test_proxy_invalid_raw_request_does_not_dispatch(tmp_path, raw):
+        from actenon_permit._proxy_routes import mount
+    
+        store = SQLiteStore(str(tmp_path / "state.db"))
+        try:
+            ledger, called = Ledger(store), []
+            pdp = PDP(store, ledger)
+            grant = Grant(
+                agent_id="review", expires_at=datetime.now(UTC) + timedelta(minutes=5),
+                scopes=Scopes(allow=["test.typed"]), budget=Budget(limit=10, remaining=10),
+            ).sign()
+            store.put_grant(grant)
+            registry = ToolRegistry()
+            registry.register("typed", action_type="test.typed", real_call=lambda **p: called.append(p))
+            gateway = Gateway(state=store, ledger=ledger, pdp=pdp, broker=Broker(pdp), tools=registry)
+            app = FastAPI()
+            mount(app, gateway)
+            response = TestClient(app).post("/proxy/typed", content=raw, headers={
+                "x-actenon-grant": grant_to_token(grant), "content-type": "application/json",
+            })
+>           assert response.status_code in (400, 403) and called == [], {
+                "status": response.status_code, "dispatched_params": called,
+            }
+E           AssertionError: {'status': 200, 'dispatched_params': [{'x': 2}]}
+E           assert (200 in (400, 403))
+E            +  where 200 = <Response [200 OK]>.status_code
+
+../typed-request-review-regressions.py:98: AssertionError
+=============================== warnings summary ===============================
+../actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+typed-request-review-regressions.py::test_proxy_invalid_raw_request_does_not_dispatch[{"x":\xff}]
+typed-request-review-regressions.py::test_proxy_invalid_raw_request_does_not_dispatch[{"x":1,"x":2}]
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-typed-request/src/actenon_permit/ed25519_signer.py:294: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer(secret=secret)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../typed-request-review-regressions.py::test_proxy_invalid_raw_request_does_not_dispatch[{"x":\xff}]
+FAILED ../typed-request-review-regressions.py::test_proxy_invalid_raw_request_does_not_dispatch[{"x":1,"x":2}]
+2 failed, 3 passed, 3 warnings in 0.51s

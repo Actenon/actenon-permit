@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -19,7 +20,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer
 
 # ---------------------------------------------------------------------------
 # Signing key handling
@@ -247,6 +248,10 @@ def authority_payload(payload: dict[str, Any]) -> dict[str, Any]:
     stay signed. An empty signature still fails ``Grant.verify``.
     """
     signed = {key: value for key, value in payload.items() if key not in {"signature", "status"}}
+    # Absence/null retains the pre-existing scope grant signing bytes. A finite
+    # list, including [], is immutable authority and must remain signed.
+    if signed.get("approved_effect_ids") is None:
+        signed.pop("approved_effect_ids", None)
     budget = signed.get("budget")
     if isinstance(budget, dict):
         signed["budget"] = {key: value for key, value in budget.items() if key != "remaining"}
@@ -412,6 +417,39 @@ class Grant(BaseModel):
     # grant. 0 = root grant, 1 = first child, etc. This enables
     # delegation-depth limits. (Phase 7 grant safety.)
     delegation_depth: int = 0
+    # None = legacy scope authority; [] = no effect approved. Finite grants
+    # require the effect-aware path, including for nominally read-only actions.
+    approved_effect_ids: list[str] | None = None
+
+    @field_validator("approved_effect_ids", mode="before")
+    @classmethod
+    def _validate_effect_ids(cls, value):
+        if value is None:
+            return None
+        if (
+            type(value) is not list
+            or len(value) > 256
+            or any(
+                type(item) is not str or re.fullmatch(r"effect_[0-9a-f]{64}", item) is None
+                for item in value
+            )
+            or len(set(value)) != len(value)
+        ):
+            raise ValueError(
+                "approved_effect_ids must be a unique list of at most 256 Protocol effect IDs"
+            )
+        return value
+
+    @model_serializer(mode="wrap")
+    def _serialize_grant(self, handler):
+        payload = handler(self)
+        if payload.get("approved_effect_ids") is None:
+            payload.pop("approved_effect_ids", None)
+        return payload
+
+    def permits_effect(self, effect_id: str | None) -> bool:
+        """One signed finite-set rule used by the PDP and durable edge store."""
+        return self.approved_effect_ids is None or effect_id in self.approved_effect_ids
 
     # ------------------------------------------------------------------
     # Signing
@@ -452,6 +490,7 @@ class Grant(BaseModel):
         rate_max: int | None = None,
         rate_per_seconds: int | None = None,
         extra_approval_rules: list[str] | None = None,
+        approved_effect_ids: list[str] | None = None,
     ) -> Grant:
         """Return a NEW grant that is equal-or-weaker than this one.
 
@@ -466,6 +505,8 @@ class Grant(BaseModel):
           (unlimited) when this grant is rate-limited
         - ``rate_per_seconds`` must be >= this grant's rate.per_seconds
         - ``extra_approval_rules`` may only add rules
+        - ``approved_effect_ids`` inherits when omitted/None; a supplied finite
+          list may only narrow a finite parent (an empty list denies all)
         """
         now = datetime.now(UTC)
 
@@ -514,6 +555,18 @@ class Grant(BaseModel):
                 if r not in new_rules:
                     new_rules.append(r)
 
+        new_effects = (
+            list(approved_effect_ids)
+            if approved_effect_ids is not None
+            else None
+            if self.approved_effect_ids is None
+            else list(self.approved_effect_ids)
+        )
+        if self.approved_effect_ids is not None and not set(new_effects).issubset(
+            self.approved_effect_ids
+        ):
+            raise ValueError("attenuation cannot widen approved effect IDs")
+
         child = Grant(
             id=f"grant_{uuid.uuid4().hex[:16]}",
             agent_id=agent_id or f"{self.agent_id}+child",
@@ -530,6 +583,7 @@ class Grant(BaseModel):
             status=GrantStatus.ACTIVE,
             parent_grant_id=self.id,
             delegation_depth=self.delegation_depth + 1,
+            approved_effect_ids=new_effects,
         )
         child.sign()
         return child

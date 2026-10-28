@@ -727,9 +727,21 @@ class Gateway:
 
         # Build the Action from the call args. The cost is extracted from the
         # argument named by ``cost_from`` (or params['amount'] / ['cost']).
-        params = {k: v for k, v in arguments.items() if isinstance(v, (str, int, float, bool, type(None)))}
+        from .kernel_bridge import KernelBridgeError, _canonicalize_params
+
         try:
-            est_cost = estimate_cost(arguments, spec.cost_from)
+            params = _canonicalize_params(arguments)
+        except KernelBridgeError:
+            return {
+                "outcome": "DENY",
+                "reason": "unsupported proof parameter representation — failing closed",
+                "rule_matched": "proof:parameters",
+                "action_id": None,
+                "grant_id": grant.id,
+                "remaining_budget": float(grant.budget.remaining),
+            }
+        try:
+            est_cost = estimate_cost(params, spec.cost_from)
         except CostError as e:
             # A cost field the budget cannot price (e.g. "40") would reserve
             # nothing yet still reach the provider. Fail closed.
@@ -910,7 +922,7 @@ class Gateway:
         # Legacy path (v1).
         try:
             if spec.credential_name is None:
-                result = spec.real_call(**arguments)
+                result = spec.real_call(**action.params)
                 actual_cost = extract_cost(result, action)
                 self.pdp.commit(grant, action, actual_cost)
             else:
@@ -918,7 +930,7 @@ class Gateway:
                     grant,
                     action,
                     decision,
-                    lambda secret: spec.real_call(secret=secret, **arguments),
+                    lambda secret: spec.real_call(secret=secret, **action.params),
                     spec.credential_name,
                 )
         except CredentialMissing as e:
@@ -1027,7 +1039,9 @@ def mcp_serve(gateway: Gateway, *, infile=None, outfile=None, grant_token: str |
     JSON-RPC 2.0 requires. The server exits cleanly on EOF or on an
     ``exit`` notification.
     """
-    infile = infile or sys.stdin
+    from ._request_json import InvalidRequestJSON, decode_request_object, request_lines
+
+    infile = infile or getattr(sys.stdin, "buffer", sys.stdin)
     outfile = outfile or sys.stdout
 
     server_info = {
@@ -1038,23 +1052,29 @@ def mcp_serve(gateway: Gateway, *, infile=None, outfile=None, grant_token: str |
         "tools": {"listChanged": False},
     }
 
-    for line in infile:
-        line = line.strip()
-        if not line:
+    for line in request_lines(infile):
+        if line is not None and not line.strip():
             continue
         try:
-            req = json.loads(line)
-        except json.JSONDecodeError:
+            if line is None:
+                raise InvalidRequestJSON("request JSON too large")
+            req = decode_request_object(line)
+        except InvalidRequestJSON:
             _write_jsonrpc(outfile, None, error={"code": -32700, "message": "Parse error"})
             continue
 
-        if not isinstance(req, dict):
+        if (
+            set(req) - {"jsonrpc", "id", "method", "params"}
+            or req.get("jsonrpc") != "2.0"
+            or not isinstance(req.get("method"), str)
+            or (req.get("id") is not None and type(req["id"]) not in (str, int))
+        ):
             _write_jsonrpc(outfile, None, error={"code": -32600, "message": "Invalid Request"})
             continue
 
         req_id = req.get("id")
         method = req.get("method")
-        params = req.get("params") or {}
+        params = req.get("params", {})
 
         # Notification (no id): never answered (JSON-RPC 2.0 §4.1). Only
         # ``exit`` has an effect; ``notifications/initialized`` etc. are
@@ -1062,6 +1082,10 @@ def mcp_serve(gateway: Gateway, *, infile=None, outfile=None, grant_token: str |
         if "id" not in req:
             if method == "exit":
                 return
+            continue
+
+        if not isinstance(params, dict):
+            _write_jsonrpc(outfile, req_id, error={"code": -32602, "message": "Invalid params"})
             continue
 
         if method == "initialize":
@@ -1081,8 +1105,17 @@ def mcp_serve(gateway: Gateway, *, infile=None, outfile=None, grant_token: str |
             _write_jsonrpc(outfile, req_id, result={"tools": gateway.tools.to_mcp_tools()})
         elif method == "tools/call":
             tool_name = params.get("name")
-            arguments = params.get("arguments") or {}
-            meta = params.get("_meta") or {}
+            arguments = params.get("arguments", {})
+            meta = params.get("_meta", {})
+            if (
+                set(params) - {"name", "arguments", "_meta"}
+                or not isinstance(tool_name, str)
+                or not isinstance(arguments, dict)
+                or not isinstance(meta, dict)
+                or ("actenon_grant" in meta and not isinstance(meta["actenon_grant"], str))
+            ):
+                _write_jsonrpc(outfile, req_id, error={"code": -32602, "message": "Invalid params"})
+                continue
             call_grant = meta.get("actenon_grant") or grant_token
             if not call_grant:
                 _write_jsonrpc(

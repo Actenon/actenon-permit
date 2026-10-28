@@ -1,0 +1,1242 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="53" skipped="0" tests="83" time="1.583" timestamp="2026-10-05T11:07:57.426973+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-malformed-utf8]" time="0.041"><failure message="AssertionError: {&quot;outcome&quot;:&quot;ALLOW&quot;,&quot;reason&quot;:&quot;allowed&quot;,&quot;rule_matched&quot;:null,&quot;result&quot;:null,&quot;action_id&quot;:&quot;act_599d926ad52c439d&quot;,&quot;grant_id&quot;:&quot;grant_384bb19b1eb2447d&quot;,&quot;remaining_budget&quot;:10.0}&#10;assert 200 in (400, 403, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a6af1a0&gt;, &lt;starlette.testclient.TestClient object at 0x10a6af620&gt;, 'v2....iMzcwNTk2OWQwNDJhZGNkNWQyY2NmYjQ1NzVmNjJhM2QyNjZjODgzNzRlOWQxOTYyMjc4Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{}])
+raw = b'{"x":\xff}', path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+&gt;       assert response.status_code in (400, 403, 422), response.text
+E       AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_599d926ad52c439d","grant_id":"grant_384bb19b1eb2447d","remaining_budget":10.0}
+E       assert 200 in (400, 403, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_raw_request_ingress.py:84: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-duplicate]" time="0.010"><failure message="AssertionError: {&quot;outcome&quot;:&quot;ALLOW&quot;,&quot;reason&quot;:&quot;allowed&quot;,&quot;rule_matched&quot;:null,&quot;result&quot;:null,&quot;action_id&quot;:&quot;act_f0d68a401d6b4ee1&quot;,&quot;grant_id&quot;:&quot;grant_6529924a2aa3450e&quot;,&quot;remaining_budget&quot;:10.0}&#10;assert 200 in (400, 403, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a6ae900&gt;, &lt;starlette.testclient.TestClient object at 0x10a7f0800&gt;, 'v2....DQzOTEyMDZlY2E2ZDY2MDU2NGI2ZDNjNzM5Njk5YzYzM2VhZTVmNTZhZGJlNmFmIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': 2}])
+raw = b'{"x":1,"x":2}', path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+&gt;       assert response.status_code in (400, 403, 422), response.text
+E       AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_f0d68a401d6b4ee1","grant_id":"grant_6529924a2aa3450e","remaining_budget":10.0}
+E       assert 200 in (400, 403, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_raw_request_ingress.py:84: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-escaped-duplicate]" time="0.010"><failure message="AssertionError: {&quot;outcome&quot;:&quot;ALLOW&quot;,&quot;reason&quot;:&quot;allowed&quot;,&quot;rule_matched&quot;:null,&quot;result&quot;:null,&quot;action_id&quot;:&quot;act_1d52abb9e2234d73&quot;,&quot;grant_id&quot;:&quot;grant_790cb6b1359d4305&quot;,&quot;remaining_budget&quot;:10.0}&#10;assert 200 in (400, 403, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a7ca9c0&gt;, &lt;starlette.testclient.TestClient object at 0x10a855460&gt;, 'v2....WJiYjg3MjlmMzg5ODhhOTU5ZmI0NzIwZTVmNjFiMjIyYzE0NGFmYzQ2YTU0YjFiIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': 2}])
+raw = b'{"x":1,"\\u0078":2}', path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+&gt;       assert response.status_code in (400, 403, 422), response.text
+E       AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_1d52abb9e2234d73","grant_id":"grant_790cb6b1359d4305","remaining_budget":10.0}
+E       assert 200 in (400, 403, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_raw_request_ingress.py:84: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-float]" time="0.009"><failure message="AssertionError: {&quot;outcome&quot;:&quot;ALLOW&quot;,&quot;reason&quot;:&quot;allowed&quot;,&quot;rule_matched&quot;:null,&quot;result&quot;:null,&quot;action_id&quot;:&quot;act_9e256d241ccd4c34&quot;,&quot;grant_id&quot;:&quot;grant_23adb13cf85a4d50&quot;,&quot;remaining_budget&quot;:10.0}&#10;assert 200 in (400, 403, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a86a240&gt;, &lt;starlette.testclient.TestClient object at 0x10a869fd0&gt;, 'v2....5MTcwYTAzY2JlODUzZTA2YjViMjkwYzQ0NWFkZTViMzNlYjk1ODgxZmM0ZDM3Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': 1.0}])
+raw = b'{"x":1.0}', path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+&gt;       assert response.status_code in (400, 403, 422), response.text
+E       AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_9e256d241ccd4c34","grant_id":"grant_23adb13cf85a4d50","remaining_budget":10.0}
+E       assert 200 in (400, 403, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_raw_request_ingress.py:84: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-negative-float-zero]" time="0.010"><failure message="AssertionError: {&quot;outcome&quot;:&quot;ALLOW&quot;,&quot;reason&quot;:&quot;allowed&quot;,&quot;rule_matched&quot;:null,&quot;result&quot;:null,&quot;action_id&quot;:&quot;act_135950194a724f49&quot;,&quot;grant_id&quot;:&quot;grant_00d9077b97e84c79&quot;,&quot;remaining_budget&quot;:10.0}&#10;assert 200 in (400, 403, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8c18b0&gt;, &lt;starlette.testclient.TestClient object at 0x10a8c2db0&gt;, 'v2....ZTE2MWJkMmY4ZDViZGU4ZmVmZWU2ZDA2NzM4YTBmNTYxMTc2M2U0OTZiZjc1Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': -0.0}])
+raw = b'{"x":-0.0}', path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+&gt;       assert response.status_code in (400, 403, 422), response.text
+E       AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_135950194a724f49","grant_id":"grant_00d9077b97e84c79","remaining_budget":10.0}
+E       assert 200 in (400, 403, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_raw_request_ingress.py:84: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-nan]" time="0.011"><failure message="AssertionError: {&quot;outcome&quot;:&quot;ALLOW&quot;,&quot;reason&quot;:&quot;allowed&quot;,&quot;rule_matched&quot;:null,&quot;result&quot;:null,&quot;action_id&quot;:&quot;act_155abcecef8f4954&quot;,&quot;grant_id&quot;:&quot;grant_998f5a70653148d8&quot;,&quot;remaining_budget&quot;:10.0}&#10;assert 200 in (400, 403, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a88e3c0&gt;, &lt;starlette.testclient.TestClient object at 0x10a88f590&gt;, 'v2....2NGRkYTU3YWM1YzhhMDczMzAxM2E4NTYxODUzZTU0MzYxZDI0MTZkY2I0NzE4Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': nan}])
+raw = b'{"x":NaN}', path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+&gt;       assert response.status_code in (400, 403, 422), response.text
+E       AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_155abcecef8f4954","grant_id":"grant_998f5a70653148d8","remaining_budget":10.0}
+E       assert 200 in (400, 403, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_raw_request_ingress.py:84: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-surrogate]" time="0.010"><failure message="AssertionError: invalid raw representation reached gateway: ['call_tool']&#10;assert ['call_tool'] == []&#10;  &#10;  Left contains one more item: 'call_tool'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a89fc80&gt;, &lt;starlette.testclient.TestClient object at 0x10a86e7e0&gt;, 'v2....zJkZGI5MjJkYzEwY2QyMzRiYzU3MGI5NzFmYTIzNmQ3ZDA0Nzk5NGE0ZmVhZmIyYTNjYzBjIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [])
+raw = b'{"x":"\\ud800"}', path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['call_tool']
+E       assert ['call_tool'] == []
+E         
+E         Left contains one more item: 'call_tool'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-deep]" time="0.012"><failure message="AssertionError: {&quot;outcome&quot;:&quot;ALLOW&quot;,&quot;reason&quot;:&quot;allowed&quot;,&quot;rule_matched&quot;:null,&quot;result&quot;:null,&quot;action_id&quot;:&quot;act_167c604c86674fba&quot;,&quot;grant_id&quot;:&quot;grant_1c085528eca24b75&quot;,&quot;remaining_budget&quot;:10.0}&#10;assert 200 in (400, 403, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8dcaa0&gt;, &lt;starlette.testclient.TestClient object at 0x10a8dc4a0&gt;, 'v2....3MzA1ZDFkOWQ1N2QwMWMxZjBmYWRlNGI2MDQ4MGEzMDA0Zjc3YWI3Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': [[[[...]]]]}])
+raw = b'{"x":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}'
+path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+&gt;       assert response.status_code in (400, 403, 422), response.text
+E       AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_167c604c86674fba","grant_id":"grant_1c085528eca24b75","remaining_budget":10.0}
+E       assert 200 in (400, 403, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_raw_request_ingress.py:84: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-oversized]" time="0.029"><failure message="AssertionError: invalid raw representation reached gateway: ['call_tool']&#10;assert ['call_tool'] == []&#10;  &#10;  Left contains one more item: 'call_tool'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a89f2f0&gt;, &lt;starlette.testclient.TestClient object at 0x10a89c380&gt;, 'v2....WM1OWUwMWFlNmRmMmY3MzE0OWIwNThjOGM2ZjkyNGY3NWRlYjc2ZjEyZDQ3ZmNhZjFiOTI0Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [])
+raw = b'{"x":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['call_tool']
+E       assert ['call_tool'] == []
+E         
+E         Left contains one more item: 'call_tool'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-malformed-json]" time="0.011"><failure message="AssertionError: {&quot;outcome&quot;:&quot;ALLOW&quot;,&quot;reason&quot;:&quot;allowed&quot;,&quot;rule_matched&quot;:null,&quot;result&quot;:null,&quot;action_id&quot;:&quot;act_59bec3d9694b4aff&quot;,&quot;grant_id&quot;:&quot;grant_3df3a8245a4e41f1&quot;,&quot;remaining_budget&quot;:10.0}&#10;assert 200 in (400, 403, 422)&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a86cd70&gt;, &lt;starlette.testclient.TestClient object at 0x10a86df10&gt;, 'v2....xZmE4YTEwOGM1OTNiMDQ3OTI5MmRhOWI4NTNlOWQyZjhjOWNiNjRiNjIzMzNmOWZiY2M2Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{}])
+raw = b'{"x":', path = '/proxy/typed'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+&gt;       assert response.status_code in (400, 403, 422), response.text
+E       AssertionError: {"outcome":"ALLOW","reason":"allowed","rule_matched":null,"result":null,"action_id":"act_59bec3d9694b4aff","grant_id":"grant_3df3a8245a4e41f1","remaining_budget":10.0}
+E       assert 200 in (400, 403, 422)
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_raw_request_ingress.py:84: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-array]" time="0.007" /><testcase classname="" name="test_raw_http_refused_before_gateway[/proxy/typed-null]" time="0.007" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-malformed-utf8]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-duplicate]" time="0.008" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-escaped-duplicate]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-float]" time="0.008" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-negative-float-zero]" time="0.007" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-nan]" time="0.017" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-surrogate]" time="0.007" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-deep]" time="0.007" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-oversized]" time="0.008" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-malformed-json]" time="0.008" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-array]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents-null]" time="0.008" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-malformed-utf8]" time="0.009"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a88e870&gt;, &lt;starlette.testclient.TestClient object at 0x10a88c2c0&gt;, 'v2....g5MWI5MDM4NWYwZmY0ZWNhZjkzNmE2MjllNTVkNTRmNzBjOTUwMDkzZjI3M2UxMTk1Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":\xff}', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-duplicate]" time="0.009"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a89e5a0&gt;, &lt;starlette.testclient.TestClient object at 0x10a89f170&gt;, 'v2....llODAyMTdlNjJiMDc1NTI3YzhkZTQ1OWM3NTM4Yjk3NjQzNGVkMjZhNmFmZjc5M2UzIiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":1,"x":2}', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-escaped-duplicate]" time="0.008"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a94b290&gt;, &lt;starlette.testclient.TestClient object at 0x10a94bcb0&gt;, 'v2....M5MjJjMDE2NGNkNTFiMTk4MzQ2ZDBiNDQ0N2UxMzZiNjI3MGNlOGQwMjhjZTI0MjU5Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":1,"\\u0078":2}', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-float]" time="0.008"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a94a5a0&gt;, &lt;starlette.testclient.TestClient object at 0x10a86e780&gt;, 'v2....c5NTVmOTc2Y2ZlNWI2ODA3MmNhODI1MTQ5YjFkNzAzNmNhMDMwYmI0MDliNjdkMzRhIiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":1.0}', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-negative-float-zero]" time="0.009"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a89e540&gt;, &lt;starlette.testclient.TestClient object at 0x10a89e570&gt;, 'v2....UzZTZiNzM1ZjMzYThiMDRlNDc2NTQxMzk4ZDJmNGEyNzc3NjFjM2ZkYzhlZDBlNzU3Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":-0.0}', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-nan]" time="0.008"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8c0800&gt;, &lt;starlette.testclient.TestClient object at 0x10a8c3bf0&gt;, 'v2....VhYjBlNTc4OGY4ZTM0MmYxZGQ0ZDI4YTc5ZjNkZDg1ZjAwYThjOTVmNmZkMTlhMTRlIiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":NaN}', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-surrogate]" time="0.008"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a868d40&gt;, &lt;starlette.testclient.TestClient object at 0x10a86b440&gt;, 'v2....M2ZGI1OWZiMzI0OWY4NTk5N2JlZjMwZjJlZTU0MmQ3ZGNhNWUxOWRmMjIyNDYyNzY5Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":"\\ud800"}', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-deep]" time="0.008"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8f5f10&gt;, &lt;starlette.testclient.TestClient object at 0x10a8f6b10&gt;, 'v2....k4NjhhMDlmNjA5NGJjODBkNTcxMTkzZDJjOWFkMTIxYTUwOTljY2IzYmE5YThkMDk0Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}'
+path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-oversized]" time="0.009"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a934830&gt;, &lt;starlette.testclient.TestClient object at 0x10a935760&gt;, 'v2....AzOGY0OTkzMDYyNTUwOWYyMWE2Mjg1MjI0M2ZmYmZhZTNhOTNkMmUzMzExMzAxMzhmIiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-malformed-json]" time="0.009"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a921580&gt;, &lt;starlette.testclient.TestClient object at 0x10a9205c0&gt;, 'v2....NjNDM2ZmY4NGRiYjdlNjY2Zjc2MWFlZDA2NGJmMmUxZDFiZGMyMjUzODZiMmU5ZWRjIiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'{"x":', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-array]" time="0.011"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8f6f60&gt;, &lt;starlette.testclient.TestClient object at 0x10a8571a0&gt;, 'v2....ZhNjIzZWEyODAwMjI2MWY0NTExYjlkMTc1Y2Y0MWEyMGM4MmM4NzU4YmVkOWQ1OTY0Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'[]', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/execute-null]" time="0.008"><failure message="AssertionError: invalid raw representation reached gateway: ['execute_intent']&#10;assert ['execute_intent'] == []&#10;  &#10;  Left contains one more item: 'execute_intent'&#10;  Use -v to get more diff">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a88d790&gt;, &lt;starlette.testclient.TestClient object at 0x10a88f050&gt;, 'v2....AxODY2ZjUxMWFhMmIzNmQyNjQ3MmUxNDhiMWU4NDAyODI5NmZmZDg2YzBiMmY0ZDRlIiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+raw = b'null', path = '/intents/absent/execute'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    @pytest.mark.parametrize(
+        "path", ["/proxy/typed", "/intents", "/intents/absent/execute", "/intents/absent/submit"]
+    )
+    def test_raw_http_refused_before_gateway(ingress, raw, path):
+        _, client, token, calls, dispatched = ingress
+        response = client.post(
+            path,
+            content=raw,
+            headers={
+                "x-actenon-grant": token,
+                "content-type": "application/json",
+            },
+        )
+        assert response.status_code in (400, 403, 422), response.text
+&gt;       assert calls == [], f"invalid raw representation reached gateway: {calls}"
+E       AssertionError: invalid raw representation reached gateway: ['execute_intent']
+E       assert ['execute_intent'] == []
+E         
+E         Left contains one more item: 'execute_intent'
+E         Use -v to get more diff
+
+tests/test_raw_request_ingress.py:85: AssertionError</failure></testcase><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-malformed-utf8]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-duplicate]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-escaped-duplicate]" time="0.008" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-float]" time="0.007" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-negative-float-zero]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-nan]" time="0.013" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-surrogate]" time="0.034" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-deep]" time="0.008" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-oversized]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-malformed-json]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-array]" time="0.009" /><testcase classname="" name="test_raw_http_refused_before_gateway[/intents/absent/submit-null]" time="0.008" /><testcase classname="" name="test_proxy_valid_typed_unicode_request_dispatches" time="0.010" /><testcase classname="" name="test_execute_empty_body_remains_supported" time="0.007" /><testcase classname="" name="test_execute_body_cannot_smuggle_unused_overrides" time="0.007"><failure message="assert 403 == 400&#10; +  where 403 = &lt;Response [403 Forbidden]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a89e2a0&gt;, &lt;starlette.testclient.TestClient object at 0x10a8c0e00&gt;, 'v2....U0OTFiMmY4YmFjZDVmNWMzOWMwYmFlYzQ1ZTUzNzg3NjJlNTMxNWYxZDQwNzVjY2IyIiwic3RhdHVzIjoiYWN0aXZlIn0', ['execute_intent'], [])
+
+    def test_execute_body_cannot_smuggle_unused_overrides(ingress):
+        _, client, token, calls, _ = ingress
+        response = client.post(
+            "/intents/absent/execute", json={"target_id": "new"}, headers={"x-actenon-grant": token}
+        )
+&gt;       assert response.status_code == 400
+E       assert 403 == 400
+E        +  where 403 = &lt;Response [403 Forbidden]&gt;.status_code
+
+tests/test_raw_request_ingress.py:110: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[malformed-utf8]" time="0.006"><failure message="UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 88: invalid start byte">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a86d160&gt;, &lt;starlette.testclient.TestClient object at 0x10a86c140&gt;, 'v2....djYmVlMmY1YTdmNjc5ZjhkMWQwMmJmMmZhMWFmMzIyNWEwMDcxZGQ2MWM2NzhjZGQwYWFjYjQ1MzhlM2M0Iiwic3RhdHVzIjoiYWN0aXZlIn0', [], [])
+raw = b'{"x":\xff}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+&gt;       mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+
+tests/test_raw_request_ingress.py:124: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../actenon-permit-effects/src/actenon_permit/gateway.py:1046: in mcp_serve
+    req = json.loads(line)
+          ^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+s = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":{"x":\xff}}}'
+cls = None, object_hook = None, parse_float = None, parse_int = None
+parse_constant = None, object_pairs_hook = None, kw = {}
+
+    def loads(s, *, cls=None, object_hook=None, parse_float=None,
+            parse_int=None, parse_constant=None, object_pairs_hook=None, **kw):
+        """Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
+        containing a JSON document) to a Python object.
+    
+        ``object_hook`` is an optional function that will be called with the
+        result of any object literal decode (a ``dict``). The return value of
+        ``object_hook`` will be used instead of the ``dict``. This feature
+        can be used to implement custom decoders (e.g. JSON-RPC class hinting).
+    
+        ``object_pairs_hook`` is an optional function that will be called with the
+        result of any object literal decoded with an ordered list of pairs.  The
+        return value of ``object_pairs_hook`` will be used instead of the ``dict``.
+        This feature can be used to implement custom decoders.  If ``object_hook``
+        is also defined, the ``object_pairs_hook`` takes priority.
+    
+        ``parse_float``, if specified, will be called with the string
+        of every JSON float to be decoded. By default this is equivalent to
+        float(num_str). This can be used to use another datatype or parser
+        for JSON floats (e.g. decimal.Decimal).
+    
+        ``parse_int``, if specified, will be called with the string
+        of every JSON int to be decoded. By default this is equivalent to
+        int(num_str). This can be used to use another datatype or parser
+        for JSON integers (e.g. float).
+    
+        ``parse_constant``, if specified, will be called with one of the
+        following strings: -Infinity, Infinity, NaN.
+        This can be used to raise an exception if invalid JSON numbers
+        are encountered.
+    
+        To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
+        kwarg; otherwise ``JSONDecoder`` is used.
+        """
+        if isinstance(s, str):
+            if s.startswith('\ufeff'):
+                raise JSONDecodeError("Unexpected UTF-8 BOM (decode using utf-8-sig)",
+                                      s, 0)
+        else:
+            if not isinstance(s, (bytes, bytearray)):
+                raise TypeError(f'the JSON object must be str, bytes or bytearray, '
+                                f'not {s.__class__.__name__}')
+&gt;           s = s.decode(detect_encoding(s), 'surrogatepass')
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 88: invalid start byte
+
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/json/__init__.py:341: UnicodeDecodeError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[duplicate]" time="0.007"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8c3e30&gt;, &lt;starlette.testclient.TestClient object at 0x10a8c2f30&gt;, 'v2....TY3N2RhYTg0YmJiODQ0OTM0YjY2Njc3YjQ4YzIyYzBkYTI4YWJiYTc0MDVkYWVjIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': 2}])
+raw = b'{"x":1,"x":2}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[escaped-duplicate]" time="0.009"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8de630&gt;, &lt;starlette.testclient.TestClient object at 0x10a89f950&gt;, 'v2....DI4NmI0MDZlY2Q2OTVmNDdlZDc2NzBkY2RmNDFkZDA5MzA3N2Q4NGRkN2IyOGIwIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': 2}])
+raw = b'{"x":1,"\\u0078":2}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[float]" time="0.008"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a9e66c0&gt;, &lt;starlette.testclient.TestClient object at 0x10a9e71a0&gt;, 'v2....zNDc0YTVjMWM3ZDRjYWM4MzRiNGIyNmM1MDEzNzI3YmEyNDJmNDQ4MTk4N2NkIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': 1.0}])
+raw = b'{"x":1.0}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[negative-float-zero]" time="0.008"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a98c320&gt;, &lt;starlette.testclient.TestClient object at 0x10a98ce90&gt;, 'v2....N2Y0ODUzODI1YmViOTcwYWY3ZGUxMWNkZmUwNTk5NDE0NWY0NTM2NWY4Y2YwIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': -0.0}])
+raw = b'{"x":-0.0}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[nan]" time="0.009"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a94b7d0&gt;, &lt;starlette.testclient.TestClient object at 0x10a9483e0&gt;, 'v2....yNWE2MWQ1ODYwN2I2NWU1ZTMwZGFlMWM0MzVlMDU2MDlkMmJlMGE1NWIxNmIxIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': nan}])
+raw = b'{"x":NaN}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[surrogate]" time="0.010"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: engine error, failing closed: Cano...ings must not contain unpaired UTF-16 surrogates (found U+D800); they cannot be encoded as UTF-8'}], 'isError': True}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: engine error, failing closed: Canon...rings must not contain unpaired UTF-16 surrogates (found U+D800); they cannot be encoded as UTF-8'}], 'isError': True}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x109352450&gt;, &lt;starlette.testclient.TestClient object at 0x109350380&gt;, 'v2....TYwMzJhNmZmMmVhMWMxODhhMWMxMTc1YWM2OGVjNjAxZjkwOTZkNzc2ZTcxYThlNWE0NDgxIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [])
+raw = b'{"x":"\\ud800"}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: engine error, failing closed: Cano...ings must not contain unpaired UTF-16 surrogates (found U+D800); they cannot be encoded as UTF-8'}], 'isError': True}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: engine error, failing closed: Canon...rings must not contain unpaired UTF-16 surrogates (found U+D800); they cannot be encoded as UTF-8'}], 'isError': True}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[deep]" time="0.007"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x109321190&gt;, &lt;starlette.testclient.TestClient object at 0x109321ac0&gt;, 'v2....5MmVmNWJjMGFkZjQ1YWU1N2Y0MjRhN2VmNGZmMmVmNzA4YWEzNDQxIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{'x': [[[[...]]]]}])
+raw = b'{"x":[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[oversized]" time="0.021"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: PCCB emission failed — failing closed'}], 'isError': True}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: PCCB emission failed — failing closed'}], 'isError': True}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a98fe00&gt;, &lt;starlette.testclient.TestClient object at 0x10a98ed20&gt;, 'v2....jg2YjBiMGI2MzJmNjYxMjNjYjNhY2QyNzYzZTE3ODc1YTc5MjczMWYwNDRlMWUwNWE2YTU2Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [])
+raw = b'{"x":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: PCCB emission failed — failing closed'}], 'isError': True}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'DENY: PCCB emission failed — failing closed'}], 'isError': True}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[malformed-json]" time="0.008" /><testcase classname="" name="test_raw_mcp_refused_without_dispatch[array]" time="0.008"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a89d8b0&gt;, &lt;starlette.testclient.TestClient object at 0x10a89f440&gt;, 'v2....hNTUwMWY1ODg0ZDY0NGZmMDU0ZmEwNTAwYTA4ZDE1NzM0MTkyMzdlZTFmOTA1Y2M2YjJmIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{}])
+raw = b'[]'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_raw_mcp_refused_without_dispatch[null]" time="0.009"><failure message="AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]&#10;assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8dff50&gt;, &lt;starlette.testclient.TestClient object at 0x10a8df230&gt;, 'v2....xZGM1ZGFhNTEzOTFhYTliZGNjYTE3OWM1MzJjMWIwNmUxMWFlZGUwMmNlNTRhZjAzZTA1Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{}])
+raw = b'null'
+
+    @pytest.mark.parametrize("raw", INVALID_RAW)
+    def test_raw_mcp_refused_without_dispatch(ingress, raw):
+        gateway, _, token, calls, dispatched = ingress
+        # Place the invalid value inside the arguments of an otherwise genuine call.
+        line = (
+            b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"typed","arguments":'
+            + raw
+            + b"}}\n"
+        )
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(line), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert len(responses) == 1
+&gt;       assert "error" in responses[0], responses
+E       AssertionError: [{'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}]
+E       assert 'error' in {'jsonrpc': '2.0', 'id': 1, 'result': {'content': [{'type': 'text', 'text': 'null'}], 'isError': False}}
+
+tests/test_raw_request_ingress.py:127: AssertionError</failure></testcase><testcase classname="" name="test_mcp_oversized_frame_drains_without_executing_suffix" time="0.007"><failure message="AssertionError: assert 1 == 2&#10; +  where 1 = len([{'jsonrpc': '2.0', 'id': 2, 'result': {}}])">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8c0110&gt;, &lt;starlette.testclient.TestClient object at 0x10a9c0c80&gt;, 'v2....RhMjUwMGY1ZmZmYTE2NDRhMGQxMzdhY2Q2YzIyMjYyZGIzNjMxZTEyMzQ5ODhiMGZiNThiODYzOGY0NGY3Iiwic3RhdHVzIjoiYWN0aXZlIn0', [], [])
+
+    def test_mcp_oversized_frame_drains_without_executing_suffix(ingress):
+        gateway, _, token, calls, _ = ingress
+        oversized = b'{"padding":"' + b"x" * 1_048_577 + b'"}\n'
+        ping = b'{"jsonrpc":"2.0","id":2,"method":"ping"}\n'
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.BytesIO(oversized + ping), outfile=output, grant_token=token)
+        responses = [json.loads(line) for line in output.getvalue().splitlines()]
+&gt;       assert len(responses) == 2
+E       AssertionError: assert 1 == 2
+E        +  where 1 = len([{'jsonrpc': '2.0', 'id': 2, 'result': {}}])
+
+tests/test_raw_request_ingress.py:139: AssertionError</failure></testcase><testcase classname="" name="test_mcp_valid_unicode_typed_call_preserved" time="0.013" /><testcase classname="" name="test_create_wrapper_rejects_unknown_or_wrongly_typed_fields[extra0]" time="0.008"><failure message="assert 201 in (400, 422)&#10; +  where 201 = &lt;Response [201 Created]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a7f3b00&gt;, &lt;starlette.testclient.TestClient object at 0x10a86b020&gt;, 'v2....jJmZDViODljZjFjNTBlZDI5OTlhODE5NDFhYjc5MDM2MWRjODE0ODA0NjNhYTY1NjU2Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['create_intent'], [])
+extra = {'Action_Type': 'test.other'}
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {"Action_Type": "test.other"},
+            {"unused": True},
+            {"action_params": []},
+            {"target_id": 1},
+            {"expiry_seconds": True},
+            {"metadata": []},
+        ],
+    )
+    def test_create_wrapper_rejects_unknown_or_wrongly_typed_fields(ingress, extra):
+        _, client, _, calls, _ = ingress
+        body = {
+            "action_type": "test.typed",
+            "action_params": {"x": 1},
+            "target_type": "test",
+            "target_id": "fixture",
+            "requested_execution_mode": "brokered",
+            "requester_subject": "operator",
+            "requester_agent_id": "agent",
+            **extra,
+        }
+        response = client.post("/intents", json=body)
+&gt;       assert response.status_code in (400, 422)
+E       assert 201 in (400, 422)
+E        +  where 201 = &lt;Response [201 Created]&gt;.status_code
+
+tests/test_raw_request_ingress.py:191: AssertionError</failure></testcase><testcase classname="" name="test_create_wrapper_rejects_unknown_or_wrongly_typed_fields[extra1]" time="0.008"><failure message="assert 201 in (400, 422)&#10; +  where 201 = &lt;Response [201 Created]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8debd0&gt;, &lt;starlette.testclient.TestClient object at 0x10a8dcd40&gt;, 'v2....TAxZjhkYjQ0MGFmMzBiYjYxNDVhNjU0M2VmZTExZGY4MDEwM2FkOTBkNzE1MjJlMjNjIiwic3RhdHVzIjoiYWN0aXZlIn0', ['create_intent'], [])
+extra = {'unused': True}
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {"Action_Type": "test.other"},
+            {"unused": True},
+            {"action_params": []},
+            {"target_id": 1},
+            {"expiry_seconds": True},
+            {"metadata": []},
+        ],
+    )
+    def test_create_wrapper_rejects_unknown_or_wrongly_typed_fields(ingress, extra):
+        _, client, _, calls, _ = ingress
+        body = {
+            "action_type": "test.typed",
+            "action_params": {"x": 1},
+            "target_type": "test",
+            "target_id": "fixture",
+            "requested_execution_mode": "brokered",
+            "requester_subject": "operator",
+            "requester_agent_id": "agent",
+            **extra,
+        }
+        response = client.post("/intents", json=body)
+&gt;       assert response.status_code in (400, 422)
+E       assert 201 in (400, 422)
+E        +  where 201 = &lt;Response [201 Created]&gt;.status_code
+
+tests/test_raw_request_ingress.py:191: AssertionError</failure></testcase><testcase classname="" name="test_create_wrapper_rejects_unknown_or_wrongly_typed_fields[extra2]" time="0.008"><failure message="assert 201 in (400, 422)&#10; +  where 201 = &lt;Response [201 Created]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a98d310&gt;, &lt;starlette.testclient.TestClient object at 0x10a98c500&gt;, 'v2....TI3MzIzNDYzNmI5MTI3YTNkNTEwZDQ2YWUwNjA3YjcyM2Y1MmZmZTcxY2UzMGRiMTZkIiwic3RhdHVzIjoiYWN0aXZlIn0', ['create_intent'], [])
+extra = {'action_params': []}
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {"Action_Type": "test.other"},
+            {"unused": True},
+            {"action_params": []},
+            {"target_id": 1},
+            {"expiry_seconds": True},
+            {"metadata": []},
+        ],
+    )
+    def test_create_wrapper_rejects_unknown_or_wrongly_typed_fields(ingress, extra):
+        _, client, _, calls, _ = ingress
+        body = {
+            "action_type": "test.typed",
+            "action_params": {"x": 1},
+            "target_type": "test",
+            "target_id": "fixture",
+            "requested_execution_mode": "brokered",
+            "requester_subject": "operator",
+            "requester_agent_id": "agent",
+            **extra,
+        }
+        response = client.post("/intents", json=body)
+&gt;       assert response.status_code in (400, 422)
+E       assert 201 in (400, 422)
+E        +  where 201 = &lt;Response [201 Created]&gt;.status_code
+
+tests/test_raw_request_ingress.py:191: AssertionError</failure></testcase><testcase classname="" name="test_create_wrapper_rejects_unknown_or_wrongly_typed_fields[extra3]" time="0.008"><failure message="assert 201 in (400, 422)&#10; +  where 201 = &lt;Response [201 Created]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a98f350&gt;, &lt;starlette.testclient.TestClient object at 0x1093207d0&gt;, 'v2....DQzMmI5Yjk2YTNkNjNhNjlhMzYzYzhhMTlhZTk0Njg0ZjYzZGE4ZDAyNGQ0OTA3NjIxIiwic3RhdHVzIjoiYWN0aXZlIn0', ['create_intent'], [])
+extra = {'target_id': 1}
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {"Action_Type": "test.other"},
+            {"unused": True},
+            {"action_params": []},
+            {"target_id": 1},
+            {"expiry_seconds": True},
+            {"metadata": []},
+        ],
+    )
+    def test_create_wrapper_rejects_unknown_or_wrongly_typed_fields(ingress, extra):
+        _, client, _, calls, _ = ingress
+        body = {
+            "action_type": "test.typed",
+            "action_params": {"x": 1},
+            "target_type": "test",
+            "target_id": "fixture",
+            "requested_execution_mode": "brokered",
+            "requester_subject": "operator",
+            "requester_agent_id": "agent",
+            **extra,
+        }
+        response = client.post("/intents", json=body)
+&gt;       assert response.status_code in (400, 422)
+E       assert 201 in (400, 422)
+E        +  where 201 = &lt;Response [201 Created]&gt;.status_code
+
+tests/test_raw_request_ingress.py:191: AssertionError</failure></testcase><testcase classname="" name="test_create_wrapper_rejects_unknown_or_wrongly_typed_fields[extra4]" time="0.008"><failure message="assert 201 in (400, 422)&#10; +  where 201 = &lt;Response [201 Created]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a948c20&gt;, &lt;starlette.testclient.TestClient object at 0x10a88d6a0&gt;, 'v2....GMzNmZmYTJhYzMyYWNlNDJkMGM0NzU4YjRjNzUxZmFhYTRmOWFhNjIzZDM4MGM1Y2JkIiwic3RhdHVzIjoiYWN0aXZlIn0', ['create_intent'], [])
+extra = {'expiry_seconds': True}
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {"Action_Type": "test.other"},
+            {"unused": True},
+            {"action_params": []},
+            {"target_id": 1},
+            {"expiry_seconds": True},
+            {"metadata": []},
+        ],
+    )
+    def test_create_wrapper_rejects_unknown_or_wrongly_typed_fields(ingress, extra):
+        _, client, _, calls, _ = ingress
+        body = {
+            "action_type": "test.typed",
+            "action_params": {"x": 1},
+            "target_type": "test",
+            "target_id": "fixture",
+            "requested_execution_mode": "brokered",
+            "requester_subject": "operator",
+            "requester_agent_id": "agent",
+            **extra,
+        }
+        response = client.post("/intents", json=body)
+&gt;       assert response.status_code in (400, 422)
+E       assert 201 in (400, 422)
+E        +  where 201 = &lt;Response [201 Created]&gt;.status_code
+
+tests/test_raw_request_ingress.py:191: AssertionError</failure></testcase><testcase classname="" name="test_create_wrapper_rejects_unknown_or_wrongly_typed_fields[extra5]" time="0.008"><failure message="assert 201 in (400, 422)&#10; +  where 201 = &lt;Response [201 Created]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a9461b0&gt;, &lt;starlette.testclient.TestClient object at 0x10a944da0&gt;, 'v2....TM5MDEyMDEwM2E3Y2RmYzk0NDRiNzRjYjgxZjU1YmVlZTFlN2YyZGJkMmI0OTI0ZGI3Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['create_intent'], [])
+extra = {'metadata': []}
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {"Action_Type": "test.other"},
+            {"unused": True},
+            {"action_params": []},
+            {"target_id": 1},
+            {"expiry_seconds": True},
+            {"metadata": []},
+        ],
+    )
+    def test_create_wrapper_rejects_unknown_or_wrongly_typed_fields(ingress, extra):
+        _, client, _, calls, _ = ingress
+        body = {
+            "action_type": "test.typed",
+            "action_params": {"x": 1},
+            "target_type": "test",
+            "target_id": "fixture",
+            "requested_execution_mode": "brokered",
+            "requester_subject": "operator",
+            "requester_agent_id": "agent",
+            **extra,
+        }
+        response = client.post("/intents", json=body)
+&gt;       assert response.status_code in (400, 422)
+E       assert 201 in (400, 422)
+E        +  where 201 = &lt;Response [201 Created]&gt;.status_code
+
+tests/test_raw_request_ingress.py:191: AssertionError</failure></testcase><testcase classname="" name="test_submission_rejects_unknown_wrapper_fields[extra0]" time="0.008"><failure message="assert 403 == 400&#10; +  where 403 = &lt;Response [403 Forbidden]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a947410&gt;, &lt;starlette.testclient.TestClient object at 0x10a946a20&gt;, 'v2....jg2NzBjZTlmMDgwNDJjZDk0ZDI1MmE5YjUzYjE0ZmQ4Mzk5NTg0YjMyIiwic3RhdHVzIjoiYWN0aXZlIn0', ['submit_intent_to_resource'], [])
+extra = {'Proof': {}}
+
+    @pytest.mark.parametrize("extra", [{"Proof": {}}, {"target_id": "other"}])
+    def test_submission_rejects_unknown_wrapper_fields(ingress, extra):
+        _, client, _, calls, _ = ingress
+        response = client.post("/intents/absent/submit", json={"proof": {}, **extra})
+&gt;       assert response.status_code == 400
+E       assert 403 == 400
+E        +  where 403 = &lt;Response [403 Forbidden]&gt;.status_code
+
+tests/test_raw_request_ingress.py:199: AssertionError</failure></testcase><testcase classname="" name="test_submission_rejects_unknown_wrapper_fields[extra1]" time="0.008"><failure message="assert 403 == 400&#10; +  where 403 = &lt;Response [403 Forbidden]&gt;.status_code">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a9496d0&gt;, &lt;starlette.testclient.TestClient object at 0x108eeab70&gt;, 'v2....TVjZDk1MWM1YTE1ZWY3ZjA5MjY0OWFhOGRlODRiNjFmNTNjYmM0NGRmIiwic3RhdHVzIjoiYWN0aXZlIn0', ['submit_intent_to_resource'], [])
+extra = {'target_id': 'other'}
+
+    @pytest.mark.parametrize("extra", [{"Proof": {}}, {"target_id": "other"}])
+    def test_submission_rejects_unknown_wrapper_fields(ingress, extra):
+        _, client, _, calls, _ = ingress
+        response = client.post("/intents/absent/submit", json={"proof": {}, **extra})
+&gt;       assert response.status_code == 400
+E       assert 403 == 400
+E        +  where 403 = &lt;Response [403 Forbidden]&gt;.status_code
+
+tests/test_raw_request_ingress.py:199: AssertionError</failure></testcase><testcase classname="" name="test_mcp_wrong_wrapper_does_not_dispatch[params0]" time="0.006"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a98d670&gt;, &lt;starlette.testclient.TestClient object at 0x10a98d550&gt;, 'v2....Tk1ODNlMDZiZDI0ZWI2NzNkYjgyNjI1OTRiZjRmNTJmOWZjMDM5ZTg1NjA3ZTJmMzQ2ZGEwIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [])
+params = []
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            [],
+            None,
+            {"name": "typed", "Name": "other"},
+            {"name": "typed", "arguments": []},
+            {"name": "typed", "arguments": None},
+            {"name": "typed", "_meta": []},
+            {"name": "typed", "_meta": {"actenon_grant": 1}},
+        ],
+    )
+    def test_mcp_wrong_wrapper_does_not_dispatch(ingress, params):
+        gateway, _, token, calls, dispatched = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32602
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:220: KeyError</failure></testcase><testcase classname="" name="test_mcp_wrong_wrapper_does_not_dispatch[None]" time="0.007"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a9e4ec0&gt;, &lt;starlette.testclient.TestClient object at 0x10a8dfa70&gt;, 'v2....mVlNWY2MWZjM2EwZWExMWZhMjBkZGE4MTM0ODc0ZDVhNmQxOWM3NjFkMzAyZmZjZGZlNGNiIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [])
+params = None
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            [],
+            None,
+            {"name": "typed", "Name": "other"},
+            {"name": "typed", "arguments": []},
+            {"name": "typed", "arguments": None},
+            {"name": "typed", "_meta": []},
+            {"name": "typed", "_meta": {"actenon_grant": 1}},
+        ],
+    )
+    def test_mcp_wrong_wrapper_does_not_dispatch(ingress, params):
+        gateway, _, token, calls, dispatched = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32602
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:220: KeyError</failure></testcase><testcase classname="" name="test_mcp_wrong_wrapper_does_not_dispatch[params2]" time="0.007"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8c2870&gt;, &lt;starlette.testclient.TestClient object at 0x10a86af00&gt;, 'v2....1MmQ3NzVkZjgxZjkwYjU0NzBiMGI0NDU4ZTJmZmFlM2ZjNDIzMmYwMzA3NjlhMTI0NmU5Iiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{}])
+params = {'name': 'typed', 'Name': 'other'}
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            [],
+            None,
+            {"name": "typed", "Name": "other"},
+            {"name": "typed", "arguments": []},
+            {"name": "typed", "arguments": None},
+            {"name": "typed", "_meta": []},
+            {"name": "typed", "_meta": {"actenon_grant": 1}},
+        ],
+    )
+    def test_mcp_wrong_wrapper_does_not_dispatch(ingress, params):
+        gateway, _, token, calls, dispatched = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32602
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:220: KeyError</failure></testcase><testcase classname="" name="test_mcp_wrong_wrapper_does_not_dispatch[params3]" time="0.007"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a9348f0&gt;, &lt;starlette.testclient.TestClient object at 0x10a934680&gt;, 'v2....xMWVmZDQxMWQ1OGFlYzM5YzcwNTNmOWFjZjhiYmVmZjczODUzYmE4ZGMzZWVjYmMxM2NiIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{}])
+params = {'name': 'typed', 'arguments': []}
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            [],
+            None,
+            {"name": "typed", "Name": "other"},
+            {"name": "typed", "arguments": []},
+            {"name": "typed", "arguments": None},
+            {"name": "typed", "_meta": []},
+            {"name": "typed", "_meta": {"actenon_grant": 1}},
+        ],
+    )
+    def test_mcp_wrong_wrapper_does_not_dispatch(ingress, params):
+        gateway, _, token, calls, dispatched = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32602
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:220: KeyError</failure></testcase><testcase classname="" name="test_mcp_wrong_wrapper_does_not_dispatch[params4]" time="0.007"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a9c1820&gt;, &lt;starlette.testclient.TestClient object at 0x10a7ca1e0&gt;, 'v2....xZWNkMWVlMzc2NThiZDllMjk0MjlkYjUxZTU5MjE2M2ViZDZjMDk4ZGRlNDc5OTMxZDZiIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{}])
+params = {'name': 'typed', 'arguments': None}
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            [],
+            None,
+            {"name": "typed", "Name": "other"},
+            {"name": "typed", "arguments": []},
+            {"name": "typed", "arguments": None},
+            {"name": "typed", "_meta": []},
+            {"name": "typed", "_meta": {"actenon_grant": 1}},
+        ],
+    )
+    def test_mcp_wrong_wrapper_does_not_dispatch(ingress, params):
+        gateway, _, token, calls, dispatched = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32602
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:220: KeyError</failure></testcase><testcase classname="" name="test_mcp_wrong_wrapper_does_not_dispatch[params5]" time="0.007"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8c3620&gt;, &lt;starlette.testclient.TestClient object at 0x10a8c1310&gt;, 'v2....mNTA5OTU1NzAwYWUxODA2ZGU2YTg3ZGVhY2U3YmYxMjdhYTQ4MGYyOGRiYmE0ZjA1ZmZkIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [{}])
+params = {'name': 'typed', '_meta': []}
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            [],
+            None,
+            {"name": "typed", "Name": "other"},
+            {"name": "typed", "arguments": []},
+            {"name": "typed", "arguments": None},
+            {"name": "typed", "_meta": []},
+            {"name": "typed", "_meta": {"actenon_grant": 1}},
+        ],
+    )
+    def test_mcp_wrong_wrapper_does_not_dispatch(ingress, params):
+        gateway, _, token, calls, dispatched = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32602
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:220: KeyError</failure></testcase><testcase classname="" name="test_mcp_wrong_wrapper_does_not_dispatch[params6]" time="0.010"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a98d670&gt;, &lt;starlette.testclient.TestClient object at 0x10a98d940&gt;, 'v2....TEyMmJmNGVmNTc5ZTM2MmI5YmUyY2E2MmU1NmI4ZGMyMWIxZTQ5MjExYTdjM2ZiYzMwMzVjIiwic3RhdHVzIjoiYWN0aXZlIn0', ['call_tool'], [])
+params = {'name': 'typed', '_meta': {'actenon_grant': 1}}
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            [],
+            None,
+            {"name": "typed", "Name": "other"},
+            {"name": "typed", "arguments": []},
+            {"name": "typed", "arguments": None},
+            {"name": "typed", "_meta": []},
+            {"name": "typed", "_meta": {"actenon_grant": 1}},
+        ],
+    )
+    def test_mcp_wrong_wrapper_does_not_dispatch(ingress, params):
+        gateway, _, token, calls, dispatched = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32602
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:220: KeyError</failure></testcase><testcase classname="" name="test_mcp_unknown_or_wrongly_typed_envelope_refused[extra0]" time="0.007"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x1093216d0&gt;, &lt;starlette.testclient.TestClient object at 0x10a6af0b0&gt;, 'v2....YyMDhiNmE3MzAyMGI1MGExZWZiOGU2ZGNjYjU2NTRjN2ViNjUxYjZmYzA1NWY1MGQ0OGM5ZTc0ZjBlZDFmIiwic3RhdHVzIjoiYWN0aXZlIn0', [], [])
+extra = {'Method': 'tools/call'}
+
+    @pytest.mark.parametrize("extra", [{"Method": "tools/call"}, {"id": True}, {"jsonrpc": 2}])
+    def test_mcp_unknown_or_wrongly_typed_envelope_refused(ingress, extra):
+        gateway, _, token, calls, _ = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping", **extra})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32600
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:230: KeyError</failure></testcase><testcase classname="" name="test_mcp_unknown_or_wrongly_typed_envelope_refused[extra1]" time="0.005"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a94ab70&gt;, &lt;starlette.testclient.TestClient object at 0x10a944710&gt;, 'v2....MxMTJjODJjNmEyMzg2ZjlmY2QyNzRlYzMyNDM1N2Q1YTJmZTQ4YzlkN2FjM2FlZmMxMjFiM2RiOTdiNTdjIiwic3RhdHVzIjoiYWN0aXZlIn0', [], [])
+extra = {'id': True}
+
+    @pytest.mark.parametrize("extra", [{"Method": "tools/call"}, {"id": True}, {"jsonrpc": 2}])
+    def test_mcp_unknown_or_wrongly_typed_envelope_refused(ingress, extra):
+        gateway, _, token, calls, _ = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping", **extra})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32600
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:230: KeyError</failure></testcase><testcase classname="" name="test_mcp_unknown_or_wrongly_typed_envelope_refused[extra2]" time="0.006"><failure message="KeyError: 'error'">ingress = (&lt;actenon_permit.gateway.Gateway object at 0x10a8f5280&gt;, &lt;starlette.testclient.TestClient object at 0x10a8f4830&gt;, 'v2....UyY2I3ZmZhOTc2ZDNkNDdlNTgxZTE5MGE0Yjk5ZGQwOWZiNzc5N2UyODUzZmI2NzFmMzFmMDk5NDUxOTM4Iiwic3RhdHVzIjoiYWN0aXZlIn0', [], [])
+extra = {'jsonrpc': 2}
+
+    @pytest.mark.parametrize("extra", [{"Method": "tools/call"}, {"id": True}, {"jsonrpc": 2}])
+    def test_mcp_unknown_or_wrongly_typed_envelope_refused(ingress, extra):
+        gateway, _, token, calls, _ = ingress
+        raw = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping", **extra})
+        output = io.StringIO()
+        mcp_serve(gateway, infile=io.StringIO(raw + "\n"), outfile=output, grant_token=token)
+&gt;       assert json.loads(output.getvalue())["error"]["code"] == -32600
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+tests/test_raw_request_ingress.py:230: KeyError</failure></testcase></testsuite></testsuites>

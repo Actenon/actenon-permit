@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="5" time="0.630" timestamp="2026-10-05T10:52:23.038530+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_boundary_kit" name="test_middleware_preserves_parameter_types[1-True]" time="0.060"><failure message="AssertionError: Python equality collapsed a boolean/integer at the sink&#10;assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:300: in test_middleware_preserves_parameter_types
+    assert response.status_code == 403, "Python equality collapsed a boolean/integer at the sink"
+E   AssertionError: Python equality collapsed a boolean/integer at the sink
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_preserves_parameter_types[True-1]" time="0.006"><failure message="AssertionError: Python equality collapsed a boolean/integer at the sink&#10;assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:300: in test_middleware_preserves_parameter_types
+    assert response.status_code == 403, "Python equality collapsed a boolean/integer at the sink"
+E   AssertionError: Python equality collapsed a boolean/integer at the sink
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_preserves_parameter_types[signed2-actual2]" time="0.005"><failure message="AssertionError: Python equality collapsed a boolean/integer at the sink&#10;assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:300: in test_middleware_preserves_parameter_types
+    assert response.status_code == 403, "Python equality collapsed a boolean/integer at the sink"
+E   AssertionError: Python equality collapsed a boolean/integer at the sink
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_refuses_duplicate_body_members[{&quot;payment_intent_id&quot;:&quot;pi_123&quot;,&quot;amount&quot;:999,&quot;amount&quot;:100,&quot;reason&quot;:&quot;customer&quot;}]" time="0.005"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:312: in test_middleware_refuses_duplicate_body_members
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_refuses_duplicate_body_members[{&quot;payment_intent_id&quot;:&quot;pi_123&quot;,&quot;amount&quot;:999,&quot;amoun\u0074&quot;:100,&quot;reason&quot;:&quot;customer&quot;}]" time="0.005"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:312: in test_middleware_refuses_duplicate_body_members
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase></testsuite></testsuites>

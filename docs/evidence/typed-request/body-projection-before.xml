@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="4" time="0.506" timestamp="2026-10-05T11:00:03.484691+01:00" hostname="Rosss-MacBook-Air.local"><testcase classname="tests.test_boundary_kit" name="test_middleware_refuses_unbound_body_fields[extra0]" time="0.054"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:321: in test_middleware_refuses_unbound_body_fields
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_refuses_unbound_body_fields[extra1]" time="0.006"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:321: in test_middleware_refuses_unbound_body_fields
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_does_not_coerce_numeric_target_to_string" time="0.004"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:329: in test_middleware_does_not_coerce_numeric_target_to_string
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase><testcase classname="tests.test_boundary_kit" name="test_middleware_missing_field_is_not_signed_null" time="0.004"><failure message="assert 200 == 403&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">tests/test_boundary_kit.py:337: in test_middleware_missing_field_is_not_signed_null
+    assert response.status_code == 403
+E   assert 200 == 403
+E    +  where 200 = &lt;Response [200 OK]&gt;.status_code</failure></testcase></testsuite></testsuites>

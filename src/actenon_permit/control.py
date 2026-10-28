@@ -233,6 +233,7 @@ class AttenuateRequest(BaseModel):
     rate_max: int | None = None
     rate_per_seconds: int | None = None
     extra_approval_rules: list[str] | None = None
+    approved_effect_ids: list[str] | None = None
 
 
 class RevokeResponse(BaseModel):
@@ -398,6 +399,8 @@ def create_app(
             kwargs["rate_per_seconds"] = req.rate_per_seconds
         if req.extra_approval_rules is not None:
             kwargs["extra_approval_rules"] = req.extra_approval_rules
+        if req.approved_effect_ids is not None:
+            kwargs["approved_effect_ids"] = req.approved_effect_ids
 
         try:
             child = parent.attenuate(**kwargs)

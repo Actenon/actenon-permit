@@ -1,0 +1,256 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-raw-ingress
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.2
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 211 items
+
+tests/test_raw_request_ingress.py ...................................... [ 18%]
+...........................                                              [ 30%]
+tests/test_gateway.py ...............                                    [ 37%]
+tests/test_intent_http.py .............                                  [ 44%]
+tests/test_intent_submit_http.py EEEEEEEEE                               [ 48%]
+tests/test_gateway_execution_modes.py ....EEEEEE                         [ 53%]
+tests/test_audit_attacks.py ............................................ [ 73%]
+........                                                                 [ 77%]
+tests/test_adversarial.py .............................................. [ 99%]
+.                                                                        [100%]
+
+==================================== ERRORS ====================================
+_____ ERROR at setup of test_submit_intent_succeeded_with_verified_receipt _____
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+_ ERROR at setup of test_submit_intent_forged_receipt_returns_outcome_unknown __
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+_ ERROR at setup of test_submit_intent_missing_receipt_returns_outcome_unknown _
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+___________ ERROR at setup of test_submit_intent_refused_returns_403 ___________
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+________ ERROR at setup of test_submit_intent_missing_proof_returns_422 ________
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+__________ ERROR at setup of test_submit_intent_unknown_returns_deny ___________
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+___ ERROR at setup of test_submit_intent_brokered_mode_returns_mode_mismatch ___
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+_____ ERROR at setup of test_submit_intent_no_resource_client_returns_deny _____
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+______ ERROR at setup of test_submit_intent_does_not_require_grant_header ______
+tests/test_intent_submit_http.py:52: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+___ ERROR at setup of test_iam_stub_succeeded_path_produces_verified_receipt ___
+tests/test_gateway_execution_modes.py:251: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+___ ERROR at setup of test_iam_stub_forged_receipt_forced_to_outcome_unknown ___
+tests/test_gateway_execution_modes.py:251: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+______ ERROR at setup of test_iam_stub_missing_receipt_remains_non_final _______
+tests/test_gateway_execution_modes.py:251: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+___________ ERROR at setup of test_iam_stub_refused_maps_to_refused ____________
+tests/test_gateway_execution_modes.py:251: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+__________ ERROR at setup of test_iam_stub_malformed_proof_is_refused __________
+tests/test_gateway_execution_modes.py:251: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+________ ERROR at setup of test_iam_stub_unsupported_action_is_refused _________
+tests/test_gateway_execution_modes.py:251: in iam_stub
+    stub.start()
+src/actenon_permit/_iam_stub.py:249: in start
+    self._httpd = HTTPServer(("127.0.0.1", 0), _IAMStubHandler)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:457: in __init__
+    self.server_bind()
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/http/server.py:140: in server_bind
+    socketserver.TCPServer.server_bind(self)
+/Users/ross/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/socketserver.py:478: in server_bind
+    self.socket.bind(self.server_address)
+E   PermissionError: [Errno 1] Operation not permitted
+=============================== warnings summary ===============================
+../actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-effects/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_raw_request_ingress.py: 2 warnings
+tests/test_intent_http.py: 1 warning
+tests/test_gateway_execution_modes.py: 3 warnings
+tests/test_audit_attacks.py: 8 warnings
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-raw-ingress/src/actenon_permit/ed25519_signer.py:294: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer(secret=secret)
+
+tests/test_gateway.py::test_gateway_allow
+tests/test_gateway.py::test_gateway_deny_budget
+tests/test_gateway.py::test_gateway_approval_then_allow
+tests/test_gateway.py::test_http_proxy_allow
+tests/test_gateway.py::test_mcp_stdio_tools_call_allow
+tests/test_audit_attacks.py::TestRevocationCascade::test_http_revoke_reaches_grandchildren
+tests/test_audit_attacks.py::TestRevocationCascade::test_kill_switch_by_agent_reaches_delegated_children
+  /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/actenon-permit-raw-ingress/src/actenon_permit/ed25519_signer.py:306: RuntimeWarning: ACTENON LOCAL HMAC SIGNER IS FOR LOCAL/DEV/DEMO ONLY. The default local proof secret is public; production must use asymmetric well-known/KMS/HSM signing custody.
+    return build_local_proof_signer()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /Users/ross/Documents/Codex/2026-10-03/referenced-chatgpt-conversation-this-is-an/work/raw-request-ingress-after.xml -
+=========================== short test summary info ============================
+ERROR tests/test_intent_submit_http.py::test_submit_intent_succeeded_with_verified_receipt
+ERROR tests/test_intent_submit_http.py::test_submit_intent_forged_receipt_returns_outcome_unknown
+ERROR tests/test_intent_submit_http.py::test_submit_intent_missing_receipt_returns_outcome_unknown
+ERROR tests/test_intent_submit_http.py::test_submit_intent_refused_returns_403
+ERROR tests/test_intent_submit_http.py::test_submit_intent_missing_proof_returns_422
+ERROR tests/test_intent_submit_http.py::test_submit_intent_unknown_returns_deny
+ERROR tests/test_intent_submit_http.py::test_submit_intent_brokered_mode_returns_mode_mismatch
+ERROR tests/test_intent_submit_http.py::test_submit_intent_no_resource_client_returns_deny
+ERROR tests/test_intent_submit_http.py::test_submit_intent_does_not_require_grant_header
+ERROR tests/test_gateway_execution_modes.py::test_iam_stub_succeeded_path_produces_verified_receipt
+ERROR tests/test_gateway_execution_modes.py::test_iam_stub_forged_receipt_forced_to_outcome_unknown
+ERROR tests/test_gateway_execution_modes.py::test_iam_stub_missing_receipt_remains_non_final
+ERROR tests/test_gateway_execution_modes.py::test_iam_stub_refused_maps_to_refused
+ERROR tests/test_gateway_execution_modes.py::test_iam_stub_malformed_proof_is_refused
+ERROR tests/test_gateway_execution_modes.py::test_iam_stub_unsupported_action_is_refused
+================= 196 passed, 22 warnings, 15 errors in 3.55s ==================

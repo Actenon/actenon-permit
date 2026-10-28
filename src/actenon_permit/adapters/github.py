@@ -172,12 +172,12 @@ class GitHubAdapter(ProviderAdapter):
         for k in missing:
             errors.append({"field": k, "reason": "required parameter missing"})
         # Type checks for known fields.
-        for k in schema["required"]:
+        for k in known:
             if k in params:
                 v = params[k]
-                if k in ("owner", "repo", "title", "body", "branch", "head", "base", "from") and not isinstance(v, str):
+                if k in ("owner", "repo", "title", "body", "branch", "head", "base", "from") and not isinstance(v, str) and not (k == "from" and v is None):
                     errors.append({"field": k, "reason": f"expected string, got {type(v).__name__}"})
-                if k == "issue_number" and (not isinstance(v, int) or v < 1):
+                if k == "issue_number" and (type(v) is not int or v < 1):
                     errors.append({"field": k, "reason": "expected positive integer"})
         owner = params.get("owner")
         if isinstance(owner, str) and not _OWNER_RE.fullmatch(owner):
@@ -185,7 +185,10 @@ class GitHubAdapter(ProviderAdapter):
         repo = params.get("repo")
         if isinstance(repo, str) and (not _REPO_RE.fullmatch(repo) or repo in (".", "..")):
             errors.append({"field": "repo", "reason": "not a valid GitHub repository name"})
-        if "labels" in params and not isinstance(params["labels"], list):
+        if "labels" in params and (
+            not isinstance(params["labels"], list)
+            or any(not isinstance(label, str) for label in params["labels"])
+        ):
             errors.append({"field": "labels", "reason": "expected list of strings"})
         if "draft" in params and not isinstance(params["draft"], bool):
             errors.append({"field": "draft", "reason": "expected bool"})
