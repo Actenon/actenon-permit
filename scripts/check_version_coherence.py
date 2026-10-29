@@ -39,9 +39,7 @@ relevant assertion is skipped with a printed note.
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, date, datetime, timedelta
 import json
-from pathlib import Path
 import re
 import subprocess
 import sys
@@ -49,6 +47,8 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
 

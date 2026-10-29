@@ -1,6 +1,7 @@
 """Experimental OpenAPI / HTTP Dynamic Capability Adapter with Witness Reconciliation.
 
-NOTE: This adapter is **experimental** (``EXPERIMENTAL = True``) and is excluded
+NOTE: This adapter is **experimental** (``EXPERIMENTAL = True``) and is disabled
+by default in production (``experimental_opt_in: bool = False``). It is excluded
 from the first supported production profile (where ``GitHubAdapter`` is the
 supported production adapter). It implements HTTP/OpenAPI capability execution
 with post-action read-only ``GET`` witness reconciliation; it is **not** an MCP
@@ -21,32 +22,37 @@ Key properties:
    directly to the outbound TCP connection to prevent DNS rebinding TOCTOU,
    bounds response reads to ``MAX_RESPONSE_BYTES``, and blocks cross-origin
    redirects.
-3. **Post-Action Read-Only Witness Reconciliation:** Executes an independent
-   read-only ``GET`` witness probe after consequential mutations, validating
-   ``provider_action_id`` path safety, binding request parameters and response
-   identifiers to the witness payload, and raising
-   ``ReconciliationConflictError(retryable=False)`` on any mismatch or witness
-   failure while recording the action/idempotency key as uncertain so duplicate
-   retries cannot re-dispatch the mutation.
+3. **In-Flight Reservation, Crash/Restart Protection & Witness Reconciliation:**
+   Reserves ``IN_FLIGHT`` state before network dispatch so concurrent callers
+   using the same ``idempotency_key`` (or identical mutating parameters) cannot
+   dispatch duplicate operations before the first completes. Supports durable
+   SQLite persistence (``durable_state_path``) across adapter instances and
+   process restarts (mandatory when ``production_mode=True`` or
+   ``ACTENON_ENV=production``). Any mid-flight crash, response loss, or witness
+   mismatch transitions the operation to ``OUTCOME_UNKNOWN`` and fails closed on
+   retry with ``ReconciliationConflictError(retryable=False)``.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+import hashlib
 import http.client
 import ipaddress
 import json
 import os
 import re
 import socket
+import sqlite3
 import ssl
 import threading
-from typing import Any
 import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 from ..credentials import Credential
 from . import (
@@ -65,6 +71,7 @@ _SAFE_PATH_PARAM_RE = re.compile(r"^[A-Za-z0-9._:@-]+$")
 _TEMPLATE_PARAM_RE = re.compile(r"\{([A-Za-z0-9_]+)\}")
 MAX_RESPONSE_BYTES = 1_048_576  # 1 MiB hard cap on provider HTTP responses
 _UNSUPPORTED_SCHEMA_KEYWORDS = ("$ref", "oneOf", "anyOf", "allOf", "not")
+_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 class SSRFBlockedError(AdapterError):
@@ -400,8 +407,10 @@ def _parse_field_schema(
 class OpenAPIDynamicAdapter(ProviderAdapter):
     """Experimental OpenAPI / HTTP Dynamic Capability Adapter with Witness Reconciliation.
 
-    Excluded from the first supported production profile unless explicitly
-    opted in via ``experimental_opt_in=True``.
+    Disabled by default in production (``experimental_opt_in=False``). When opted
+    into production (``production_mode=True`` or ``ACTENON_ENV=production``),
+    requires ``durable_state_path`` so in-flight reservations, uncertain outcomes,
+    and idempotency records survive process crashes and restarts.
     """
 
     EXPERIMENTAL = True
@@ -417,16 +426,27 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
         allow_same_origin_redirects: bool = False,
         auth_header: str = "Authorization",
         auth_scheme: str = "Bearer",
-        experimental_opt_in: bool = True,
+        experimental_opt_in: bool = False,
+        production_mode: bool = False,
         block_uncertain_retries: bool = True,
+        durable_state_path: str | Path | None = None,
+        require_durable_state: bool = False,
+        post_dispatch_hook: Callable[[], None] | None = None,
     ):
-        if (
-            os.environ.get("ACTENON_ENV", "").strip().lower() == "production"
-            and not experimental_opt_in
-        ):
+        is_prod = (
+            production_mode
+            or os.environ.get("ACTENON_ENV", "").strip().lower() == "production"
+        )
+        if is_prod and not experimental_opt_in:
             raise ValueError(
                 "OpenAPIDynamicAdapter is experimental and excluded from the supported "
                 "production profile; pass experimental_opt_in=True to explicitly opt in."
+            )
+        if (is_prod or require_durable_state) and durable_state_path is None:
+            raise ValueError(
+                "OpenAPIDynamicAdapter requires durable_state_path when production_mode=True "
+                "or require_durable_state=True; in-memory idempotency/uncertain caches do not "
+                "survive process restarts or span worker processes."
             )
         self.provider_id = provider_id
         self.base_url = base_url.rstrip("/")
@@ -438,14 +458,314 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
         self.auth_header = auth_header
         self.auth_scheme = auth_scheme
         self.experimental_opt_in = experimental_opt_in
+        self.production_mode = production_mode
         self.block_uncertain_retries = block_uncertain_retries
+        self.durable_state_path = Path(durable_state_path) if durable_state_path else None
+        self.require_durable_state = require_durable_state or is_prod
+        self.post_dispatch_hook = post_dispatch_hook
         self._operations: dict[str, OpenAPIOperationSpec] = {
             op.action: op for op in operations
         }
+        # Process-local, per-instance guards. These do NOT survive a process
+        # restart and are NOT shared between adapter instances or worker
+        # processes. Cross-instance / cross-restart single-dispatch requires
+        # ``durable_state_path`` (SQLite, BEGIN IMMEDIATE serialised).
         self._lock = threading.RLock()
         self._idem_cache: dict[str, tuple[int, ProviderResponse]] = {}
         self._uncertain_keys: dict[str, str] = {}
         self._uncertain_actions: dict[tuple[str, int], str] = {}
+        self._inflight_keys: dict[str, int] = {}
+        self._inflight_actions: set[tuple[str, int]] = set()
+        if self.durable_state_path is not None:
+            self._init_durable_db()
+
+    def _init_durable_db(self) -> None:
+        assert self.durable_state_path is not None
+        self.durable_state_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(str(self.durable_state_path), timeout=30.0) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS openapi_adapter_effects (
+                    scope_key TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    params_hash TEXT NOT NULL,
+                    response_json TEXT,
+                    error_reason TEXT
+                )
+                """
+            )
+            conn.commit()
+
+    def _durable_scope_keys(
+        self, action: str, params_hash: int, idempotency_key: str | None
+    ) -> tuple[str | None, str]:
+        idem_scope = (
+            f"idem:{self.provider_id}:{self.pinned_origin}:{idempotency_key}"
+            if idempotency_key is not None
+            else None
+        )
+        act_scope = f"act:{self.provider_id}:{self.pinned_origin}:{action}:{params_hash}"
+        return idem_scope, act_scope
+
+    def _reserve_or_check_execution(
+        self,
+        action: str,
+        params_hash: int,
+        idempotency_key: str | None,
+        *,
+        is_mutation: bool,
+    ) -> ProviderResponse | None:
+        """Atomically check uncertain/in-flight/idempotent state and reserve IN_FLIGHT before dispatch."""
+        track_action = self.block_uncertain_retries and is_mutation
+        with self._lock:
+            if self.durable_state_path is not None:
+                idem_scope, act_scope = self._durable_scope_keys(
+                    action, params_hash, idempotency_key
+                )
+                conn = sqlite3.connect(
+                    str(self.durable_state_path), timeout=30.0, isolation_level=None
+                )
+                try:
+                    conn.execute("BEGIN IMMEDIATE")
+                    if idem_scope is not None:
+                        row = conn.execute(
+                            "SELECT status, params_hash, response_json, error_reason "
+                            "FROM openapi_adapter_effects WHERE scope_key = ?",
+                            (idem_scope,),
+                        ).fetchone()
+                        if row is not None:
+                            status, stored_hash, resp_json, err_reason = row
+                            if status == "OUTCOME_UNKNOWN":
+                                conn.execute("ROLLBACK")
+                                raise ReconciliationConflictError(
+                                    f"idempotency key '{idempotency_key}' is locked in OUTCOME_UNKNOWN after prior uncertain execution ({err_reason}); refusing duplicate retry until reconciled",
+                                    retryable=False,
+                                    provider=self.provider_id,
+                                )
+                            if status == "IN_FLIGHT":
+                                conn.execute("ROLLBACK")
+                                raise ReconciliationConflictError(
+                                    f"idempotency key '{idempotency_key}' is locked in IN_FLIGHT/OUTCOME_UNKNOWN (concurrent execution or prior process crash before reconciliation); refusing duplicate dispatch",
+                                    retryable=False,
+                                    provider=self.provider_id,
+                                )
+                            if status == "COMPLETED":
+                                conn.execute("ROLLBACK")
+                                if int(stored_hash) != params_hash:
+                                    raise InvalidParametersError(
+                                        [
+                                            {
+                                                "field": "*",
+                                                "reason": f"idempotency key '{idempotency_key}' was already used with different params",
+                                            }
+                                        ],
+                                        provider=self.provider_id,
+                                    )
+                                data = json.loads(resp_json or "{}")
+                                return ProviderResponse(
+                                    ok=bool(data.get("ok", True)),
+                                    action=str(data.get("action", action)),
+                                    provider_action_id=data.get("provider_action_id"),
+                                    provider_evidence=dict(data.get("provider_evidence", {})),
+                                    cost=data.get("cost"),
+                                    raw=None,
+                                )
+                    if track_action:
+                        row = conn.execute(
+                            "SELECT status, error_reason FROM openapi_adapter_effects WHERE scope_key = ?",
+                            (act_scope,),
+                        ).fetchone()
+                        if row is not None:
+                            status, err_reason = row
+                            if status in ("OUTCOME_UNKNOWN", "IN_FLIGHT"):
+                                conn.execute("ROLLBACK")
+                                raise ReconciliationConflictError(
+                                    f"action '{action}' with identical parameters is locked in {status} ({err_reason or 'concurrent or un-reconciled prior dispatch'}); refusing duplicate retry until reconciled",
+                                    retryable=False,
+                                    provider=self.provider_id,
+                                )
+
+                    if idem_scope is not None:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO openapi_adapter_effects "
+                            "(scope_key, status, params_hash, response_json, error_reason) "
+                            "VALUES (?, 'IN_FLIGHT', ?, NULL, 'dispatch in flight')",
+                            (idem_scope, str(params_hash)),
+                        )
+                    if track_action:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO openapi_adapter_effects "
+                            "(scope_key, status, params_hash, response_json, error_reason) "
+                            "VALUES (?, 'IN_FLIGHT', ?, NULL, 'dispatch in flight')",
+                            (act_scope, str(params_hash)),
+                        )
+                    conn.execute("COMMIT")
+                finally:
+                    conn.close()
+                # Durable mode: SQLite is the single source of truth.
+                return None
+
+            if idempotency_key is not None and idempotency_key in self._uncertain_keys:
+                prior_reason = self._uncertain_keys[idempotency_key]
+                raise ReconciliationConflictError(
+                    f"idempotency key '{idempotency_key}' is locked in OUTCOME_UNKNOWN after prior uncertain execution ({prior_reason}); refusing duplicate retry until reconciled",
+                    retryable=False,
+                    provider=self.provider_id,
+                )
+            if track_action and (action, params_hash) in self._uncertain_actions:
+                prior_reason = self._uncertain_actions[(action, params_hash)]
+                raise ReconciliationConflictError(
+                    f"action '{action}' with identical parameters is locked in OUTCOME_UNKNOWN ({prior_reason}); refusing duplicate retry until reconciled",
+                    retryable=False,
+                    provider=self.provider_id,
+                )
+            if idempotency_key is not None and idempotency_key in self._inflight_keys:
+                raise ReconciliationConflictError(
+                    f"idempotency key '{idempotency_key}' is currently in-flight; refusing concurrent duplicate dispatch because single-execution cannot be guaranteed while prior dispatch is unresolved",
+                    retryable=False,
+                    provider=self.provider_id,
+                )
+            if track_action and (action, params_hash) in self._inflight_actions:
+                raise ReconciliationConflictError(
+                    f"action '{action}' with identical parameters is currently in-flight; refusing concurrent duplicate dispatch",
+                    retryable=False,
+                    provider=self.provider_id,
+                )
+            if idempotency_key is not None:
+                cached = self._idem_cache.get(idempotency_key)
+                if cached is not None:
+                    cached_hash, cached_resp = cached
+                    if cached_hash != params_hash:
+                        raise InvalidParametersError(
+                            [
+                                {
+                                    "field": "*",
+                                    "reason": f"idempotency key '{idempotency_key}' was already used with different params",
+                                }
+                            ],
+                            provider=self.provider_id,
+                        )
+                    return cached_resp
+
+            if idempotency_key is not None:
+                self._inflight_keys[idempotency_key] = params_hash
+            if track_action:
+                self._inflight_actions.add((action, params_hash))
+            return None
+
+    def _release_pre_dispatch_reservation(
+        self,
+        action: str,
+        params_hash: int,
+        idempotency_key: str | None,
+        *,
+        is_mutation: bool,
+    ) -> None:
+        track_action = self.block_uncertain_retries and is_mutation
+        with self._lock:
+            if idempotency_key is not None:
+                self._inflight_keys.pop(idempotency_key, None)
+            if track_action:
+                self._inflight_actions.discard((action, params_hash))
+            if self.durable_state_path is not None:
+                idem_scope, act_scope = self._durable_scope_keys(
+                    action, params_hash, idempotency_key
+                )
+                with sqlite3.connect(str(self.durable_state_path), timeout=30.0) as conn:
+                    if idem_scope is not None:
+                        conn.execute(
+                            "DELETE FROM openapi_adapter_effects WHERE scope_key = ? AND status = 'IN_FLIGHT'",
+                            (idem_scope,),
+                        )
+                    if track_action:
+                        conn.execute(
+                            "DELETE FROM openapi_adapter_effects WHERE scope_key = ? AND status = 'IN_FLIGHT'",
+                            (act_scope,),
+                        )
+                    conn.commit()
+
+    def _record_uncertain_outcome(
+        self,
+        action: str,
+        params_hash: int,
+        idempotency_key: str | None,
+        reason: str,
+        *,
+        is_mutation: bool,
+    ) -> None:
+        track_action = self.block_uncertain_retries and is_mutation
+        with self._lock:
+            if idempotency_key is not None:
+                self._inflight_keys.pop(idempotency_key, None)
+                self._uncertain_keys[idempotency_key] = reason
+            if track_action:
+                self._inflight_actions.discard((action, params_hash))
+                self._uncertain_actions[(action, params_hash)] = reason
+            if self.durable_state_path is not None:
+                idem_scope, act_scope = self._durable_scope_keys(
+                    action, params_hash, idempotency_key
+                )
+                with sqlite3.connect(str(self.durable_state_path), timeout=30.0) as conn:
+                    if idem_scope is not None:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO openapi_adapter_effects "
+                            "(scope_key, status, params_hash, response_json, error_reason) "
+                            "VALUES (?, 'OUTCOME_UNKNOWN', ?, NULL, ?)",
+                            (idem_scope, str(params_hash), reason),
+                        )
+                    if track_action:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO openapi_adapter_effects "
+                            "(scope_key, status, params_hash, response_json, error_reason) "
+                            "VALUES (?, 'OUTCOME_UNKNOWN', ?, NULL, ?)",
+                            (act_scope, str(params_hash), reason),
+                        )
+                    conn.commit()
+
+    def _record_completed_outcome(
+        self,
+        action: str,
+        params_hash: int,
+        idempotency_key: str | None,
+        response: ProviderResponse,
+        *,
+        is_mutation: bool,
+    ) -> None:
+        track_action = self.block_uncertain_retries and is_mutation
+        with self._lock:
+            if idempotency_key is not None:
+                self._inflight_keys.pop(idempotency_key, None)
+                self._idem_cache[idempotency_key] = (params_hash, response)
+            if track_action:
+                self._inflight_actions.discard((action, params_hash))
+            if self.durable_state_path is not None:
+                idem_scope, act_scope = self._durable_scope_keys(
+                    action, params_hash, idempotency_key
+                )
+                with sqlite3.connect(str(self.durable_state_path), timeout=30.0) as conn:
+                    if idem_scope is not None:
+                        serialized = json.dumps(
+                            {
+                                "ok": response.ok,
+                                "action": response.action,
+                                "provider_action_id": response.provider_action_id,
+                                "provider_evidence": response.provider_evidence,
+                                "cost": response.cost,
+                            },
+                            sort_keys=True,
+                        )
+                        conn.execute(
+                            "INSERT OR REPLACE INTO openapi_adapter_effects "
+                            "(scope_key, status, params_hash, response_json, error_reason) "
+                            "VALUES (?, 'COMPLETED', ?, ?, NULL)",
+                            (idem_scope, str(params_hash), serialized),
+                        )
+                    if track_action:
+                        conn.execute(
+                            "DELETE FROM openapi_adapter_effects WHERE scope_key = ? AND status = 'IN_FLIGHT'",
+                            (act_scope,),
+                        )
+                    conn.commit()
 
     @classmethod
     def from_openapi(
@@ -457,7 +777,10 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
         witness_map: dict[str, WitnessSpec] | None = None,
         test_mode: bool = False,
         allow_loopback_for_tests: bool = False,
-        experimental_opt_in: bool = True,
+        experimental_opt_in: bool = False,
+        production_mode: bool = False,
+        durable_state_path: str | Path | None = None,
+        require_durable_state: bool = False,
     ) -> OpenAPIDynamicAdapter:
         """Compile an OpenAPI 3.x specification dictionary into an ``OpenAPIDynamicAdapter``."""
         resolved_base = base_url
@@ -594,6 +917,9 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
             test_mode=test_mode,
             allow_loopback_for_tests=allow_loopback_for_tests,
             experimental_opt_in=experimental_opt_in,
+            production_mode=production_mode,
+            durable_state_path=durable_state_path,
+            require_durable_state=require_durable_state,
         )
 
     # ------------------------------------------------------------------
@@ -706,6 +1032,24 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
         idempotency_key: str | None = None,
         timeout_seconds: float | None = None,
     ) -> ProviderResponse:
+        is_prod = (
+            self.production_mode
+            or os.environ.get("ACTENON_ENV", "").strip().lower() == "production"
+        )
+        if is_prod and not self.experimental_opt_in:
+            raise UnsupportedActionError(
+                "OpenAPIDynamicAdapter is experimental and disabled by default in production; "
+                "pass experimental_opt_in=True to explicitly opt in.",
+                provider=self.provider_id,
+            )
+        if (is_prod or self.require_durable_state) and self.durable_state_path is None:
+            raise ReconciliationConflictError(
+                "OpenAPIDynamicAdapter requires durable_state_path in production/durable mode "
+                "because single-execution cannot be guaranteed across restarts with ephemeral state.",
+                retryable=False,
+                provider=self.provider_id,
+            )
+
         op = self._operations.get(action)
         if op is None:
             raise UnsupportedActionError(
@@ -713,48 +1057,50 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
                 provider=self.provider_id,
             )
 
-        params_hash = _hash_params(action, params)
-        with self._lock:
-            if idempotency_key is not None and idempotency_key in self._uncertain_keys:
-                prior_reason = self._uncertain_keys[idempotency_key]
-                raise ReconciliationConflictError(
-                    f"idempotency key '{idempotency_key}' is locked in OUTCOME_UNKNOWN after prior uncertain execution ({prior_reason}); refusing duplicate retry until reconciled",
-                    retryable=False,
-                    provider=self.provider_id,
-                )
-            if self.block_uncertain_retries and (action, params_hash) in self._uncertain_actions:
-                prior_reason = self._uncertain_actions[(action, params_hash)]
-                raise ReconciliationConflictError(
-                    f"action '{action}' with identical parameters is locked in OUTCOME_UNKNOWN ({prior_reason}); refusing duplicate retry until reconciled",
-                    retryable=False,
-                    provider=self.provider_id,
-                )
-            if idempotency_key is not None:
-                cached = self._idem_cache.get(idempotency_key)
-                if cached is not None:
-                    cached_hash, cached_resp = cached
-                    if cached_hash != params_hash:
-                        raise InvalidParametersError(
-                            [
-                                {
-                                    "field": "*",
-                                    "reason": f"idempotency key '{idempotency_key}' was already used with different params",
-                                }
-                            ],
-                            provider=self.provider_id,
-                        )
-                    return cached_resp
-
         vr = self.validate_params(action, params)
         if not vr.ok:
             raise InvalidParametersError(vr.errors, provider=self.provider_id)
 
+        is_mutation = op.method.upper() in _MUTATING_METHODS
+        params_hash = _hash_params(action, params)
+        cached_resp = self._reserve_or_check_execution(
+            action, params_hash, idempotency_key, is_mutation=is_mutation
+        )
+        if cached_resp is not None:
+            return cached_resp
+
         secret_value = credential.value
+        # Phase 1: primary dispatch. Only failures proven to occur before any
+        # request bytes left this process release the reservation. Everything
+        # else (including a redirect refusal, which happens AFTER the provider
+        # received the request) is OUTCOME_UNKNOWN and blocks retries.
         try:
             if self.test_mode:
                 raw = self._test_call(op, params)
             else:
-                raw = self._live_call(op, params, credential, idempotency_key, timeout_seconds)
+                raw, _ = self._live_call_tracked(
+                    op, params, credential, idempotency_key, timeout_seconds
+                )
+        except BaseException as exc:
+            if getattr(exc, "_actenon_not_dispatched", False):
+                self._release_pre_dispatch_reservation(
+                    action, params_hash, idempotency_key, is_mutation=is_mutation
+                )
+            else:
+                self._record_uncertain_outcome(
+                    action,
+                    params_hash,
+                    idempotency_key,
+                    f"{type(exc).__name__}: {exc}",
+                    is_mutation=is_mutation,
+                )
+            raise
+
+        # Phase 2: post-dispatch handling. The request was sent, so ANY failure
+        # here (crash, partial response, witness refusal/mismatch) is uncertain.
+        try:
+            if self.post_dispatch_hook is not None:
+                self.post_dispatch_hook()
 
             response = self.map_response(action, raw)
             response = self.reconcile(
@@ -763,18 +1109,19 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
             response = self.redact(
                 action, params, response, credential_value=secret_value
             )
-        except (ReconciliationConflictError, ProviderTimeoutError, ProviderPartialResponseError) as exc:
-            with self._lock:
-                if idempotency_key is not None:
-                    self._uncertain_keys[idempotency_key] = str(exc)
-                if self.block_uncertain_retries:
-                    self._uncertain_actions[(action, params_hash)] = str(exc)
+        except BaseException as exc:
+            self._record_uncertain_outcome(
+                action,
+                params_hash,
+                idempotency_key,
+                f"{type(exc).__name__}: {exc}",
+                is_mutation=is_mutation,
+            )
             raise
 
-        with self._lock:
-            if idempotency_key is not None:
-                self._idem_cache[idempotency_key] = (params_hash, response)
-
+        self._record_completed_outcome(
+            action, params_hash, idempotency_key, response, is_mutation=is_mutation
+        )
         return response
 
     def map_response(self, action: str, raw: Any) -> ProviderResponse:
@@ -983,6 +1330,8 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
                 "ok": True,
                 "provider": self.provider_id,
                 "experimental": True,
+                "experimental_opt_in": self.experimental_opt_in,
+                "durable_state": self.durable_state_path is not None,
                 "detail": "test mode (no network)",
                 "pinned_origin": self.pinned_origin,
             }
@@ -997,6 +1346,8 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
                 "ok": True,
                 "provider": self.provider_id,
                 "experimental": True,
+                "experimental_opt_in": self.experimental_opt_in,
+                "durable_state": self.durable_state_path is not None,
                 "detail": "origin and SSRF policy verified",
                 "pinned_origin": self.pinned_origin,
             }
@@ -1005,6 +1356,8 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
                 "ok": False,
                 "provider": self.provider_id,
                 "experimental": True,
+                "experimental_opt_in": self.experimental_opt_in,
+                "durable_state": self.durable_state_path is not None,
                 "detail": f"unhealthy: {type(exc).__name__}",
                 "pinned_origin": self.pinned_origin,
             }
@@ -1013,14 +1366,14 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
     # Internal HTTP & test helpers
     # ------------------------------------------------------------------
 
-    def _live_call(
+    def _live_call_tracked(
         self,
         op: OpenAPIOperationSpec,
         params: dict[str, Any],
         credential: Credential,
         idempotency_key: str | None,
         timeout_seconds: float | None,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], bool]:
         path_vars = {k: str(params[k]) for k in op.path_params if k in params}
         path = op.path_template.format(**path_vars)
         non_path_params = {k: v for k, v in params.items() if k not in op.path_params}
@@ -1033,10 +1386,10 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
         else:
             body = (
                 non_path_params
-                if method_upper in ("POST", "PUT", "PATCH", "DELETE") and non_path_params
+                if method_upper in _MUTATING_METHODS and non_path_params
                 else None
             )
-        status, payload = self._http_request(
+        status, payload, dispatch_started = self._http_request_tracked(
             method=method_upper,
             path=path,
             body=body,
@@ -1050,6 +1403,19 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
                 retryable=500 <= status < 600,
                 provider=self.provider_id,
             )
+        return payload, dispatch_started
+
+    def _live_call(
+        self,
+        op: OpenAPIOperationSpec,
+        params: dict[str, Any],
+        credential: Credential,
+        idempotency_key: str | None,
+        timeout_seconds: float | None,
+    ) -> dict[str, Any]:
+        payload, _ = self._live_call_tracked(
+            op, params, credential, idempotency_key, timeout_seconds
+        )
         return payload
 
     def _http_request(
@@ -1062,22 +1428,50 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
         idempotency_key: str | None,
         timeout_seconds: float | None,
     ) -> tuple[int, dict[str, Any]]:
+        status, payload, _ = self._http_request_tracked(
+            method=method,
+            path=path,
+            body=body,
+            credential_value=credential_value,
+            idempotency_key=idempotency_key,
+            timeout_seconds=timeout_seconds,
+        )
+        return status, payload
+
+    def _http_request_tracked(
+        self,
+        *,
+        method: str,
+        path: str,
+        body: dict[str, Any] | None,
+        credential_value: str | None,
+        idempotency_key: str | None,
+        timeout_seconds: float | None,
+    ) -> tuple[int, dict[str, Any], bool]:
         rel_path = path if path.startswith("/") else "/" + path
         url = self.base_url + rel_path
         scheme, host, _port = self._pinned_origin
-        if credential_value and scheme != "https":
-            if not (self.allow_loopback_for_tests and _is_loopback_host(host)):
+        try:
+            if (
+                credential_value
+                and scheme != "https"
+                and not (self.allow_loopback_for_tests and _is_loopback_host(host))
+            ):
                 raise SSRFBlockedError(
                     f"cleartext HTTP is forbidden for authenticated requests to {self.pinned_origin}; use https://",
                     provider=self.provider_id,
                 )
 
-        resolved_ip = _validate_target_ssrf(
-            url,
-            pinned_origin=self._pinned_origin,
-            allow_loopback_for_tests=self.allow_loopback_for_tests,
-            provider=self.provider_id,
-        )
+            resolved_ip = _validate_target_ssrf(
+                url,
+                pinned_origin=self._pinned_origin,
+                allow_loopback_for_tests=self.allow_loopback_for_tests,
+                provider=self.provider_id,
+            )
+        except AdapterError as exc:
+            # Refused before any connection was opened: provably not dispatched.
+            exc._actenon_not_dispatched = True  # type: ignore[attr-defined]
+            raise
 
         headers: dict[str, str] = {
             "Accept": "application/json",
@@ -1119,7 +1513,11 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
                     )
                 decoded = raw_bytes.decode("utf-8")
                 parsed = json.loads(decoded) if decoded else {}
-                return resp.status, parsed if isinstance(parsed, dict) else {"result": parsed}
+                return (
+                    resp.status,
+                    parsed if isinstance(parsed, dict) else {"result": parsed},
+                    True,
+                )
         except OriginRedirectError:
             raise
         except SSRFBlockedError:
@@ -1145,11 +1543,15 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
                     action=method.upper(),
                     timeout_seconds=timeout_seconds or 30.0,
                 ) from exc
-            raise AdapterError(
+            err = AdapterError(
                 f"{self.provider_id} api unreachable: {type(exc.reason).__name__}",
                 retryable=True,
                 provider=self.provider_id,
-            ) from exc
+            )
+            if isinstance(exc.reason, ConnectionRefusedError):
+                # TCP connect refused: no request bytes were sent.
+                err._actenon_not_dispatched = True  # type: ignore[attr-defined]
+            raise err from exc
 
     def _test_call(self, op: OpenAPIOperationSpec, params: dict[str, Any]) -> dict[str, Any]:
         seed = _hash_params(op.action, params)
@@ -1166,8 +1568,6 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
 
 
 def _hash_params(action: str, params: dict[str, Any]) -> int:
-    import hashlib
-
     canonical = json.dumps({"action": action, "params": params}, sort_keys=True, default=str)
     return int.from_bytes(hashlib.sha256(canonical.encode("utf-8")).digest()[:8], "big")
 

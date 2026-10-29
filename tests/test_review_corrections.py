@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 import pytest
@@ -20,7 +20,6 @@ from actenon_permit import (
     EnvironmentSecretProvider,
     Gateway,
     GuardRegistry,
-    InvalidParametersError,
     Ledger,
     ReconciliationConflictError,
     SQLiteStore,
