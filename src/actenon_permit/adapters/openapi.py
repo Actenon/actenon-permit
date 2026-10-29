@@ -31,6 +31,15 @@ Key properties:
    ``ACTENON_ENV=production``). Any mid-flight crash, response loss, or witness
    mismatch transitions the operation to ``OUTCOME_UNKNOWN`` and fails closed on
    retry with ``ReconciliationConflictError(retryable=False)``.
+
+Limits (tests/test_openapi_adversarial.py): this is at-most-one dispatch per
+effect identity on ONE host, not exactly-once delivery. The SQLite file is the
+only owner record: deleting it forfeits ownership and the next call
+re-dispatches. Without ``durable_state_path`` each process starts empty. There
+is no operator settlement API; an ``IN_FLIGHT`` or ``OUTCOME_UNKNOWN`` effect
+stays held until its row is resolved out of band. Calls without an
+idempotency key are identified only while in flight or uncertain, so a
+completed call with identical parameters can be repeated deliberately.
 """
 
 from __future__ import annotations
@@ -44,6 +53,7 @@ import re
 import socket
 import sqlite3
 import ssl
+import string
 import threading
 import urllib.error
 import urllib.parse
@@ -1198,6 +1208,23 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
             interp_vars[witness.id_param_from_response] = response.provider_action_id
             interp_vars.setdefault("id", response.provider_action_id)
 
+        # Request parameters are agent-supplied. Interpolated unchecked, a value
+        # such as "../../other" or "x?status=ok" would point the witness at an
+        # unrelated resource that can falsely confirm the effect.
+        for _, field_name, _, _ in string.Formatter().parse(witness.path_template):
+            if not field_name:
+                continue
+            value = interp_vars.get(re.split(r"[.\[]", field_name, maxsplit=1)[0])
+            if value is not None and (
+                not _SAFE_PATH_PARAM_RE.fullmatch(value) or value in (".", "..")
+            ):
+                raise ReconciliationConflictError(
+                    f"witness path variable '{field_name}' is not a safe path segment; "
+                    "refusing to read an unbound resource — holding action for reconciliation without retry",
+                    retryable=False,
+                    provider=self.provider_id,
+                )
+
         try:
             witness_path = witness.path_template.format(**interp_vars)
         except KeyError as exc:
@@ -1493,6 +1520,10 @@ class OpenAPIDynamicAdapter(ProviderAdapter):
 
         req = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
         opener = urllib.request.build_opener(
+            # Never honour ambient HTTP(S)_PROXY: with the connection pinned to
+            # the validated IP, a proxy would only change the port it dials and
+            # could deliver the credential to an unrelated listener.
+            urllib.request.ProxyHandler({}),
             _PinnedIPHTTPHandler(resolved_ip=resolved_ip),
             _PinnedIPHTTPSHandler(resolved_ip=resolved_ip),
             _OriginPinnedRedirectHandler(
