@@ -95,7 +95,14 @@ class GatewayClient:
         return body
 
     def get_grant(self) -> dict[str, Any]:
-        # Decode the token to find the grant_id, then fetch live state.
+        """Live grant state when the operator token is available.
+
+        The control plane (/grants/...) is admin-only by design: an agent
+        holding only its grant token can never read live state. In agent
+        mode this returns just the decoded grant id and NO status or budget;
+        callers must treat a missing status as unknown, never as active.
+        With an operator token it fetches the live state from the gateway.
+        """
         from actenon_permit.token import token_to_grant  # type: ignore[import-not-found]
 
         # The token is verified by the gateway, not the agent. We decode
@@ -105,7 +112,16 @@ class GatewayClient:
             grant_id = g.id
         except Exception:
             return {}
-        return {"id": grant_id}
+        if not self.admin_token:
+            return {"id": grant_id}
+        status, body = _http(
+            "GET",
+            f"{self.base_url}/grants/{grant_id}",
+            headers={"Authorization": f"Bearer {self.admin_token}"},
+        )
+        if status != 200 or not isinstance(body, dict):
+            return {"id": grant_id}
+        return body
 
     def revoke_grant(self, grant_id: str) -> int:
         """The operator's kill switch (needs the admin token)."""
@@ -393,8 +409,12 @@ class LLMAgent:
                 print(f"  grant status: {grant.get('status', '?')}")
                 print(f"  available tools: {[t['name'] for t in tools]}")
 
-            if grant.get("status") != "active":
-                print(f"  grant is {grant.get('status')} — stopping.")
+            # Agent mode has no live state (by design), so a missing status
+            # means unknown, not inactive. The gateway enforces the grant at
+            # every call; this local view is only an early-stop optimisation.
+            status = grant.get("status")
+            if status is not None and status != "active":
+                print(f"  grant is {status} — stopping.")
                 break
 
             try:
