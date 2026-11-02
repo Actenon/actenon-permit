@@ -214,6 +214,89 @@ def test_real_agent_budget_actually_decreases(gateway_url):
     assert "budget" in r3["reason"]
 
 
+def test_get_grant_views(gateway_url, monkeypatch):
+    """get_grant is truthful in both modes, without any LLM dependency.
+
+    Agent mode (no admin token): the control plane is admin-only by design,
+    so the client reports the decoded grant id and never fabricates a status
+    or budget. Operator mode: live state comes from the admin endpoint.
+    """
+    import agents.runner as runner_module
+    from agents.runner import GatewayClient, LLMAgent
+
+    token, grant_id = _issue_grant(gateway_url["store"])
+
+    agent_client = GatewayClient(gateway_url["url"], token)
+    agent_view = agent_client.get_grant()
+    assert agent_view.get("id") == grant_id
+    assert "status" not in agent_view, "agent mode must not fabricate live state"
+    assert "budget" not in agent_view, "agent mode must not fabricate live state"
+
+    operator_client = GatewayClient(gateway_url["url"], token, admin_token=ADMIN_TOKEN)
+    operator_view = operator_client.get_grant()
+    assert operator_view["id"] == grant_id
+    assert operator_view["status"] == "active"
+    assert float(operator_view["budget"]["remaining"]) == 50.0
+
+    # A wrong admin token is refused by the control plane; the client must
+    # fall back to the id-only view rather than leak or fabricate state.
+    bad_client = GatewayClient(gateway_url["url"], token, admin_token="not-the-token")
+    bad_view = bad_client.get_grant()
+    assert bad_view.get("id") == grant_id
+    assert "status" not in bad_view
+
+    # LLMAgent with an unknown (missing) status still attempts its calls:
+    # the gateway is the enforcer; the local view is advisory only. The LLM
+    # is replaced by a deterministic planner so this test needs no model.
+    class _PlanningClient:
+        def __init__(self, inner):
+            self._inner = inner
+            self.calls = []
+
+        def list_tools(self):
+            return self._inner.list_tools()
+
+        def get_grant(self):
+            return {"id": grant_id}  # agent mode: no status
+
+        def call_tool(self, tool, args):
+            self.calls.append((tool, args))
+            return {"outcome": "ALLOW", "reason": "test", "remaining_budget": 40.0}
+
+    monkeypatch.setattr(
+        runner_module, "_llm_decide",
+        lambda user_request, tools, grant: [{"tool": "refund", "args": {"amount": 10}}],
+    )
+    planning = _PlanningClient(agent_client)
+    agent = LLMAgent(planning, verbose=False)
+    agent.run("Refund $10 to a customer.", max_rounds=1)
+    assert planning.calls, "LLMAgent must not stop on an unknown grant status"
+
+
+def _zai_cli_ready() -> bool:
+    """True if the z-ai CLI is present AND can actually complete a chat call.
+
+    A CLI binary on PATH without working credentials must SKIP this test,
+    not fail it: the live-model dependency is an external resource, and a
+    blocked external resource is recorded as skipped, never as a regression.
+    """
+    import shutil
+    import subprocess
+
+    if not shutil.which("z-ai"):
+        return False
+    try:
+        probe = subprocess.run(
+            ["z-ai", "chat", "--prompt", "Reply with the single word: pong"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return probe.returncode == 0
+
+
 @pytest.mark.skipif(
     os.environ.get("SKIP_LLM_TESTS") == "1",
     reason="SKIP_LLM_TESTS=1 set",
@@ -221,18 +304,19 @@ def test_real_agent_budget_actually_decreases(gateway_url):
 def test_real_llm_agent_through_gateway(gateway_url):
     """The LLMAgent uses the z-ai CLI to plan and execute tool calls.
 
-    Skipped if the z-ai CLI is not on PATH or SKIP_LLM_TESTS=1.
+    Skipped if the z-ai CLI is not on PATH, cannot reach its model, or
+    SKIP_LLM_TESTS=1.
     """
-    import shutil
-
-    if not shutil.which("z-ai"):
-        pytest.skip("z-ai CLI not on PATH")
+    if not _zai_cli_ready():
+        pytest.skip("z-ai CLI not on PATH or cannot reach its model")
     from agents.runner import GatewayClient, LLMAgent
 
     token, _ = _issue_grant(gateway_url["store"])
-    client = GatewayClient(gateway_url["url"], token)
+    # Operator mode: live grant state comes from the admin control plane.
+    # An agent holding only the grant token gets no live state by design.
+    client = GatewayClient(gateway_url["url"], token, admin_token=ADMIN_TOKEN)
 
-    # Verify the agent can fetch grant state.
+    # Verify the operator can fetch live grant state.
     grant = client.get_grant()
     assert grant["status"] == "active"
     assert float(grant["budget"]["remaining"]) == 50.0
