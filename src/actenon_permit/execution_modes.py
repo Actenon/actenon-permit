@@ -243,7 +243,7 @@ class BrokeredExecutionCoordinator:
         # Adapter errors that are retryable (timeout, partial, network)
         # are outcome_unknown. Non-retryable adapter errors (HTTP 4xx
         # that aren't 408/429) are failed.
-        if e.retryable:
+        if e.retryable or rule.endswith(":outcome_unknown"):
             return BrokeredExecutionState.OUTCOME_UNKNOWN
         if rule == "broker:adapter_crash":
             # Unexpected crash; we don't know if the provider call

@@ -1,3 +1,3 @@
 # Coordinated source candidate testing only. Remove before registry release.
-actenon-kernel @ git+https://github.com/Actenon/actenon-kernel.git@1491379c40e95b8d64e7332b1be9c98c4b1ee8a8
-actenon-protocol @ git+https://github.com/Actenon/actenon-protocol.git@d79af481be6badc99b13e15118026b96883fa171
+actenon-kernel @ git+https://github.com/Actenon/actenon-kernel.git@7a1ad40581ce0f984f5b1cc4292f26d350cab311
+actenon-protocol @ git+https://github.com/Actenon/actenon-protocol.git@a2e0e08fcd24b71eb1668204ba6bed00e4c63551

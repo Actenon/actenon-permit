@@ -41,7 +41,10 @@ from .adapters import (
     AdapterError,
     InvalidParametersError,
     ProviderAdapter,
+    ProviderPartialResponseError,
     ProviderResponse,
+    ProviderTimeoutError,
+    ReconciliationConflictError,
     UnsupportedActionError,
 )
 from .credentials import (
@@ -225,6 +228,21 @@ class Broker:
                 rule="broker:action_not_supported",
             )
 
+        # 2b. Production-mode guard against experimental adapters unless explicitly opted in.
+        is_prod_env = (
+            self.production_mode
+            or os.environ.get("ACTENON_ENV", "").strip().lower() == "production"
+        )
+        if is_prod_env and getattr(adapter, "EXPERIMENTAL", False) and not getattr(
+            adapter, "experimental_opt_in", False
+        ):
+            raise BrokerExecutionError(
+                f"adapter '{adapter.provider_id}' is experimental and disabled by default in production mode; "
+                "pass experimental_opt_in=True to explicitly opt in",
+                retryable=False,
+                rule="broker:experimental_adapter_disabled",
+            )
+
         # 3. Resolve credential via the provider registry. This raises
         # CredentialResolutionError, which the gateway surfaces as a
         # DENY (never as a 500).
@@ -272,6 +290,16 @@ class Broker:
         except InvalidParametersError as e:
             raise BrokerExecutionError(
                 _scrub_text(str(e), secret_value), rule="broker:invalid_parameters"
+            ) from e
+        except (
+            ReconciliationConflictError,
+            ProviderTimeoutError,
+            ProviderPartialResponseError,
+        ) as e:
+            raise BrokerExecutionError(
+                _scrub_text(str(e), secret_value),
+                retryable=e.retryable,
+                rule=f"adapter:{adapter.provider_id}:outcome_unknown",
             ) from e
         except AdapterError as e:
             raise BrokerExecutionError(

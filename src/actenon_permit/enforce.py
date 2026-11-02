@@ -58,6 +58,13 @@ class AutoApproveGate:
         return True
 
 
+class DenyUnconfiguredApprovalGate:
+    """Fail-closed default approval gate when no human approval store is wired."""
+
+    def request(self, grant: Grant, action: Action, decision: Decision) -> bool:  # noqa: ARG002
+        return False
+
+
 class StdinApprovalGate:
     """Prompts on stdin for each approval. Used by the interactive demo.
 
@@ -136,7 +143,7 @@ class GuardRegistry:
         self.pdp = pdp
         self.broker = broker
         self._grant_id: str | None = None
-        self._gate: ApprovalGate = AutoApproveGate()
+        self._gate: ApprovalGate = DenyUnconfiguredApprovalGate()
         self._lock = threading.RLock()
 
     def set_grant(self, grant_id: str) -> None:
@@ -144,6 +151,8 @@ class GuardRegistry:
             self._grant_id = grant_id
 
     def set_approval_gate(self, gate: ApprovalGate) -> None:
+        if getattr(self.broker, "production_mode", False) and isinstance(gate, AutoApproveGate):
+            raise ValueError("AutoApproveGate is forbidden when broker.production_mode=True")
         with self._lock:
             self._gate = gate
 

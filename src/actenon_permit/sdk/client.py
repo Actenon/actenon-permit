@@ -110,9 +110,9 @@ class LocalActenonClient(ActenonClient):
         # Lazy imports to avoid circular dependency at package load time.
         from .. import (
             PDP,
-            AutoApproveGate,
             Broker,
             CredentialProviderRegistry,
+            DenyUnconfiguredApprovalGate,
             EphemeralIntentStore,
             Gateway,
             IntentManager,
@@ -162,7 +162,7 @@ class LocalActenonClient(ActenonClient):
             pdp=self._pdp,
             broker=self._broker,
             tools=self._tools,
-            approval_gate=AutoApproveGate(),
+            approval_gate=DenyUnconfiguredApprovalGate(),
             intent_manager=self._intent_manager,
         )
 
