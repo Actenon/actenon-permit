@@ -27,5 +27,5 @@ You will receive an acknowledgement within 72 hours.
 
 | Version | Supported |
 |---|---|
-| `2.0.x` (`2.0.0rc1`) | Yes |
+| `2.0.x` (`2.0.0`) | Yes |
 | `< 2.0` | No |
