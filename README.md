@@ -137,7 +137,7 @@ pip install actenon-permit              # Python SDK + unified CLI + Boundary Ki
 npm install @actenon/sdk                # TypeScript SDK v1.4.0 — discriminated result types, receipt verification, protocol parity with Python
 ```
 
-> **Release note:** these registry commands install the previous public release, not this source candidate. This branch consolidates Permit 2.0 with Protocol 1.5 and Kernel 1.3; those dependency versions are not yet all published. To test the candidate from this checkout, run `uv sync --locked --extra dev` so the frozen coordinated dependencies are used. Plain `pip install .` requires the candidate constraint file until those dependencies are published. See [consolidation evidence](docs/ECOSYSTEM_CONSOLIDATION.md).
+> **Release note:** these registry commands install the previous public release, not this source candidate. This branch consolidates Permit 2.0 with Protocol 1.6 and Kernel 1.3; those dependency versions are not yet all published. To test the candidate from this checkout, run `uv sync --locked --extra dev` so the frozen coordinated dependencies are used. Plain `pip install .` requires the candidate constraint file until those dependencies are published. See [consolidation evidence](docs/ECOSYSTEM_CONSOLIDATION.md).
 
 ## Hero quickstart (6 lines)
 
